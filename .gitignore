@@ -37,3 +37,6 @@ temp_*.jpg
 
 # Old root-level data files (migrated to Storage/)
 *.json
+
+instance_data_backup.tgz
+
