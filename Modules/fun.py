@@ -341,7 +341,7 @@ class FunCog(commands.Cog):
                 ephemeral=True,
             )
 
-    @app_commands.command(name="nuke", description="Send a gift... surprise! 🎁")
+    @app_commands.command(name="giftnuke", description="Send a gift... surprise! 🎁")
     @app_commands.describe(member="The target of your gift")
     async def nuke(self, interaction: discord.Interaction, member: discord.Member) -> None:
         if not await _check_fun_enabled(interaction):

@@ -47,6 +47,56 @@
         "required_role_ids": [],
         "remove_others": false,
         "logging": true
+      },
+      "1485124279266836661": {
+        "channel_id": 1485123471993208862,
+        "mode": "button",
+        "content": "Get your roles to be pinged for stuff",
+        "embed": {
+          "title": "Roles",
+          "description": "",
+          "color": 5793266
+        },
+        "mappings": [
+          {
+            "id": "map_5b681321",
+            "role_id": 1485123823803301888,
+            "label": "Toggle Role",
+            "emoji": null
+          }
+        ],
+        "max_roles": 0,
+        "required_role_ids": [],
+        "remove_others": false,
+        "logging": true
+      },
+      "1485317203761954889": {
+        "channel_id": 1485123471993208862,
+        "mode": "button",
+        "content": "Choose if you want to be pinged for bot updates of announcements.",
+        "embed": {
+          "title": "Get some roles",
+          "description": "RR",
+          "color": 5793266
+        },
+        "mappings": [
+          {
+            "id": "map_ba240d4f",
+            "role_id": 1485123823803301888,
+            "label": "Updates",
+            "emoji": null
+          },
+          {
+            "id": "map_8d413e78",
+            "role_id": 1485123655963775140,
+            "label": "Announcements",
+            "emoji": null
+          }
+        ],
+        "max_roles": 0,
+        "required_role_ids": [],
+        "remove_others": false,
+        "logging": true
       }
     }
   }

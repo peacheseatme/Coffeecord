@@ -79,7 +79,6 @@ class ModulesCommandCog(commands.GroupCog, group_name="modules", group_descripti
         return pages
 
     @app_commands.command(name="status", description="Show all modules and their current state.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def status(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
@@ -94,7 +93,6 @@ class ModulesCommandCog(commands.GroupCog, group_name="modules", group_descripti
             )
 
     @app_commands.command(name="toggle", description="Toggle a module on or off for this server.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.autocomplete(module=_module_autocomplete)
     async def toggle(self, interaction: discord.Interaction, module: str) -> None:
         if interaction.guild is None:
@@ -114,7 +112,6 @@ class ModulesCommandCog(commands.GroupCog, group_name="modules", group_descripti
         )
 
     @app_commands.command(name="enable", description="Enable a module for this server.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.autocomplete(module=_module_autocomplete)
     async def enable(self, interaction: discord.Interaction, module: str) -> None:
         if interaction.guild is None:
@@ -128,7 +125,6 @@ class ModulesCommandCog(commands.GroupCog, group_name="modules", group_descripti
         await interaction.response.send_message(f"Module `{module_id}` enabled.", ephemeral=True)
 
     @app_commands.command(name="disable", description="Disable a module for this server.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.autocomplete(module=_module_autocomplete)
     async def disable(self, interaction: discord.Interaction, module: str) -> None:
         if interaction.guild is None:
@@ -142,7 +138,6 @@ class ModulesCommandCog(commands.GroupCog, group_name="modules", group_descripti
         await interaction.response.send_message(f"Module `{module_id}` disabled.", ephemeral=True)
 
     @app_commands.command(name="info", description="Show details for a single module.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.autocomplete(module=_module_autocomplete)
     async def info(self, interaction: discord.Interaction, module: str) -> None:
         if interaction.guild is None:

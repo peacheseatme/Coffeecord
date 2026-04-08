@@ -30,7 +30,9 @@ c-cord stop       # Stop the bot
 c-cord restart    # Restart the bot
 c-cord status     # Check status and uptime
 c-cord logs       # Watch live output
-c-cord update     # Pull updates and restart
+c-cord update              # Latest GitHub release → restart
+c-cord update 1.0.3        # Specific release tag
+c-cord update --branch     # git pull main (development)
 ```
 
 ## Documentation

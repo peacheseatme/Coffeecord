@@ -67,7 +67,6 @@ def register_persistent_views(bot_instance):
 
 # ---------- /ticket_setup ----------
 @ticket_group.command(name="setup", description="Set up the ticket system")
-@discord.app_commands.checks.has_permissions(manage_guild=True)
 async def ticket_setup(
     interaction: Interaction,
     channel: discord.TextChannel,

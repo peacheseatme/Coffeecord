@@ -8,8 +8,18 @@ from typing import Any
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_DIR = BASE_DIR / "Storage" / "Config"
 MODULES_DIR = BASE_DIR / "Modules"
-REGISTRY_PATH = CONFIG_DIR / "modules.json"
-STATE_PATH = CONFIG_DIR / "module_states.json"
+
+
+def _registry_path() -> Path:
+    from . import bot_config
+
+    return bot_config.get_module_registry_path()
+
+
+def _state_path() -> Path:
+    from . import bot_config
+
+    return bot_config.get_module_state_path()
 
 # These files live in Modules/ but are not loadable cogs.
 _DISCOVERY_EXCLUDE: frozenset[str] = frozenset({"module_registry", "kofi_webhook"})
@@ -249,9 +259,9 @@ def _normalize_registry(raw: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
 
 async def load_module_registry() -> list[dict[str, Any]]:
     async with _REGISTRY_LOCK:
-        raw = await asyncio.to_thread(_read_json_sync, REGISTRY_PATH, REGISTRY_DEFAULT)
+        raw = await asyncio.to_thread(_read_json_sync, _registry_path(), REGISTRY_DEFAULT)
         normalized = _normalize_registry(raw)
-        await asyncio.to_thread(_write_json_sync, REGISTRY_PATH, normalized)
+        await asyncio.to_thread(_write_json_sync, _registry_path(), normalized)
         return list(normalized["modules"])
 
 
@@ -279,7 +289,7 @@ async def get_guild_module_states(guild_id: int) -> dict[str, bool]:
         for module_id, entry in module_map.items()
     }
     async with _STATE_LOCK:
-        raw = await asyncio.to_thread(_read_json_sync, STATE_PATH, {})
+        raw = await asyncio.to_thread(_read_json_sync, _state_path(), {})
         guild_key = str(guild_id)
         stored = raw.get(guild_key, {})
         if not isinstance(stored, dict):
@@ -289,7 +299,7 @@ async def get_guild_module_states(guild_id: int) -> dict[str, bool]:
             if module_id in merged:
                 merged[module_id] = bool(value)
         raw[guild_key] = merged
-        await asyncio.to_thread(_write_json_sync, STATE_PATH, raw)
+        await asyncio.to_thread(_write_json_sync, _state_path(), raw)
     return merged
 
 
@@ -369,7 +379,7 @@ def refresh_registry(dry_run: bool = False) -> tuple[int, int]:
     Returns:
         (added_count, total_count)
     """
-    existing_raw = _read_json_sync(REGISTRY_PATH, REGISTRY_DEFAULT)
+    existing_raw = _read_json_sync(_registry_path(), REGISTRY_DEFAULT)
     existing_list: list[dict[str, Any]] = existing_raw.get("modules", [])
     if not isinstance(existing_list, list):
         existing_list = []
@@ -390,7 +400,7 @@ def refresh_registry(dry_run: bool = False) -> tuple[int, int]:
     total = len(existing_map)
     if not dry_run:
         merged = [existing_map[k] for k in sorted(existing_map)]
-        _write_json_sync(REGISTRY_PATH, {"modules": merged})
+        _write_json_sync(_registry_path(), {"modules": merged})
     return added, total
 
 
@@ -402,11 +412,11 @@ async def set_module_enabled(guild_id: int, module_id: str, enabled: bool) -> No
     if module_id not in module_map:
         return
     async with _STATE_LOCK:
-        raw = await asyncio.to_thread(_read_json_sync, STATE_PATH, {})
+        raw = await asyncio.to_thread(_read_json_sync, _state_path(), {})
         guild_key = str(guild_id)
         stored = raw.get(guild_key, {})
         if not isinstance(stored, dict):
             stored = {}
         stored[module_id] = bool(enabled)
         raw[guild_key] = stored
-        await asyncio.to_thread(_write_json_sync, STATE_PATH, raw)
+        await asyncio.to_thread(_write_json_sync, _state_path(), raw)

@@ -440,7 +440,6 @@ theme_group = app_commands.Group(name="theme", description="Moderation message t
 
 
 @theme_group.command(name="list", description="List available themes (moderation DMs + command responses)")
-@app_commands.checks.has_permissions(manage_guild=True)
 async def theme_list(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
         return
@@ -491,7 +490,6 @@ def _theme_has_responses(name: str) -> bool:
 
 @theme_group.command(name="set", description="Set the server theme (moderation DMs + command responses)")
 @app_commands.describe(name="Theme name to apply")
-@app_commands.checks.has_permissions(manage_guild=True)
 async def theme_set(interaction: discord.Interaction, name: str) -> None:
     if not await _guild_only(interaction):
         return
@@ -527,7 +525,6 @@ async def theme_set(interaction: discord.Interaction, name: str) -> None:
 
 @theme_group.command(name="preview", description="Preview a theme's moderation messages")
 @app_commands.describe(name="Theme name to preview")
-@app_commands.checks.has_permissions(manage_guild=True)
 async def theme_preview(interaction: discord.Interaction, name: str) -> None:
     if not await _guild_only(interaction):
         return
@@ -558,7 +555,6 @@ async def theme_preview(interaction: discord.Interaction, name: str) -> None:
 
 
 @theme_group.command(name="info", description="Show current theme and settings")
-@app_commands.checks.has_permissions(manage_guild=True)
 async def theme_info(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
         return
@@ -584,7 +580,6 @@ async def theme_info(interaction: discord.Interaction) -> None:
 
 @theme_group.command(name="upload", description="Upload a custom theme (supporters only)")
 @app_commands.describe(file="JSON theme file (max 50KB)")
-@app_commands.checks.has_permissions(manage_guild=True)
 async def theme_upload(interaction: discord.Interaction, file: discord.Attachment) -> None:
     if not await _guild_only(interaction):
         return
@@ -648,7 +643,6 @@ async def theme_upload(interaction: discord.Interaction, file: discord.Attachmen
 
 @theme_group.command(name="delete", description="Delete a custom theme (supporters only)")
 @app_commands.describe(name="Custom theme name to delete")
-@app_commands.checks.has_permissions(manage_guild=True)
 async def theme_delete(interaction: discord.Interaction, name: str) -> None:
     if not await _guild_only(interaction):
         return
@@ -694,7 +688,6 @@ responses_group = app_commands.Group(name="responses", description="Customize co
 
 
 @responses_group.command(name="presets", description="List preset response themes (use /theme set to apply)")
-@app_commands.checks.has_permissions(manage_guild=True)
 async def responses_presets(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
         return
@@ -721,7 +714,6 @@ async def responses_presets(interaction: discord.Interaction) -> None:
 
 
 @responses_group.command(name="list", description="List configured command response overrides")
-@app_commands.checks.has_permissions(manage_guild=True)
 async def responses_list(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
         return
@@ -750,7 +742,6 @@ async def responses_list(interaction: discord.Interaction) -> None:
 
 @responses_group.command(name="upload", description="Upload command response overrides JSON (supporters only)")
 @app_commands.describe(file="JSON file with overrides (max 100KB)")
-@app_commands.checks.has_permissions(manage_guild=True)
 async def responses_upload(interaction: discord.Interaction, file: discord.Attachment) -> None:
     if not await _guild_only(interaction):
         return
@@ -812,7 +803,6 @@ def _collect_slash_commands(tree: discord.app_commands.CommandTree) -> list[str]
 
 
 @responses_group.command(name="discover", description="List all slash commands you can override")
-@app_commands.checks.has_permissions(manage_guild=True)
 async def responses_discover(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
         return
@@ -837,7 +827,6 @@ async def responses_discover(interaction: discord.Interaction) -> None:
 
 
 @responses_group.command(name="keys", description="List common response keys and override format")
-@app_commands.checks.has_permissions(manage_guild=True)
 async def responses_keys(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
         return
@@ -861,7 +850,6 @@ async def responses_keys(interaction: discord.Interaction) -> None:
 
 
 @responses_group.command(name="clear", description="Clear all command response overrides (supporters only)")
-@app_commands.checks.has_permissions(manage_guild=True)
 async def responses_clear(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
         return

@@ -412,7 +412,6 @@ class AutoRoleCog(
                 )
 
     @app_commands.command(name="status", description="Show current auto role configuration.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def autorole_status(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
@@ -430,7 +429,6 @@ class AutoRoleCog(
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="toggle", description="Enable or disable auto roles for this server.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def autorole_toggle(self, interaction: discord.Interaction, enabled: Optional[bool] = None) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
@@ -444,7 +442,6 @@ class AutoRoleCog(
         )
 
     @app_commands.command(name="add", description="Create an auto role rule with a simple interactive setup.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.describe(
         event="When this rule should run.",
         delay_seconds="Optional delay before assigning roles.",
@@ -498,7 +495,6 @@ class AutoRoleCog(
         )
 
     @app_commands.command(name="remove", description="Remove an auto role rule by ID.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def autorole_remove(self, interaction: discord.Interaction, rule_id: str) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
@@ -514,7 +510,6 @@ class AutoRoleCog(
         await interaction.response.send_message(f"Removed rule `{rule_id}`.", ephemeral=True)
 
     @app_commands.command(name="test", description="Simulate which auto role rules apply to you.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def autorole_test(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None or not isinstance(interaction.user, discord.Member):
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)

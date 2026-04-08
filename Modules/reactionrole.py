@@ -19,6 +19,38 @@ CONFIG_PATH = BASE_DIR / "Storage" / "Config" / "reactionrole_config.json"
 _CONFIG_LOCK = asyncio.Lock()
 LOGGER = logging.getLogger("coffeecord.reactionrole")
 
+# Discord UI limit for options on one panel.
+REACTION_ROLE_PANEL_MAX_ROLES = 25
+
+# Distinct default emojis for guided multi-role reaction panels (one per mapping).
+REACTION_PANEL_DEFAULT_EMOJIS: tuple[str, ...] = (
+    "✅",
+    "🔵",
+    "🟢",
+    "🟡",
+    "🟠",
+    "🔴",
+    "🟣",
+    "⚫",
+    "⚪",
+    "🟤",
+    "🔷",
+    "🔶",
+    "⬜",
+    "⬛",
+    "◾",
+    "◽",
+    "\u25aa",
+    "\u25ab",
+    "🔸",
+    "🔹",
+    "🔺",
+    "🔻",
+    "💠",
+    "🔘",
+    "⭐",
+)
+
 
 @dataclass
 class ToggleResult:
@@ -169,11 +201,11 @@ class RRMessageModal(discord.ui.Modal, title="Reaction Role Message Setup"):
             default=parent.embed_description or "",
         )
         self.action_text = discord.ui.TextInput(
-            label="Button label or reaction emoji",
-            required=True,
+            label="Label / emoji (required for exactly one role)",
+            required=False,
             max_length=80,
             default=parent.action_text or "",
-            placeholder="Example: Verify Me / ✅",
+            placeholder="One role: e.g. Verify Me or ✅. Several roles: optional (auto labels/emojis).",
         )
         self.add_item(self.message_content)
         self.add_item(self.embed_title)
@@ -216,11 +248,19 @@ class RRChannelSelect(discord.ui.ChannelSelect):
 class RRRoleSelect(discord.ui.RoleSelect):
     def __init__(self, parent: "ReactionRoleSetupView") -> None:
         self.parent_view = parent
-        super().__init__(placeholder="2) Select role to toggle", min_values=1, max_values=1)
+        super().__init__(
+            placeholder=f"2) Select role(s) to toggle (up to {REACTION_ROLE_PANEL_MAX_ROLES})",
+            min_values=1,
+            max_values=REACTION_ROLE_PANEL_MAX_ROLES,
+        )
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        self.parent_view.role = self.values[0] if self.values else None
-        await self.parent_view.refresh(interaction, "Role selected.")
+        self.parent_view.roles = list(self.values)
+        n = len(self.parent_view.roles)
+        await self.parent_view.refresh(
+            interaction,
+            f"{n} role(s) selected — members can claim multiple from this panel unless you set exclusive mode in `/reactionrole edit`.",
+        )
 
 
 class RRModeSelect(discord.ui.Select):
@@ -271,7 +311,7 @@ class ReactionRoleSetupView(discord.ui.View):
         self.cog = cog
         self.invoker_id = invoker_id
         self.channel: Optional[discord.TextChannel] = None
-        self.role: Optional[discord.Role] = None
+        self.roles: list[discord.Role] = []
         self.mode: str = default_mode if default_mode in {"button", "reaction"} else "button"
         self.logging_enabled: bool = default_logging
         self.content: str = ""
@@ -295,12 +335,26 @@ class ReactionRoleSetupView(discord.ui.View):
         embed = discord.Embed(title="Reaction Role Setup", color=discord.Color.blurple())
         embed.description = status
         embed.add_field(name="Channel", value=self.channel.mention if self.channel else "Not selected", inline=True)
-        embed.add_field(name="Role", value=self.role.mention if self.role else "Not selected", inline=True)
         embed.add_field(name="Style", value=self.mode, inline=True)
+        if not self.roles:
+            roles_value = "Not selected"
+        elif len(self.roles) <= 6:
+            roles_value = ", ".join(r.mention for r in self.roles)
+        else:
+            roles_value = (
+                f"**{len(self.roles)}** roles: "
+                + ", ".join(r.mention for r in self.roles[:6])
+                + " …"
+            )
+        embed.add_field(name="Roles", value=roles_value, inline=False)
         embed.add_field(name="Message content", value=(self.content[:200] or "None"), inline=False)
         embed.add_field(name="Embed title", value=self.embed_title or "None", inline=True)
         embed.add_field(name="Embed description", value=(self.embed_description[:200] or "None"), inline=False)
-        embed.add_field(name="Button label / emoji", value=self.action_text or "Not set", inline=True)
+        embed.add_field(
+            name="Button label / emoji",
+            value=self.action_text or ("(auto per role)" if len(self.roles) > 1 else "Not set"),
+            inline=True,
+        )
         return embed
 
     async def refresh(self, interaction: discord.Interaction, status: str) -> None:
@@ -313,19 +367,57 @@ class ReactionRoleSetupView(discord.ui.View):
         if self.channel is None:
             await interaction.response.send_message("Select a channel first.", ephemeral=True)
             return
-        if self.role is None:
-            await interaction.response.send_message("Select a role first.", ephemeral=True)
+        roles = list(self.roles)
+        if not roles:
+            await interaction.response.send_message("Select at least one role.", ephemeral=True)
             return
-        if not self.action_text:
-            await interaction.response.send_message("Set the button label or reaction emoji first.", ephemeral=True)
+        if len(roles) > REACTION_ROLE_PANEL_MAX_ROLES:
+            await interaction.response.send_message(
+                f"Select at most {REACTION_ROLE_PANEL_MAX_ROLES} roles per panel.",
+                ephemeral=True,
+            )
             return
 
-        mapping = {
-            "id": f"map_{uuid.uuid4().hex[:8]}",
-            "role_id": self.role.id,
-            "label": self.action_text if self.mode == "button" else "Toggle Role",
-            "emoji": self.action_text if self.mode == "reaction" else None,
-        }
+        action = (self.action_text or "").strip()
+        if len(roles) == 1:
+            if not action:
+                await interaction.response.send_message(
+                    "Set the button label or reaction emoji first (step 4).",
+                    ephemeral=True,
+                )
+                return
+            mappings = [
+                {
+                    "id": f"map_{uuid.uuid4().hex[:8]}",
+                    "role_id": roles[0].id,
+                    "label": action if self.mode == "button" else "Toggle Role",
+                    "emoji": action if self.mode == "reaction" else None,
+                }
+            ]
+        else:
+            if self.mode == "reaction" and len(roles) > len(REACTION_PANEL_DEFAULT_EMOJIS):
+                await interaction.response.send_message(
+                    f"Reaction mode supports up to {len(REACTION_PANEL_DEFAULT_EMOJIS)} roles in guided setup. "
+                    "Use fewer roles here or add more with `/reactionrole edit`.",
+                    ephemeral=True,
+                )
+                return
+            mappings = []
+            for i, role in enumerate(roles):
+                if self.mode == "button":
+                    label = (role.name or "Role")[:80]
+                    emoji = None
+                else:
+                    label = "Toggle Role"
+                    emoji = REACTION_PANEL_DEFAULT_EMOJIS[i]
+                mappings.append(
+                    {
+                        "id": f"map_{uuid.uuid4().hex[:8]}",
+                        "role_id": role.id,
+                        "label": label,
+                        "emoji": emoji,
+                    }
+                )
 
         embed_to_send = None
         if self.embed_title or self.embed_description:
@@ -346,7 +438,7 @@ class ReactionRoleSetupView(discord.ui.View):
                 "description": self.embed_description,
                 "color": 0x5865F2,
             },
-            "mappings": [mapping],
+            "mappings": mappings,
             "max_roles": 0,
             "required_role_ids": [],
             "remove_others": False,
@@ -359,17 +451,29 @@ class ReactionRoleSetupView(discord.ui.View):
             await panel_message.edit(view=view)
             self.cog.bot.add_view(view, message_id=panel_message.id)
         else:
-            try:
-                await panel_message.add_reaction(self.action_text)
-            except discord.HTTPException:
+            failed: list[str] = []
+            for m in mappings:
+                em = m.get("emoji")
+                if not em:
+                    continue
+                try:
+                    await panel_message.add_reaction(str(em))
+                except discord.HTTPException:
+                    failed.append(str(em))
+            if failed:
                 await interaction.response.send_message(
-                    "Created panel, but reaction emoji is invalid. Use `/reactionrole edit` to fix it.",
+                    f"Panel created, but some reactions could not be added: {', '.join(failed)}. "
+                    "Use `/reactionrole edit` to fix emojis.",
                     ephemeral=True,
                 )
                 return
 
+        summary = f"{len(mappings)} role option(s)"
         await interaction.response.edit_message(
-            content=f"✅ Reaction role panel created in {self.channel.mention} (`{panel_message.id}`).",
+            content=(
+                f"✅ Reaction role panel created in {self.channel.mention} (`{panel_message.id}`) — {summary}. "
+                "Members can pick multiple roles from this panel unless you set **remove_others** or **max_roles** in `/reactionrole edit`."
+            ),
             embed=None,
             view=None,
         )
@@ -622,8 +726,10 @@ class ReactionRoleCog(
     # Slash commands
     # -----------------------------------------------------------------------
 
-    @app_commands.command(name="create", description="Create a reaction role panel with guided setup.")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.command(
+        name="create",
+        description="Create a reaction role panel with guided setup (select multiple roles at once).",
+    )
     async def reactionrole_create(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
@@ -638,7 +744,6 @@ class ReactionRoleCog(
         await interaction.response.send_message(embed=view._preview_embed(), view=view, ephemeral=True)
 
     @app_commands.command(name="list", description="List reaction role panels in this server.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def reactionrole_list(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
@@ -661,7 +766,6 @@ class ReactionRoleCog(
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="delete", description="Delete a reaction role panel by message ID.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def reactionrole_delete(self, interaction: discord.Interaction, message_id: str) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
@@ -687,7 +791,6 @@ class ReactionRoleCog(
         await interaction.response.send_message(f"Deleted panel `{message_id}`.", ephemeral=True)
 
     @app_commands.command(name="config", description="Set defaults for reaction role panels in this server.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.describe(enabled="Enable or disable reaction roles globally for this guild.")
     @app_commands.choices(
         default_mode=[
@@ -720,7 +823,6 @@ class ReactionRoleCog(
         )
 
     @app_commands.command(name="edit", description="Edit mappings and advanced options for a panel.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.describe(
         message_id="Target panel message ID.",
         role="Role to add/update/remove in this panel.",

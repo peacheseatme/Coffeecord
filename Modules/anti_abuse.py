@@ -163,8 +163,7 @@ async def should_allow_interaction(interaction: discord.Interaction) -> bool:
     """
     if interaction.type is not discord.InteractionType.application_command:
         return True
-    if interaction.command is None:
-        return True
+    # During CommandTree.interaction_check, interaction.command may not be filled yet; still rate-limit.
     if interaction.user.bot:
         return False
 

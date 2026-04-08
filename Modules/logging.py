@@ -289,7 +289,6 @@ class LoggingCog(
         return embed
 
     @app_commands.command(name="status", description="Show logging status for this server.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def logging_status(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
@@ -298,7 +297,6 @@ class LoggingCog(
         await interaction.response.send_message(embed=self._build_status_embed(interaction.guild, cfg), ephemeral=True)
 
     @app_commands.command(name="setup", description="Set logging channel and enable logging.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.describe(channel="Channel where logs should be sent")
     async def logging_setup(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
         if interaction.guild is None:
@@ -314,7 +312,6 @@ class LoggingCog(
         )
 
     @app_commands.command(name="toggle", description="Enable or disable a specific logging event.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.describe(event="Event to toggle")
     @app_commands.choices(
         event=[
@@ -356,7 +353,6 @@ class LoggingCog(
         await interaction.response.send_message(f"`{event.value}` is now **{state}**.", ephemeral=True)
 
     @app_commands.command(name="module", description="Enable or disable a logging module.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.describe(module="Module to toggle", enabled="Whether this module should log")
     @app_commands.choices(
         module=[
@@ -395,7 +391,6 @@ class LoggingCog(
         )
 
     @app_commands.command(name="disable", description="Disable logging for this server.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def logging_disable(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)

@@ -19,8 +19,10 @@ The bot is controlled via `bot.sh` or the `c-cord` symlink.
 | `console` | Live console — tail bot log (commands, errors, etc.) |
 | `console -n N` | Last N lines, no follow |
 | `console clear` | Clear the bot log file |
-| `update` | git pull → pip install → restart |
-| `update -f` | Continue even if git pull fails |
+| `update` | Latest **GitHub release** tag → fetch/checkout → pip install → restart |
+| `update <version>` | Same, pinned to that release (e.g. `1.0.3` or `v1.0.3`) |
+| `update --branch` | `git pull` on current branch (for development on `main`) → pip → restart |
+| `update -f` | Continue even if resolve/fetch/checkout/pull fails |
 | `module refresh` | Scan Modules/, add new files to registry |
 | `module refresh_registry` | Alias for module refresh |
 | `module refresh --dry-run` | Preview additions without writing |
@@ -40,8 +42,19 @@ The bot is controlled via `bot.sh` or the `c-cord` symlink.
 | `max_rotated` | `5` | Max rotated log files to keep |
 | `ngrok_enabled` | `true` | Start ngrok with bot when Ko-fi is configured |
 | `kofi_webhook_host` | *(none)* | Your ngrok host (e.g. `xxx.ngrok-free.dev`) — used to display the Ko-fi webhook URL on start |
+| `github_repo` | *(from `git remote`)* | `owner/repo` for GitHub Releases API when `origin` is not github.com or you track upstream releases from another fork |
 
 Paths are relative to the project root unless absolute. The config is loaded automatically when present.
+
+### `c-cord update` (releases)
+
+Default update uses the [GitHub Releases API](https://docs.github.com/en/rest/releases/releases) on the repo inferred from `git remote get-url origin` (HTTPS or `git@github.com:...`), unless `github_repo` is set in `c-cord.json`. Requires a **git clone** (not a plain zip). The working tree must be clean unless you pass `-f`.
+
+After a release checkout the repo is in a **detached HEAD** state at the release tag — expected for production installs. To follow `main` again, use `c-cord update --branch` or `git checkout main && git pull`.
+
+Unauthenticated API calls are rate-limited (about 60/hour per IP). For private repositories or heavier use, set environment variable `GITHUB_TOKEN` (fine-grained or classic PAT with `Contents: Read`) when running `c-cord update`.
+
+If the latest release cannot be resolved (e.g. no published releases), the helper falls back to the newest **local** semver-looking tag after you run `git fetch --tags`; that may include tags that were never published as GitHub “releases.”
 
 ## ngrok (Ko-fi webhooks)
 

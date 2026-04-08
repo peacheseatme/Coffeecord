@@ -318,7 +318,6 @@ class WelcomeCog(
         enabled="Enable or disable welcome messages.",
         use_embed="Send as embed instead of plain text.",
     )
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def config(
         self,
         interaction: discord.Interaction,
@@ -345,7 +344,6 @@ class WelcomeCog(
         )
 
     @app_commands.command(name="test", description="Send a test welcome message.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def test(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
@@ -405,7 +403,6 @@ class LeaveCog(
         enable_exit_survey="Try DMing an optional survey when someone leaves.",
         exit_survey_log_channel="Channel where survey answers should be posted.",
     )
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def config(
         self,
         interaction: discord.Interaction,
@@ -445,7 +442,6 @@ class LeaveCog(
         )
 
     @app_commands.command(name="test", description="Send a test leave message.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def test(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)

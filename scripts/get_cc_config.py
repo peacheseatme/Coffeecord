@@ -47,6 +47,11 @@ def main() -> int:
     if "max_rotated" in d and isinstance(d["max_rotated"], (int, float)):
         print(f'MAX_ROTATED={int(d["max_rotated"])}')
 
+    gr = d.get("github_repo", "")
+    if isinstance(gr, str) and gr.strip():
+        safe_repo = gr.strip().replace("\\", "\\\\").replace('"', '\\"')
+        print(f'GITHUB_REPO="{safe_repo}"')
+
     return 0
 
 

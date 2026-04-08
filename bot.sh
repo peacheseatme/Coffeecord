@@ -60,8 +60,9 @@ _usage() {
     echo "  console -n N              Last N lines, no follow"
     echo "  console clear             Clear the bot log file"
     echo ""
-    echo "  update                    git pull → pip install → restart"
-    echo "  update -f / --force       Continue even if git pull fails"
+    echo "  update [version]          Latest GitHub release (or tag) → pip → restart"
+    echo "  update --branch          git pull on current branch (dev) → pip → restart"
+    echo "  update -f / --force      Continue even if git/VCS step fails"
     echo ""
     echo "  module refresh            Scan Modules/ — add new files to registry"
     echo "  module refresh_registry   Alias for 'module refresh'"
@@ -617,16 +618,38 @@ _console_bot() {
 }
 
 # ── update ───────────────────────────────────────────────────────────────────
+# Optional positional: release version (e.g. 1.0.3); omit = latest GitHub release.
 # Flags:
-#   -f / --force   Continue even when git pull fails (network down, dirty tree, etc.)
+#   --branch       git pull on current branch instead of release checkout
+#   -f / --force   Continue even when git fetch/checkout/pull fails
 _update_bot() {
     local force="false"
+    local branch_mode="false"
+    local version_arg=""
     while [[ $# -gt 0 ]]; do
         case "${1}" in
             -f|--force) force="true" ;;
+            --branch) branch_mode="true" ;;
+            -*)
+                err "Unknown option: ${1}"
+                echo "Usage: c-cord update [--branch] [-f] [version]"
+                exit 1
+                ;;
+            *)
+                if [[ -n "${version_arg}" ]]; then
+                    err "Unexpected extra argument: ${1}"
+                    exit 1
+                fi
+                version_arg="${1}"
+                ;;
         esac
         shift
     done
+
+    if [[ "${branch_mode}" == "true" && -n "${version_arg}" ]]; then
+        err "Cannot combine --branch with a release version."
+        exit 1
+    fi
 
     _ensure_runtime_dirs
     if [[ "${force}" == "true" ]]; then
@@ -646,20 +669,86 @@ _update_bot() {
         _stop_bot
     fi
 
-    local pulled="skipped"
-    if [[ -d "${SCRIPT_DIR}/.git" ]] && command -v git >/dev/null 2>&1; then
-        info "Pulling latest changes..."
-        if git -C "${SCRIPT_DIR}" pull; then
-            pulled="done"
-        elif [[ "${force}" == "true" ]]; then
-            warn "git pull failed — continuing anyway (-f)."
-            pulled="failed (ignored)"
+    local vcs_summary="skipped"
+    if [[ "${branch_mode}" == "true" ]]; then
+        if [[ -d "${SCRIPT_DIR}/.git" ]] && command -v git >/dev/null 2>&1; then
+            info "Pulling latest changes on current branch..."
+            if git -C "${SCRIPT_DIR}" pull; then
+                vcs_summary="git pull: done"
+            elif [[ "${force}" == "true" ]]; then
+                warn "git pull failed — continuing anyway (-f)."
+                vcs_summary="git pull: failed (ignored)"
+            else
+                err "git pull failed. Use c-cord update -f to continue anyway."
+                exit 1
+            fi
         else
-            err "git pull failed. Use c-cord update -f to continue anyway."
-            exit 1
+            if [[ "${force}" == "true" ]]; then
+                warn "Not a git repository or git unavailable; skipping git pull."
+                vcs_summary="git pull: skipped"
+            else
+                err "c-cord update --branch requires a git clone and git installed."
+                exit 1
+            fi
         fi
     else
-        warn "Not a git repository or git unavailable; skipping git pull."
+        if [[ ! -d "${SCRIPT_DIR}/.git" ]] || ! command -v git >/dev/null 2>&1; then
+            if [[ "${force}" == "true" ]]; then
+                warn "Not a git repository or git unavailable; cannot checkout a release."
+                vcs_summary="release: skipped"
+            else
+                err "Release update requires a git clone and git. Use c-cord update --branch on a clone, or install from git."
+                exit 1
+            fi
+        else
+            local dirty
+            dirty="$(git -C "${SCRIPT_DIR}" status --porcelain 2>/dev/null || true)"
+            if [[ -n "${dirty}" ]]; then
+                if [[ "${force}" == "true" ]]; then
+                    warn "Working tree has uncommitted changes; proceeding (-f). checkout may fail."
+                else
+                    err "Working tree has uncommitted changes. Commit, stash, or use c-cord update -f."
+                    exit 1
+                fi
+            fi
+
+            local tag
+            info "Resolving GitHub release${version_arg:+ (${version_arg})}..."
+            if tag="$(
+                GITHUB_REPO="${GITHUB_REPO:-}" GITHUB_TOKEN="${GITHUB_TOKEN:-}" \
+                    "${PYTHON_BIN}" "${SCRIPT_DIR}/scripts/ccord_release_resolve.py" "${SCRIPT_DIR}" ${version_arg:+"${version_arg}"}
+            )"; then
+                info "Fetching and checking out ${tag}..."
+                local fetch_ok="false"
+                if git -C "${SCRIPT_DIR}" fetch -q origin "refs/tags/${tag}:refs/tags/${tag}"; then
+                    fetch_ok="true"
+                elif [[ "${force}" == "true" ]]; then
+                    warn "git fetch failed for tag ${tag} — skipping checkout (-f); deps/restart still run."
+                    vcs_summary="release: fetch failed (ignored)"
+                else
+                    err "git fetch failed for tag ${tag}."
+                    exit 1
+                fi
+                if [[ "${fetch_ok}" == "true" ]]; then
+                    if git -C "${SCRIPT_DIR}" checkout -q "${tag}"; then
+                        vcs_summary="release: ${tag}"
+                    elif [[ "${force}" == "true" ]]; then
+                        warn "git checkout ${tag} failed — continuing anyway (-f)."
+                        vcs_summary="release: checkout failed (ignored)"
+                    else
+                        err "git checkout ${tag} failed."
+                        exit 1
+                    fi
+                fi
+            else
+                if [[ "${force}" == "true" ]]; then
+                    warn "Could not resolve a release tag — continuing anyway (-f)."
+                    vcs_summary="release: resolve failed (ignored)"
+                else
+                    exit 1
+                fi
+            fi
+        fi
     fi
 
     info "Updating dependencies..."
@@ -675,7 +764,7 @@ _update_bot() {
     echo ""
     ok "Update summary:"
     echo "  - Previously running: ${was_running}"
-    echo "  - Git pull          : ${pulled}"
+    echo "  - VCS               : ${vcs_summary}"
     echo "  - Dependencies      : updated"
     echo "  - Bot state         : running"
 }

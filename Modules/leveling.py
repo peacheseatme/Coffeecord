@@ -13,7 +13,6 @@ from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFont, ImageSequence
 
 from . import anti_abuse
-from . import checks as module_checks
 from .json_cache import get as _json_get, set_ as _json_set
 from .module_registry import is_module_enabled
 from .themes import get_command_response_for_interaction
@@ -29,6 +28,50 @@ FONT_PATH = BASE_DIR / "Storage" / "Assets" / "Roboto-Regular.ttf"
 BOLD_FONT_PATH = BASE_DIR / "Storage" / "Assets" / "Roboto-Bold.ttf"
 CACHE_DIR = BASE_DIR / "Storage" / "Temp" / "level_cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _guild_leveling_cfg(config: dict[str, Any], guild_id: str) -> dict[str, Any]:
+    raw = config.get(guild_id, {})
+    return raw if isinstance(raw, dict) else {}
+
+
+def _default_xp_user(guild_cfg: dict[str, Any]) -> dict[str, Any]:
+    """Initial user row; first level-up threshold matches _check_level_up (base_xp only for level 1)."""
+    base = max(int(guild_cfg.get("base_xp", 10)), 1)
+    return {"xp": 0, "level": 1, "next_level_xp": base}
+
+
+def _normalize_user_level(user_data: dict[str, Any]) -> int:
+    """Return level >= 1; fix legacy level 0 rows from old setdefault."""
+    lvl = int(user_data.get("level", 1))
+    if lvl < 1:
+        user_data["level"] = 1
+        return 1
+    return lvl
+
+
+def _next_level_xp_threshold(level: int, user_data: dict[str, Any], guild_cfg: dict[str, Any]) -> int:
+    """
+    XP needed in the current level pool to level up (same as stored next_level_xp).
+    Must match _check_level_up: level 1 uses base_xp; level 2+ uses base * scale**level.
+    """
+    explicit = user_data.get("next_level_xp")
+    if explicit is not None:
+        return max(int(explicit), 1)
+    base = max(int(guild_cfg.get("base_xp", 10)), 1)
+    scale = float(guild_cfg.get("xp_scale", 1.1))
+    level = max(1, level)
+    if level <= 1:
+        return base
+    return max(int(base * (scale**level)), 1)
+
+
+def _computation_next_level_xp_after_level_up(new_level: int, guild_cfg: dict[str, Any]) -> int:
+    """Threshold after a level-up (xp reset to 0); matches existing _check_level_up assignment."""
+    base = int(guild_cfg.get("base_xp", 10))
+    scale = float(guild_cfg.get("xp_scale", 1.1))
+    return max(int(base * (scale**new_level)), 1)
+
 
 # Font cache (avoids truetype load on every /level)
 _FONT_CACHE: dict[tuple[str, int], ImageFont.FreeTypeFont] = {}
@@ -309,26 +352,32 @@ async def _check_level_up(bot: commands.Bot, guild_id: str, user_id: str, channe
     config = _load_json(CONFIG_FILE, {})
     rewards_data = _load_json(LEVEL_REWARDS_FILE, {})
 
-    user_data = xp_data.get(guild_id, {}).get(user_id, {"xp": 0, "level": 1, "next_level_xp": 10})
-    guild_cfg = config.get(guild_id, {})
+    guild_cfg = _guild_leveling_cfg(config, guild_id)
     guild_rewards = rewards_data.get(guild_id, {})
     rewards = guild_rewards.get("rewards", {})
     replace_old = bool(guild_rewards.get("replace_old_roles", False))
 
+    xp_data.setdefault(guild_id, {})
+    user_data = xp_data[guild_id].get(user_id)
+    if not user_data:
+        user_data = _default_xp_user(guild_cfg)
+        xp_data[guild_id][user_id] = user_data
+
+    before_level = int(user_data.get("level", 1))
+    level = _normalize_user_level(user_data)
+    level_fixed = before_level < 1
     xp = int(user_data.get("xp", 0))
-    level = int(user_data.get("level", 1))
-    next_level_xp = int(user_data.get("next_level_xp", guild_cfg.get("base_xp", 10)))
+    next_level_xp = _next_level_xp_threshold(level, user_data, guild_cfg)
     if xp < next_level_xp:
+        if level_fixed:
+            _save_json(XP_FILE, xp_data)
         return
 
     old_level = level
     user_data["level"] = level + 1
     user_data["xp"] = 0
-    base = int(guild_cfg.get("base_xp", 10))
-    scale = float(guild_cfg.get("xp_scale", 1.1))
-    user_data["next_level_xp"] = int(base * (scale ** user_data["level"]))
+    user_data["next_level_xp"] = _computation_next_level_xp_after_level_up(int(user_data["level"]), guild_cfg)
 
-    xp_data.setdefault(guild_id, {})
     xp_data[guild_id][user_id] = user_data
     _save_json(XP_FILE, xp_data)
 
@@ -409,9 +458,13 @@ async def award_message_xp(bot: commands.Bot, message: discord.Message) -> None:
     user_id = str(message.author.id)
     xp_data = _load_json(XP_FILE, {})
     config = _load_json(CONFIG_FILE, {})
+    guild_cfg = _guild_leveling_cfg(config, guild_id)
     xp_data.setdefault(guild_id, {})
-    xp_data[guild_id].setdefault(user_id, {"xp": 0, "level": 0})
-    xp_data[guild_id][user_id]["xp"] += int(config.get(guild_id, {}).get("message_xp", 0))
+    if user_id not in xp_data[guild_id]:
+        xp_data[guild_id][user_id] = _default_xp_user(guild_cfg)
+    u = xp_data[guild_id][user_id]
+    _normalize_user_level(u)
+    u["xp"] = int(u.get("xp", 0)) + int(guild_cfg.get("message_xp", 0))
     _save_json(XP_FILE, xp_data)
     await _check_level_up(bot, guild_id, user_id, message.channel)
 
@@ -425,9 +478,13 @@ async def award_reaction_xp(bot: commands.Bot, reaction: discord.Reaction, user:
     user_id = str(user.id)
     xp_data = _load_json(XP_FILE, {})
     config = _load_json(CONFIG_FILE, {})
+    guild_cfg = _guild_leveling_cfg(config, guild_id)
     xp_data.setdefault(guild_id, {})
-    xp_data[guild_id].setdefault(user_id, {"xp": 0, "level": 0})
-    xp_data[guild_id][user_id]["xp"] += int(config.get(guild_id, {}).get("reaction_xp", 0))
+    if user_id not in xp_data[guild_id]:
+        xp_data[guild_id][user_id] = _default_xp_user(guild_cfg)
+    u = xp_data[guild_id][user_id]
+    _normalize_user_level(u)
+    u["xp"] = int(u.get("xp", 0)) + int(guild_cfg.get("reaction_xp", 0))
     _save_json(XP_FILE, xp_data)
     await _check_level_up(bot, guild_id, user_id, reaction.message.channel)
 
@@ -450,10 +507,14 @@ async def award_voice_xp(
         return
     xp_data = _load_json(XP_FILE, {})
     config = _load_json(CONFIG_FILE, {})
+    guild_cfg = _guild_leveling_cfg(config, guild_id)
     xp_data.setdefault(guild_id, {})
-    xp_data[guild_id].setdefault(user_id, {"xp": 0, "level": 0})
-    gained_xp = int(config.get(guild_id, {}).get("vc_minute_xp", 0)) * minutes
-    xp_data[guild_id][user_id]["xp"] += gained_xp
+    if user_id not in xp_data[guild_id]:
+        xp_data[guild_id][user_id] = _default_xp_user(guild_cfg)
+    u = xp_data[guild_id][user_id]
+    _normalize_user_level(u)
+    gained_xp = int(guild_cfg.get("vc_minute_xp", 0)) * minutes
+    u["xp"] = int(u.get("xp", 0)) + gained_xp
     _save_json(XP_FILE, xp_data)
     channel = discord.utils.get(member.guild.text_channels, name="general")
     if channel is not None:
@@ -664,17 +725,24 @@ class LevelingCog(commands.Cog):
         guild_id = str(interaction.guild.id)
         user_id = str(target.id)
         xp_data = _load_json(XP_FILE, {})
-        user_data = xp_data.get(guild_id, {}).get(user_id, {"xp": 0, "level": 1})
+        config = _load_json(CONFIG_FILE, {})
+        guild_cfg = _guild_leveling_cfg(config, guild_id)
+        user_data = dict(xp_data.get(guild_id, {}).get(user_id) or _default_xp_user(guild_cfg))
+        _normalize_user_level(user_data)
         xp = int(user_data.get("xp", 0))
         level = int(user_data.get("level", 1))
-        xp_for_next_level = max(int(user_data.get("next_level_xp", (level * 100) + 100)), 1)
+        xp_for_next_level = _next_level_xp_threshold(level, user_data, guild_cfg)
         progress = max(0.0, min(xp / xp_for_next_level, 1.0))
         bg_url, style_colors = _get_levelcard_config(user_id)
         supporter = _supporter_active(target.id)
         render_gif = bg_url.lower().endswith(".gif") and supporter
 
         guild_xp = xp_data.get(guild_id, {})
-        sorted_users = sorted(guild_xp.items(), key=lambda x: x[1].get("xp", 0), reverse=True)
+        sorted_users = sorted(
+            guild_xp.items(),
+            key=lambda x: (int(x[1].get("level", 1)), int(x[1].get("xp", 0))),
+            reverse=True,
+        )
         rank = next((i + 1 for i, (uid, _) in enumerate(sorted_users) if uid == user_id), 0)
         guild_member = interaction.guild.get_member(target.id)
         status_source = guild_member or target
@@ -769,7 +837,6 @@ class LevelingCog(commands.Cog):
 
     @app_commands.command(name="xpset", description="Set a user's XP and level (Admin only)")
     @app_commands.describe(user="User", xp="XP value", level="Level value")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def xpset(self, interaction: discord.Interaction, user: discord.Member, xp: int, level: int) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
@@ -783,8 +850,21 @@ class LevelingCog(commands.Cog):
         guild_id = str(interaction.guild.id)
         user_id = str(user.id)
         xp_data = _load_json(XP_FILE, {})
+        config = _load_json(CONFIG_FILE, {})
+        guild_cfg = _guild_leveling_cfg(config, guild_id)
+        level_norm = max(1, int(level))
+        xp_clamped = max(0, int(xp))
+        next_xp = _next_level_xp_threshold(
+            level_norm,
+            {"xp": xp_clamped, "level": level_norm},
+            guild_cfg,
+        )
         xp_data.setdefault(guild_id, {})
-        xp_data[guild_id][user_id] = {"xp": xp, "level": level}
+        xp_data[guild_id][user_id] = {
+            "xp": xp_clamped,
+            "level": level_norm,
+            "next_level_xp": next_xp,
+        }
         _save_json(XP_FILE, xp_data)
         await _dispatch_module_event(
             self.bot,
@@ -800,8 +880,8 @@ class LevelingCog(commands.Cog):
             "success",
             "✅ Set {user}'s XP to {xp} and Level to {level}.",
             user=user.display_name,
-            xp=str(xp),
-            level=str(level),
+            xp=str(xp_clamped),
+            level=str(level_norm),
         )
         await interaction.response.send_message(msg, ephemeral=True)
 
@@ -814,7 +894,6 @@ class LevelingCog(commands.Cog):
         base_xp="XP required for Level 1",
         xp_scale="XP scaling factor (how much more XP per level)",
     )
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def xp_config(
         self,
         interaction: discord.Interaction,
@@ -877,7 +956,6 @@ class LevelingCog(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @levelreward_group.command(name="add", description="Add a level reward role.")
-    @app_commands.check(module_checks.can_manage_roles_or_moderate)
     async def levelreward_add(
         self,
         interaction: discord.Interaction,
@@ -919,7 +997,6 @@ class LevelingCog(commands.Cog):
         await interaction.response.send_message(msg, ephemeral=True)
 
     @levelreward_group.command(name="remove", description="Remove a level reward role.")
-    @app_commands.check(module_checks.can_manage_roles_or_moderate)
     async def levelreward_remove(self, interaction: discord.Interaction, level: int) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
@@ -981,7 +1058,6 @@ class LevelingCog(commands.Cog):
         )
 
     @levelreward_group.command(name="mode", description="Choose whether to replace old reward roles.")
-    @app_commands.check(module_checks.can_manage_roles_or_moderate)
     async def levelreward_mode(self, interaction: discord.Interaction, replace_old_roles: bool) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)

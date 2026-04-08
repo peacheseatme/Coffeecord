@@ -2,3 +2,7 @@
 .env
 ticket.env
 Storage/
+__pycache__/
+journal.log
+journal
+journal.pub

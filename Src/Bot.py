@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import logging
+from logging.handlers import RotatingFileHandler
 from discord.ext import commands, tasks
 import os
 import sys
@@ -28,15 +29,66 @@ import typing
 from discord import Member
 from typing import List
 import re
+import secrets
+import urllib.parse
 from contextlib import asynccontextmanager
 
 import aiohttp
+
+# Cache for "Show technical details" button; key -> technical_details str (cleaned periodically)
+_error_details_cache: dict[str, str] = {}
+_ERROR_DETAILS_PREFIX = "err:"
+_REDACTED_DISCORD_TOKEN_MARKER = "[REDACTED_DISCORD_TOKEN]"
 
 load_dotenv()
 # Load ticket.env for TICKET_SECRET (path relative to project root)
 _ticket_env = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Src", "ticket.env")
 load_dotenv(_ticket_env)
-token = os.getenv('DISCORD_TOKEN')
+token = os.getenv("DISCORD_TOKEN")
+
+
+def _parse_int_env(key: str, default: int = 0) -> int:
+    raw = os.getenv(key, "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _env_str(key: str, default: str) -> str:
+    v = os.getenv(key, "").strip()
+    return v if v else default
+
+
+_INVITE_PERMISSIONS = (os.getenv("DISCORD_INVITE_PERMISSIONS") or "8866461766385655").strip()
+_DISCORD_APP_ID = (os.getenv("DISCORD_APPLICATION_ID") or os.getenv("DISCORD_CLIENT_ID") or "").strip()
+
+
+def _oauth_invite_url(application_id: str) -> str:
+    inner = f"https://discord.com/oauth2/authorize?client_id={application_id}"
+    redirect = urllib.parse.quote(inner, safe="")
+    return (
+        "https://discord.com/oauth2/authorize"
+        f"?client_id={application_id}&permissions={_INVITE_PERMISSIONS}"
+        "&response_type=code"
+        f"&redirect_uri={redirect}"
+        "&integration_type=0"
+        "&scope=bot+identify+applications.commands+applications.commands.permissions.update"
+    )
+
+
+def _redact_discord_token_in_text(text: str) -> str:
+    """Strip DISCORD_TOKEN from user-visible error strings if it ever appears."""
+    if not text:
+        return text
+    tok = (os.getenv("DISCORD_TOKEN") or "").strip()
+    if len(tok) < 8:
+        return text
+    return text.replace(tok, _REDACTED_DISCORD_TOKEN_MARKER)
+
+
 # ───────── staff applications – storage helpers ─────────
 # Path setup (must be before Modules import)
 _bot_dir = os.path.dirname(os.path.abspath(__file__))
@@ -48,10 +100,53 @@ if _discordbot_root not in sys.path:
 if _modules_path not in sys.path:
     sys.path.insert(0, _modules_path)
 
+from Modules.bot_config import get_bot_version_display, get_discord_library_log_settings
+
+_COFFEECORD_DISCORD_LOG_ATTR = "_coffeecord_discord_file_handler"
+
+
+def _configure_discord_library_logging() -> None:
+    """Send discord.py library logs to a rotating file (see Storage/Config/bot_sys.cfg; env DISCORD_LOG_* overrides)."""
+    settings = get_discord_library_log_settings()
+    if not settings.enabled:
+        return
+    log_dir = str(settings.path.parent)
+    os.makedirs(log_dir, exist_ok=True)
+    dlog = logging.getLogger("discord")
+    dlog.setLevel(settings.level)
+    for h in dlog.handlers:
+        if getattr(h, _COFFEECORD_DISCORD_LOG_ATTR, False):
+            return
+    handler = RotatingFileHandler(
+        settings.path,
+        maxBytes=settings.max_bytes,
+        backupCount=settings.backup_count,
+        encoding="utf-8",
+    )
+    setattr(handler, _COFFEECORD_DISCORD_LOG_ATTR, True)
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s | %(levelname)-8s | %(name)s | %(message)s")
+    )
+    dlog.addHandler(handler)
+
+
+_configure_discord_library_logging()
+
 from Modules import anti_abuse
 from Modules import checks as module_checks
+from Modules import command_perm_overrides
 from Modules import json_cache
 from Modules.themes import get_command_response, get_command_response_for_interaction
+
+
+class CoffeecordCommandTree(app_commands.CommandTree):
+    """Slash tree with anti-abuse + configurable per-guild permission checks."""
+
+    async def interaction_check(self, interaction: discord.Interaction, /) -> bool:
+        if not await anti_abuse.should_allow_interaction(interaction):
+            return False
+        return await command_perm_overrides.tree_interaction_perm_check(interaction)
+
 
 def load_json(path: str, default: dict | list | None = None):
     """Load JSON from cache or disk."""
@@ -95,18 +190,12 @@ intents.members = True
 ENABLE_PRESENCE_INTENT = os.getenv("ENABLE_PRESENCE_INTENT", "1").strip().lower() in {"1", "true", "yes", "on"}
 intents.presences = ENABLE_PRESENCE_INTENT
 
-bot = commands.Bot(command_prefix=".", intents=intents)
+bot = commands.Bot(command_prefix=".", intents=intents, tree_cls=CoffeecordCommandTree)
 
 tree = bot.tree
 anti_abuse.register_dev_group(bot)
 
-
-@tree.interaction_check
-async def _global_anti_abuse_check(interaction: discord.Interaction) -> bool:
-    """Global slash-command anti-abuse gate."""
-    return await anti_abuse.should_allow_interaction(interaction)
-
-OWNER_ID = 1168282467162136656  # Replace with your Discord user ID
+OWNER_ID = _parse_int_env("COFFEECORD_OWNER_ID", 0)
 
 
 def _dispatch_module_log_event(
@@ -166,30 +255,26 @@ def _get_leveling_module() -> typing.Any:
         _leveling_module = importlib.import_module("Modules.leveling")
     return _leveling_module
 
-GUILD_IDS = [
-    0,  # Replace with your guild ID(s)
-]
-
 logging_enabled = True  # Toggle to enable/disable logs
 log_channel_id = None   # Will be set with !log start
 
 authoroles = set()
 autorole_config = {}
 verify_config = {}
-GUILD_ID = 0  # Replace with your guild ID
 CONFIG_FILE = os.path.join(_storage_dir, "Config", "autorole_config.json")
-GALAXY_BOT_SERVER_ID = 0  # Replace with your guild ID
-PERMANENT_INVITE = "https://discord.gg/xxxxxxxx"  # Replace with your support server invite
 DONATION_URL = "https://ko-fi.com/coffeecord"
 GITHUB_URL = "https://github.com/peacheseatme/Coffeecord"
 PRIVACY_POLICY_URL = f"{GITHUB_URL}/blob/main/PRIVACY_POLICY.md"
 TERMS_URL = f"{GITHUB_URL}/blob/main/TERMS_OF_SERVICE.md"
 PERMISSIONS_DOC_URL = f"{GITHUB_URL}/blob/main/docs/commands/permissions.md"
-TOPGG_URL = "https://top.gg/bot/1390501770437984377"  # Replace with real bot ID for top.gg listing
-# Replace YOUR_CLIENT_ID with your bot's application ID.
-BOT_INVITE_URL = "https://discord.com/oauth2/authorize?client_id=1390501770437984377&permissions=8866461766385655&response_type=code&redirect_uri=https%3A%2F%2Fdiscord.com%2Foauth2%2Fauthorize%3Fclient_id%3D1390501770437984377&integration_type=0&scope=bot+identify+applications.commands+applications.commands.permissions.update"
-SUPPORT_SERVER = "https://discord.com/invite/HnJfJgcwZ2"
-BOT_VERSION = "1.0.1"  # TODO: keep updated
+TOPGG_URL = f"https://top.gg/bot/{_DISCORD_APP_ID}" if _DISCORD_APP_ID else "https://top.gg/"
+BOT_INVITE_URL = (
+    _oauth_invite_url(_DISCORD_APP_ID)
+    if _DISCORD_APP_ID
+    else "https://discord.com/developers/applications"
+)
+SUPPORT_SERVER = _env_str("COFFEECORD_SUPPORT_SERVER_URL", "https://discord.com/")
+PERMANENT_INVITE = _env_str("COFFEECORD_SUPPORT_INVITE", SUPPORT_SERVER)
 SUPPORTERS_FILE = os.path.join(_storage_dir, "Data", "supporters.json")
 SUPPORTER_GRACE_DAYS = 35
 pending_kofi_links: dict[str, list[int]] = {}
@@ -367,7 +452,7 @@ class Theme:
 
 COMMAND_CATEGORIES = {
     "General": [
-        "/help", "/command_perms", "/support us", "/say", "/dm", "/poll", "/nickname",
+        "/help", "/command_perms docs", "/command_perms edit", "/support us", "/say", "/dm", "/poll", "/nickname",
         "/optout", "/optin"
     ],
     "Ko-fi": [
@@ -429,10 +514,8 @@ COMMAND_CATEGORIES = {
         "/application", "/application setup", "/application toggle",
         "/modules status", "/modules toggle", "/modules enable", "/modules disable",
         "/adaptive_slowmode", "/uninstall", "/test"
-    ],
-    "Dev / Owner": [
-        "/synccommands", "/debugcommands", "/clearchache",
     ]
+
 }
 
 class HelpMenu(discord.ui.View):
@@ -496,7 +579,7 @@ async def about_cmd(interaction: discord.Interaction):
     )
     if interaction.client.user:
         embed.set_thumbnail(url=interaction.client.user.display_avatar.url)
-    embed.add_field(name="Version", value=BOT_VERSION, inline=False)
+    embed.add_field(name="Version", value=get_bot_version_display(), inline=False)
     developer_value = f"<@{OWNER_ID}>" if OWNER_ID else "Not configured"
     embed.add_field(name="Developer", value=developer_value, inline=False)
     embed.add_field(name="Servers", value=f"{len(interaction.client.guilds)} servers", inline=False)
@@ -515,13 +598,35 @@ async def about_cmd(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, view=view)
 
 
-@tree.command(name="command_perms", description="View command permissions documentation.")
-async def command_perms(interaction: discord.Interaction):
+COMMAND_PERM_MODE_CHOICES = [
+    app_commands.Choice(name="Reset to bot default", value="reset"),
+    app_commands.Choice(name="Everyone (no Discord permission)", value="everyone"),
+    app_commands.Choice(name="Administrator", value="administrator"),
+    app_commands.Choice(name="Manage Server", value="manage_guild"),
+    app_commands.Choice(name="Ban Members", value="ban_members"),
+    app_commands.Choice(name="Manage Messages", value="manage_messages"),
+    app_commands.Choice(name="Moderate Members", value="moderate_members"),
+    app_commands.Choice(name="Manage Channels", value="manage_channels"),
+    app_commands.Choice(name="Manage Nicknames", value="manage_nicknames"),
+    app_commands.Choice(name="Manage Roles", value="manage_roles"),
+    app_commands.Choice(name="Mod combo (roles / moderate / server / admin)", value="roles_or_moderate"),
+    app_commands.Choice(name="Custom (use custom_permissions)", value="custom"),
+]
+
+
+command_perms_group = app_commands.Group(
+    name="command_perms",
+    description="Command permission documentation and per-server slash overrides.",
+)
+
+
+@command_perms_group.command(name="docs", description="Open the permissions documentation.")
+async def command_perms_docs(interaction: discord.Interaction):
     embed = discord.Embed(
         title="Command Permissions",
         description=(
-            "View the full permissions reference: which commands need which user permissions, "
-            "and what bot permissions are required for each feature."
+            "Full reference: which slash commands use which **member** permissions, and what **bot** permissions "
+            "features need. Use `/command_perms edit` (Manage Server) to type any slash command name and set requirements."
         ),
         color=discord.Color.blurple(),
         url=PERMISSIONS_DOC_URL,
@@ -531,12 +636,98 @@ async def command_perms(interaction: discord.Interaction):
         value=f"[📋 Permissions doc]({PERMISSIONS_DOC_URL})",
         inline=False,
     )
-    embed.set_footer(text="Includes call create, moderation, and all slash commands.")
+    embed.set_footer(text="Per-guild overrides apply after the next sync; defaults ship with the bot.")
     view = discord.ui.View()
     view.add_item(
         discord.ui.Button(label="Open permissions doc", url=PERMISSIONS_DOC_URL, emoji="📋", style=discord.ButtonStyle.link)
     )
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
+@command_perms_group.command(name="list", description="List slash commands with non-default permission rules in this server.")
+async def command_perms_list(interaction: discord.Interaction):
+    if interaction.guild is None:
+        await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
+        return
+    ov = command_perm_overrides.get_guild_overrides(interaction.guild.id)
+    lines: list[str] = []
+    for qn in sorted(ov.keys()):
+        try:
+            human = command_perm_overrides.format_rule_human(ov[qn])
+        except Exception:
+            human = "(invalid stored rule)"
+        lines.append(f"**/{qn}** → {human}")
+    if not lines:
+        await interaction.response.send_message(
+            "No overrides in this server. Commands use bot defaults (see `/command_perms docs`).",
+            ephemeral=True,
+        )
+        return
+    desc = "\n".join(lines)[:4000]
+    embed = discord.Embed(
+        title="Command permission overrides",
+        description=desc,
+        color=discord.Color.blurple(),
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@command_perms_group.command(name="edit", description="Change required Discord permissions for a slash command (this server).")
+@app_commands.describe(
+    command="Slash command: type the qualified name (e.g. `call create`, `call_create`, or `/help`)",
+    mode="New requirement preset",
+    custom_permissions="When mode is Custom: comma-separated flags, e.g. ban_members,kick_members",
+)
+@app_commands.choices(mode=COMMAND_PERM_MODE_CHOICES)
+async def command_perms_edit(
+    interaction: discord.Interaction,
+    command: str,
+    mode: app_commands.Choice[str],
+    custom_permissions: str | None = None,
+):
+    if interaction.guild is None:
+        await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
+        return
+    resolved = command_perm_overrides.resolve_slash_command_input(interaction.client.tree, command)
+    if resolved is None:
+        await interaction.response.send_message(
+            "❌ No matching slash command. Use the name Discord shows (e.g. `help`, `call create`, `modules toggle`).",
+            ephemeral=True,
+        )
+        return
+    qn = resolved
+    if mode.value == "custom":
+        if not (custom_permissions or "").strip():
+            await interaction.response.send_message(
+                "❌ For **Custom**, fill `custom_permissions` (comma-separated permission names).",
+                ephemeral=True,
+            )
+            return
+    try:
+        if mode.value == "custom":
+            rule = command_perm_overrides.parse_custom_permissions_csv(custom_permissions or "")
+        else:
+            rule = command_perm_overrides.preset_rule(mode.value)
+    except ValueError as e:
+        await interaction.response.send_message(
+            _redact_discord_token_in_text(f"❌ {e}"),
+            ephemeral=True,
+        )
+        return
+
+    command_perm_overrides.set_guild_command_rule(interaction.guild.id, qn, rule)
+
+    if rule is None:
+        if qn in command_perm_overrides.DEFAULT_SLASH_COMMAND_RULES:
+            msg = f"✅ Reset **`/{qn}`** to the bot default."
+        else:
+            msg = f"✅ Removed custom rules for **`/{qn}`** (no CoffeeCord member-permission gate)."
+    else:
+        msg = f"✅ **`/{qn}`** now requires: {command_perm_overrides.format_rule_human(rule)}"
+    await interaction.response.send_message(msg, ephemeral=True)
+
+
+tree.add_command(command_perms_group)
 
 
 class DonateView(discord.ui.View):
@@ -856,7 +1047,6 @@ async def kofi_status(interaction: discord.Interaction):
 
 
 @kofi_group.command(name="add", description="Manually add or update a supporter.")
-@app_commands.checks.has_permissions(administrator=True)
 @app_commands.describe(user="User to mark as supporter", email="Email used on Ko-fi")
 async def kofi_add(interaction: discord.Interaction, user: discord.Member, email: str):
     if not _is_valid_email(email):
@@ -886,7 +1076,6 @@ async def kofi_add(interaction: discord.Interaction, user: discord.Member, email
 
 
 @kofi_group.command(name="remove", description="Disable supporter status for a user.")
-@app_commands.checks.has_permissions(administrator=True)
 @app_commands.describe(user="User to deactivate")
 async def kofi_remove(interaction: discord.Interaction, user: discord.Member):
     data = load_supporters_db()
@@ -1061,94 +1250,426 @@ async def kofi_remove_prefix(ctx: commands.Context, user: discord.Member):
 
 from discord import app_commands, ui, Interaction
 
-@bot.tree.command(name="purge", description="Bulk delete messages in a channel")
+# --- Purge: rate limits + emergency stop (see /purge, /specific_purge) ---
+PURGE_DISCORD_BULK_MAX = 100
+PURGE_DISCORD_BULK_MAX_AGE = timedelta(days=14)
+PURGE_RATE_LIMIT_FALLBACK_SECONDS = 1.0
+PURGE_PROGRESS_EDIT_INTERVAL_SEC = 12.0
+PURGE_PROGRESS_EDIT_MIN_DELETES = 80
+
+
+def _purge_429_sleep_seconds(exc: discord.HTTPException) -> float:
+    if exc.status != 429:
+        return PURGE_RATE_LIMIT_FALLBACK_SECONDS
+    ra = getattr(exc, "retry_after", None)
+    if ra is not None:
+        return max(float(ra), 0.5)
+    return PURGE_RATE_LIMIT_FALLBACK_SECONDS
+
+
+def _purge_message_eligible_for_bulk_delete(message: discord.Message) -> bool:
+    return (discord.utils.utcnow() - message.created_at) < PURGE_DISCORD_BULK_MAX_AGE
+
+
+async def _purge_bulk_delete_with_retry(
+    channel: discord.TextChannel,
+    messages: list[discord.Message],
+    cancel_event: asyncio.Event,
+) -> None:
+    if not messages:
+        return
+    while True:
+        if cancel_event.is_set():
+            return
+        try:
+            await channel.delete_messages(messages)
+            return
+        except discord.Forbidden:
+            raise
+        except discord.HTTPException as e:
+            if e.status == 429:
+                await asyncio.sleep(_purge_429_sleep_seconds(e))
+                continue
+            raise
+
+
+async def _purge_single_delete_with_retry(
+    message: discord.Message,
+    cancel_event: asyncio.Event,
+) -> bool:
+    while True:
+        if cancel_event.is_set():
+            return False
+        try:
+            await message.delete()
+            return True
+        except discord.NotFound:
+            return True
+        except discord.Forbidden:
+            raise
+        except discord.HTTPException as e:
+            if e.status == 429:
+                await asyncio.sleep(_purge_429_sleep_seconds(e))
+                continue
+            raise
+
+
+class PurgeEmergencyStopView(ui.View):
+    """Ephemeral purge control: only the invoker may stop."""
+
+    def __init__(self, invoker_id: int, cancel_event: asyncio.Event) -> None:
+        super().__init__(timeout=None)
+        self.invoker_id = invoker_id
+        self.cancel_event = cancel_event
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.invoker_id:
+            await interaction.response.send_message(
+                "Only the moderator who started this purge can use this button.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    @ui.button(label="Emergency stop", style=discord.ButtonStyle.danger, emoji="🛑", row=0)
+    async def emergency_stop(self, interaction: discord.Interaction, button: ui.Button) -> None:
+        self.cancel_event.set()
+        button.disabled = True
+        await interaction.response.edit_message(
+            content="**Stopping purge** — finishing the current batch, then halting…",
+            view=self,
+        )
+
+
+async def _run_cancellable_purge(
+    channel: discord.TextChannel,
+    limit: int,
+    check,
+    cancel_event: asyncio.Event,
+    *,
+    progress_message: discord.WebhookMessage | None,
+    progress_view: ui.View | None,
+    header_lines: list[str],
+) -> tuple[int, bool]:
+    """
+    Scan at most `limit` messages (newest first), delete those passing `check`.
+    Returns (deleted_count, stopped_early).
+    """
+    deleted = 0
+    scanned = 0
+    before: discord.Message | None = None
+    bulk_buffer: list[discord.Message] = []
+    loop = asyncio.get_running_loop()
+    last_progress_edit = loop.time()
+    last_shown_deleted = 0
+
+    async def flush_bulk() -> None:
+        nonlocal deleted, bulk_buffer
+        while bulk_buffer and not cancel_event.is_set():
+            chunk = bulk_buffer[:PURGE_DISCORD_BULK_MAX]
+            bulk_buffer = bulk_buffer[len(chunk) :]
+            await _purge_bulk_delete_with_retry(channel, chunk, cancel_event)
+            deleted += len(chunk)
+
+    async def maybe_update_progress() -> None:
+        nonlocal last_progress_edit, last_shown_deleted
+        if progress_message is None:
+            return
+        now = loop.time()
+        if deleted - last_shown_deleted < PURGE_PROGRESS_EDIT_MIN_DELETES and (
+            now - last_progress_edit
+        ) < PURGE_PROGRESS_EDIT_INTERVAL_SEC:
+            return
+        last_progress_edit = now
+        last_shown_deleted = deleted
+        body = "\n".join(header_lines)
+        content = (
+            f"{body}\n\n"
+            f"Scanned up to **{scanned}** / **{limit}** messages.\n"
+            f"Deleted so far: **{deleted}**\n\n"
+            "🛑 **Emergency stop** — halts after the current delete batch."
+        )
+        try:
+            await progress_message.edit(content=content, view=progress_view)
+        except discord.HTTPException as e:
+            if e.status == 429:
+                await asyncio.sleep(_purge_429_sleep_seconds(e))
+
+    while scanned < limit and not cancel_event.is_set():
+        page_size = min(PURGE_DISCORD_BULK_MAX, limit - scanned)
+        while True:
+            if cancel_event.is_set():
+                break
+            try:
+                page = [
+                    m
+                    async for m in channel.history(
+                        limit=page_size,
+                        before=before,
+                        oldest_first=False,
+                    )
+                ]
+                break
+            except discord.HTTPException as e:
+                if e.status == 429:
+                    await asyncio.sleep(_purge_429_sleep_seconds(e))
+                    continue
+                raise
+        if cancel_event.is_set():
+            break
+        if not page:
+            break
+        before = page[-1]
+        scanned += len(page)
+
+        for msg in page:
+            if cancel_event.is_set():
+                break
+            if not check(msg):
+                continue
+
+            if _purge_message_eligible_for_bulk_delete(msg):
+                bulk_buffer.append(msg)
+                if len(bulk_buffer) >= PURGE_DISCORD_BULK_MAX:
+                    chunk = bulk_buffer[:PURGE_DISCORD_BULK_MAX]
+                    bulk_buffer = bulk_buffer[PURGE_DISCORD_BULK_MAX:]
+                    await _purge_bulk_delete_with_retry(channel, chunk, cancel_event)
+                    deleted += len(chunk)
+                    await maybe_update_progress()
+            else:
+                await flush_bulk()
+                if cancel_event.is_set():
+                    break
+                if await _purge_single_delete_with_retry(msg, cancel_event):
+                    deleted += 1
+                await maybe_update_progress()
+
+            await asyncio.sleep(0)
+
+        await maybe_update_progress()
+
+        if cancel_event.is_set():
+            break
+
+    await flush_bulk()
+    stopped = cancel_event.is_set()
+    return deleted, stopped
+
+
+@bot.tree.command(name="legacy_purge", description="(Legacy) Bulk delete messages in a channel")
 @app_commands.describe(
     amount="Number of messages to delete",
     channel="Channel to purge messages from",
-    msg_type="Type of messages to delete (human/bot/all)"
+    msg_type="Type of messages to delete (human/bot/all)",
 )
-@app_commands.checks.has_permissions(manage_messages=True)
 async def purge(interaction: discord.Interaction, amount: int, channel: discord.TextChannel, msg_type: str):
-    await interaction.response.defer(ephemeral=True)  # Give the bot more time
+    await interaction.response.defer(ephemeral=True)
 
-    def check(msg):
+    def check(msg: discord.Message):
         if msg_type.lower() == "bot":
             return msg.author.bot
-        elif msg_type.lower() == "human":
+        if msg_type.lower() == "human":
             return not msg.author.bot
-        else:  # all
-            return True
+        return True
+
+    cancel_event = asyncio.Event()
+    view = PurgeEmergencyStopView(interaction.user.id, cancel_event)
+    header = (
+        f"**Purge** in {channel.mention}\n"
+        f"Type: **{msg_type}** · Scanning up to **{amount}** recent messages."
+    )
+    try:
+        control_msg = await interaction.followup.send(
+            f"{header}\n\nScanned **0** / **{amount}** · Deleted **0**\n\n"
+            "🛑 **Emergency stop** — halts after the current delete batch.",
+            view=view,
+            ephemeral=True,
+        )
+    except discord.HTTPException:
+        control_msg = None
 
     try:
-        deleted = await channel.purge(limit=amount, check=check)
+        deleted, stopped = await _run_cancellable_purge(
+            channel,
+            amount,
+            check,
+            cancel_event,
+            progress_message=control_msg,
+            progress_view=view if control_msg else None,
+            header_lines=[header],
+        )
     except discord.Forbidden:
-        return await interaction.followup.send("❌ I don't have permission to delete messages in that channel.", ephemeral=True)
+        if control_msg:
+            try:
+                await control_msg.edit(content="❌ I don't have permission to delete messages in that channel.", view=None)
+            except discord.HTTPException:
+                pass
+        else:
+            await interaction.followup.send(
+                "❌ I don't have permission to delete messages in that channel.",
+                ephemeral=True,
+            )
+        return
     except discord.HTTPException as e:
-        return await interaction.followup.send(f"❌ Failed to purge: {e}", ephemeral=True)
+        err = _redact_discord_token_in_text(f"❌ Failed to purge: {e}")
+        if control_msg:
+            try:
+                await control_msg.edit(content=err, view=None)
+            except discord.HTTPException:
+                pass
+        else:
+            await interaction.followup.send(err, ephemeral=True)
+        return
 
-    await interaction.followup.send(f"✅ Deleted {len(deleted)} messages from {channel.mention} ({msg_type})", ephemeral=True)
+    if control_msg:
+        try:
+            if stopped:
+                await control_msg.edit(
+                    content=(
+                        f"⏹️ Purge **stopped** early.\n{header}\n\n"
+                        f"Deleted **{deleted}** message(s) ({msg_type})."
+                    ),
+                    view=None,
+                )
+            else:
+                await control_msg.edit(
+                    content=(
+                        f"✅ Purge **complete**.\n{header}\n\n"
+                        f"Deleted **{deleted}** message(s) ({msg_type})."
+                    ),
+                    view=None,
+                )
+        except discord.HTTPException:
+            pass
+    else:
+        if stopped:
+            await interaction.followup.send(
+                f"⏹️ Purge stopped. Deleted **{deleted}** messages from {channel.mention} ({msg_type})",
+                ephemeral=True,
+            )
+        else:
+            await interaction.followup.send(
+                f"✅ Deleted **{deleted}** messages from {channel.mention} ({msg_type})",
+                ephemeral=True,
+            )
+
     _dispatch_module_log_event(
         interaction.guild,
         "moderation",
         "purge",
         actor=interaction.user,
-        details=f"channel_id={channel.id}; requested={amount}; deleted={len(deleted)}; type={msg_type}",
+        details=(
+            f"channel_id={channel.id}; requested={amount}; deleted={deleted}; type={msg_type}; "
+            f"stopped_early={stopped}"
+        ),
         channel_id=channel.id,
     )
-    
+
+
 @bot.tree.command(name="specific_purge", description="Delete messages from a specific user")
 @app_commands.describe(
     user="The user to delete messages from",
     amount="Number of messages to delete (or leave empty to delete all found)",
-    channel="Channel to purge messages from"
+    channel="Channel to purge messages from",
 )
-@app_commands.checks.has_permissions(manage_messages=True)
-async def specific_purge(interaction: discord.Interaction, user: discord.Member, channel: discord.TextChannel, amount: int = 1000):
-    await interaction.response.defer(ephemeral=True)  # Let the user know the bot is processing
+async def specific_purge(
+    interaction: discord.Interaction,
+    user: discord.Member,
+    channel: discord.TextChannel,
+    amount: int = 1000,
+):
+    await interaction.response.defer(ephemeral=True)
 
-    warning_sent = False
+    def check(msg: discord.Message) -> bool:
+        return msg.author.id == user.id
 
-    async def delete_messages():
-        nonlocal warning_sent
-        deleted_count = 0
-
-        def check(msg):
-            return msg.author.id == user.id
-
-        # Fetch messages in small batches to avoid rate limits
-        async for msg in channel.history(limit=amount):
-            if check(msg):
-                await msg.delete()
-                deleted_count += 1
-
-            # Check if 30 seconds have passed
-            if not warning_sent and delete_messages.start_time and (asyncio.get_running_loop().time() - delete_messages.start_time > 30):
-                await interaction.followup.send(
-                    f"⏳ Sorry, this is taking a while. {user.display_name} has a lot of messages!",
-                    ephemeral=True
-                )
-                warning_sent = True
-
-        return deleted_count
-
-    delete_messages.start_time = asyncio.get_running_loop().time()
+    cancel_event = asyncio.Event()
+    view = PurgeEmergencyStopView(interaction.user.id, cancel_event)
+    header = f"**Specific purge** — {user.mention} in {channel.mention}\nScanning up to **{amount}** recent messages."
     try:
-        deleted_count = await delete_messages()
-    except discord.Forbidden:
-        return await interaction.followup.send("❌ I don't have permission to delete messages in that channel.", ephemeral=True)
-    except discord.HTTPException as e:
-        return await interaction.followup.send(f"❌ Failed to purge: {e}", ephemeral=True)
+        control_msg = await interaction.followup.send(
+            f"{header}\n\nScanned **0** / **{amount}** · Deleted **0**\n\n"
+            "🛑 **Emergency stop** — halts after the current delete batch.",
+            view=view,
+            ephemeral=True,
+        )
+    except discord.HTTPException:
+        control_msg = None
 
-    await interaction.followup.send(
-        f"✅ Deleted {deleted_count} messages from {user.mention} in {channel.mention}",
-        ephemeral=True
-    )
+    try:
+        deleted_count, stopped = await _run_cancellable_purge(
+            channel,
+            amount,
+            check,
+            cancel_event,
+            progress_message=control_msg,
+            progress_view=view if control_msg else None,
+            header_lines=[header],
+        )
+    except discord.Forbidden:
+        if control_msg:
+            try:
+                await control_msg.edit(content="❌ I don't have permission to delete messages in that channel.", view=None)
+            except discord.HTTPException:
+                pass
+        else:
+            await interaction.followup.send(
+                "❌ I don't have permission to delete messages in that channel.",
+                ephemeral=True,
+            )
+        return
+    except discord.HTTPException as e:
+        err = _redact_discord_token_in_text(f"❌ Failed to purge: {e}")
+        if control_msg:
+            try:
+                await control_msg.edit(content=err, view=None)
+            except discord.HTTPException:
+                pass
+        else:
+            await interaction.followup.send(err, ephemeral=True)
+        return
+
+    if control_msg:
+        try:
+            if stopped:
+                await control_msg.edit(
+                    content=(
+                        f"⏹️ Specific purge **stopped** early.\n{header}\n\n"
+                        f"Deleted **{deleted_count}** message(s)."
+                    ),
+                    view=None,
+                )
+            else:
+                await control_msg.edit(
+                    content=(
+                        f"✅ Specific purge **complete**.\n{header}\n\n"
+                        f"Deleted **{deleted_count}** message(s)."
+                    ),
+                    view=None,
+                )
+        except discord.HTTPException:
+            pass
+    else:
+        if stopped:
+            await interaction.followup.send(
+                f"⏹️ Stopped. Deleted **{deleted_count}** messages from {user.mention} in {channel.mention}",
+                ephemeral=True,
+            )
+        else:
+            await interaction.followup.send(
+                f"✅ Deleted **{deleted_count}** messages from {user.mention} in {channel.mention}",
+                ephemeral=True,
+            )
+
     _dispatch_module_log_event(
         interaction.guild,
         "moderation",
         "specific_purge",
         actor=interaction.user,
-        details=f"target_user_id={user.id}; channel_id={channel.id}; limit={amount}; deleted={deleted_count}",
+        details=(
+            f"target_user_id={user.id}; channel_id={channel.id}; limit={amount}; "
+            f"deleted={deleted_count}; stopped_early={stopped}"
+        ),
         channel_id=channel.id,
     )
     
@@ -1174,8 +1695,6 @@ async def loading(ctx):
     await msg.edit(content="✅ Done!")
     await asyncio.sleep(1)
     await msg.delete()  # Remove the message after showing it's done
-    
-GUILD_ID = 0  # Replace with your guild ID
 
 LOGGING_FILE = os.path.join(_storage_dir, "Config", "logging.json")
 
@@ -1268,7 +1787,7 @@ async def log_action(interaction: discord.Interaction, message: str) -> None:
             await channel.send(message)
             print(f"[DEBUG] Sent log message to channel {channel_id}")
         except Exception as e:
-            print(f"[ERROR] Failed to send log message: {e}")
+            print(_redact_discord_token_in_text(f"[ERROR] Failed to send log message: {e}"))
     else:
         print(f"[DEBUG] Channel ID {channel_id} not found in guild {guild_id}")
 
@@ -1436,7 +1955,6 @@ async def _notify_user_moderation_dm(
     reason="Reason for the ban.",
     duration="Ban duration in minutes. Leave empty for permanent."
 )
-@app_commands.checks.has_permissions(ban_members=True)
 async def ban(
     interaction: discord.Interaction,
     member: discord.Member,
@@ -1458,53 +1976,90 @@ async def ban(
             duration_text=(f"{duration} minute(s)" if duration else "Permanent"),
         )
         await member.ban(reason=reason)
-        if duration:
-            msg = get_command_response_for_interaction(
-                interaction,
-                "success",
-                "🔨 {member} has been banned for {duration} minutes. Reason: {reason}",
-                member=str(member),
-                duration=str(duration),
-                reason=reason or "No reason provided",
-            )
-            await interaction.response.send_message(msg)
-            _dispatch_module_log_event(
-                interaction.guild,
-                "moderation",
-                "ban",
-                actor=interaction.user,
-                details=f"target_user_id={member.id}; duration_minutes={duration}; reason={reason or 'No reason provided'}",
-                channel_id=interaction.channel.id if interaction.channel else None,
-            )
-            # Wait and unban later
-            await asyncio.sleep(duration * 60)
-            await interaction.guild.unban(member)
-        else:
-            msg = get_command_response_for_interaction(
-                interaction,
-                "success_permanent",
-                "🔨 {member} has been permanently banned. Reason: {reason}",
-                member=str(member),
-                reason=reason or "No reason provided",
-            )
-            await interaction.response.send_message(msg)
-            _dispatch_module_log_event(
-                interaction.guild,
-                "moderation",
-                "ban",
-                actor=interaction.user,
-                details=f"target_user_id={member.id}; duration_minutes=permanent; reason={reason or 'No reason provided'}",
-                channel_id=interaction.channel.id if interaction.channel else None,
-            )
-    except discord.Forbidden:
-        await interaction.response.send_message("❌ I don't have permission to ban this member.", ephemeral=True)
+    except discord.Forbidden as e:
+        details = _format_error_details(exc=e)
+        friendly, view = _error_details_view(
+            "❌ I don't have permission to ban this member.",
+            details,
+        )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
     except Exception as e:
-        await interaction.response.send_message(f"❌ Failed to ban {member}: {e}", ephemeral=True)
+        details = _format_error_details(exc=e)
+        friendly, view = _error_details_view(
+            f"❌ Failed to ban {member}.",
+            details,
+        )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
+
+    if duration:
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "🔨 {member} has been banned for {duration} minutes. Reason: {reason}",
+            member=str(member),
+            duration=str(duration),
+            reason=reason or "No reason provided",
+        )
+        try:
+            await interaction.response.send_message(msg)
+        except (discord.Forbidden, discord.HTTPException):
+            try:
+                await interaction.guild.unban(member, reason="Rollback: failed to send response")
+            except Exception:
+                pass
+            try:
+                await _send_app_error(
+                    interaction,
+                    "❌ Ban was applied but I couldn't confirm. The ban has been removed.",
+                )
+            except Exception:
+                pass
+            return
+        _dispatch_module_log_event(
+            interaction.guild,
+            "moderation",
+            "ban",
+            actor=interaction.user,
+            details=f"target_user_id={member.id}; duration_minutes={duration}; reason={reason or 'No reason provided'}",
+            channel_id=interaction.channel.id if interaction.channel else None,
+        )
+        await asyncio.sleep(duration * 60)
+        await interaction.guild.unban(member)
+    else:
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success_permanent",
+            "🔨 {member} has been permanently banned. Reason: {reason}",
+            member=str(member),
+            reason=reason or "No reason provided",
+        )
+        try:
+            await interaction.response.send_message(msg)
+        except (discord.Forbidden, discord.HTTPException):
+            try:
+                await interaction.guild.unban(member, reason="Rollback: failed to send response")
+            except Exception:
+                pass
+            try:
+                await _send_app_error(
+                    interaction,
+                    "❌ Ban was applied but I couldn't confirm. The ban has been removed.",
+                )
+            except Exception:
+                pass
+            return
+        _dispatch_module_log_event(
+            interaction.guild,
+            "moderation",
+            "ban",
+            actor=interaction.user,
+            details=f"target_user_id={member.id}; duration_minutes=permanent; reason={reason or 'No reason provided'}",
+            channel_id=interaction.channel.id if interaction.channel else None,
+        )
 
 # ------------------- UNBAN COMMAND -------------------
 @tree.command(name="unban", description="Unban a user from the server by ID (Admin only)")
 @app_commands.describe(user_id="The ID of the user to unban")
-@app_commands.checks.has_permissions(ban_members=True)
 async def unban(interaction: discord.Interaction, user_id: str):
     guild = interaction.guild
     if not guild:
@@ -1542,75 +2097,122 @@ async def unban(interaction: discord.Interaction, user_id: str):
     except discord.Forbidden:
         await interaction.response.send_message("❌ I don't have permission to unban this user.", ephemeral=True)
     except Exception as e:
-        await interaction.response.send_message(f"❌ An error occurred: {e}", ephemeral=True)
-  
-@tree.command(name="giverole", description="Give a role to a user.")
+        await interaction.response.send_message(
+            _redact_discord_token_in_text(f"❌ An error occurred: {e}"),
+            ephemeral=True,
+        )
+
+@tree.command(name="legacy_giverole", description="(Legacy) Give a role to a user.")
 @app_commands.describe(member="User to give the role to", role="Role to give")
-@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def giverole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
     if role in member.roles:
         await interaction.response.send_message(
             f"❌ {member.mention} already has the role {role.name}.", ephemeral=True)
         return
 
+    reason_cannot = _can_add_role_reason(interaction.guild, member, role)
+    if reason_cannot:
+        details = _format_error_details(reason=reason_cannot)
+        friendly, view = _error_details_view(
+            f"❌ I cannot add that role to {member.mention}.",
+            details,
+        )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
     try:
         await member.add_roles(role)
-        msg = get_command_response_for_interaction(
-            interaction,
-            "success",
-            "✅ Added role {role} to {member}.",
-            role=role.name,
-            member=member.mention,
+    except discord.Forbidden as e:
+        details = _format_error_details(exc=e)
+        friendly, view = _error_details_view(
+            f"❌ I cannot add that role to {member.mention} (missing permission or role hierarchy).",
+            details,
         )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
+    msg = get_command_response_for_interaction(
+        interaction,
+        "success",
+        "✅ Added role {role} to {member}.",
+        role=role.name,
+        member=member.mention,
+    )
+    try:
         await interaction.response.send_message(msg)
-        _dispatch_module_log_event(
-            interaction.guild,
-            "moderation",
-            "giverole",
-            actor=interaction.user,
-            details=f"target_user_id={member.id}; role_id={role.id}",
-            channel_id=interaction.channel.id if interaction.channel else None,
-        )
-    except discord.Forbidden:
-        await interaction.response.send_message(
-            "❌ I do not have permission to add that role.", ephemeral=True)
-    except Exception as e:
-        await interaction.response.send_message(
-            f"❌ Error: {e}", ephemeral=True)
+    except (discord.Forbidden, discord.HTTPException):
+        try:
+            await member.remove_roles(role, reason="Rollback: failed to send response")
+        except Exception:
+            pass
+        try:
+            await _send_app_error(
+                interaction,
+                f"❌ Role was added but I couldn't confirm. The role has been removed from {member.mention}.",
+            )
+        except Exception:
+            pass
+        return
+    _dispatch_module_log_event(
+        interaction.guild,
+        "moderation",
+        "giverole",
+        actor=interaction.user,
+        details=f"target_user_id={member.id}; role_id={role.id}",
+        channel_id=interaction.channel.id if interaction.channel else None,
+    )
 
-@tree.command(name="removerole", description="Remove a role from a user.")
+@tree.command(name="legacy_removerole", description="(Legacy) Remove a role from a user.")
 @app_commands.describe(member="User to remove the role from", role="Role to remove")
-@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def removerole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
     if role not in member.roles:
         await interaction.response.send_message(
             f"❌ {member.mention} does not have the role {role.name}.", ephemeral=True)
         return
 
+    reason_cannot = _can_add_role_reason(interaction.guild, member, role)
+    if reason_cannot:
+        details = _format_error_details(reason=reason_cannot)
+        friendly, view = _error_details_view(
+            f"❌ I cannot remove that role from {member.mention}.",
+            details,
+        )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
     try:
         await member.remove_roles(role)
-        msg = get_command_response_for_interaction(
-            interaction,
-            "success",
-            "✅ Removed role {role} from {member}.",
-            role=role.name,
-            member=member.mention,
+    except discord.Forbidden as e:
+        details = _format_error_details(exc=e)
+        friendly, view = _error_details_view(
+            f"❌ I cannot remove that role from {member.mention} (missing permission or role hierarchy).",
+            details,
         )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
+    msg = get_command_response_for_interaction(
+        interaction,
+        "success",
+        "✅ Removed role {role} from {member}.",
+        role=role.name,
+        member=member.mention,
+    )
+    try:
         await interaction.response.send_message(msg)
-        _dispatch_module_log_event(
-            interaction.guild,
-            "moderation",
-            "removerole",
-            actor=interaction.user,
-            details=f"target_user_id={member.id}; role_id={role.id}",
-            channel_id=interaction.channel.id if interaction.channel else None,
-        )
-    except discord.Forbidden:
-        await interaction.response.send_message(
-            "❌ I do not have permission to remove that role.", ephemeral=True)
-    except Exception as e:
-        await interaction.response.send_message(
-            f"❌ Error: {e}", ephemeral=True)
+    except (discord.Forbidden, discord.HTTPException):
+        try:
+            await member.add_roles(role, reason="Rollback: failed to send response")
+        except Exception:
+            pass
+        try:
+            await _send_app_error(
+                interaction,
+                f"❌ Role was removed but I couldn't confirm. The role has been restored to {member.mention}.",
+            )
+        except Exception:
+            pass
+        return
+    _dispatch_module_log_event(
+        interaction.guild,
+        "moderation",
+        "removerole",
+        actor=interaction.user,
+        details=f"target_user_id={member.id}; role_id={role.id}",
+        channel_id=interaction.channel.id if interaction.channel else None,
+    )
         
 
 autorole_config = {}  # guild_id: {event_key: [role_ids]}
@@ -1772,7 +2374,6 @@ mute_config = load_mute_config()
 
 @tree.command(name="mute", description="Mute a member for a specified time.")
 @app_commands.describe(member="User to mute", duration="Duration (number)", unit="Time unit: m for minutes, h for hours", reason="Reason for muting")
-@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def mute(interaction: discord.Interaction, member: discord.Member, duration: int, unit: str, reason: str = None):
     unit = unit.lower()
     if unit not in ("m", "h"):
@@ -1796,7 +2397,23 @@ async def mute(interaction: discord.Interaction, member: discord.Member, duratio
         await interaction.response.send_message(f"❌ {member.mention} is already muted.", ephemeral=True)
         return
 
-    await member.add_roles(mute_role, reason=reason)
+    reason_cannot = _can_add_role_reason(interaction.guild, member, mute_role)
+    if reason_cannot:
+        details = _format_error_details(reason=reason_cannot)
+        friendly, view = _error_details_view(
+            f"❌ I cannot mute {member.mention}.",
+            details,
+        )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
+    try:
+        await member.add_roles(mute_role, reason=reason)
+    except discord.Forbidden as e:
+        details = _format_error_details(exc=e)
+        friendly, view = _error_details_view(
+            f"❌ I cannot add the mute role to {member.mention} (missing permission or role hierarchy).",
+            details,
+        )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
     await _notify_user_moderation_dm(
         member,
         "Mute",
@@ -1814,7 +2431,21 @@ async def mute(interaction: discord.Interaction, member: discord.Member, duratio
         unit=unit,
         reason=reason or "No reason provided",
     )
-    await interaction.response.send_message(msg)
+    try:
+        await interaction.response.send_message(msg)
+    except (discord.Forbidden, discord.HTTPException):
+        try:
+            await member.remove_roles(mute_role, reason="Rollback: failed to send response")
+        except Exception:
+            pass
+        try:
+            await _send_app_error(
+                interaction,
+                "❌ Mute was applied but I couldn't confirm in this channel. The mute has been removed.",
+            )
+        except Exception:
+            pass
+        return
     _dispatch_module_log_event(
         interaction.guild,
         "moderation",
@@ -1837,7 +2468,6 @@ async def mute(interaction: discord.Interaction, member: discord.Member, duratio
 
 @tree.command(name="unmute", description="Unmute a member manually")
 @app_commands.describe(member="User to unmute")
-@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def unmute(interaction: discord.Interaction, member: discord.Member):
     guild_id = str(interaction.guild_id)
     mute_role_id = mute_config.get(guild_id)
@@ -1847,7 +2477,23 @@ async def unmute(interaction: discord.Interaction, member: discord.Member):
 
     mute_role = interaction.guild.get_role(mute_role_id)
     if mute_role in member.roles:
-        await member.remove_roles(mute_role, reason="Manual unmute")
+        reason_cannot = _can_add_role_reason(interaction.guild, member, mute_role)
+        if reason_cannot:
+            details = _format_error_details(reason=reason_cannot)
+            friendly, view = _error_details_view(
+                f"❌ I cannot unmute {member.mention}.",
+                details,
+            )
+            return await interaction.response.send_message(friendly, ephemeral=True, view=view)
+        try:
+            await member.remove_roles(mute_role, reason="Manual unmute")
+        except discord.Forbidden as e:
+            details = _format_error_details(exc=e)
+            friendly, view = _error_details_view(
+                f"❌ I cannot remove the mute role from {member.mention} (missing permission or role hierarchy).",
+                details,
+            )
+            return await interaction.response.send_message(friendly, ephemeral=True, view=view)
         await _notify_user_moderation_dm(
             member,
             "Unmute",
@@ -1878,11 +2524,18 @@ muterole_group = app_commands.Group(name="muterole", description="Mute role mana
 
 
 @muterole_group.command(name="create", description="Create and set a mute role")
-@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def muterole_create(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     guild = interaction.guild
-    role = await guild.create_role(name="Muted", reason="Mute role creation")
+    try:
+        role = await guild.create_role(name="Muted", reason="Mute role creation")
+    except discord.Forbidden as e:
+        details = _format_error_details(exc=e)
+        friendly, view = _error_details_view(
+            "❌ I don't have permission to create roles. Grant **Manage Roles** and ensure my role is high enough.",
+            details,
+        )
+        return await interaction.followup.send(friendly, ephemeral=True, view=view)
     for channel in guild.channels:
         try:
             await channel.set_permissions(role, send_messages=False, speak=False, add_reactions=False)
@@ -1897,7 +2550,23 @@ async def muterole_create(interaction: discord.Interaction):
         "✅ Created and set mute role: `{role}`",
         role=role.name,
     )
-    await interaction.followup.send(msg, ephemeral=True)
+    try:
+        await interaction.followup.send(msg, ephemeral=True)
+    except (discord.Forbidden, discord.HTTPException):
+        try:
+            await role.delete(reason="Rollback: failed to send response")
+            del mute_config[str(guild.id)]
+            save_mute_config(mute_config)
+        except Exception:
+            pass
+        try:
+            await interaction.followup.send(
+                "❌ Mute role was created but I couldn't confirm. The role has been deleted.",
+                ephemeral=True,
+            )
+        except Exception:
+            pass
+        return
     _dispatch_module_log_event(
         interaction.guild,
         "moderation",
@@ -1910,7 +2579,6 @@ async def muterole_create(interaction: discord.Interaction):
 
 @muterole_group.command(name="update", description="Update the mute role")
 @app_commands.describe(role="The new mute role")
-@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def muterole_update(interaction: discord.Interaction, role: discord.Role):
     mute_config[str(interaction.guild_id)] = role.id
     save_mute_config(mute_config)
@@ -1936,7 +2604,6 @@ tree.add_command(muterole_group)
 
 @tree.command(name="hardmute", description="Mute and remove all roles from a user")
 @app_commands.describe(member="Member to hardmute", reason="Reason for hardmute")
-@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def hardmute(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
     guild_id = str(interaction.guild_id)
     mute_role_id = mute_config.get(guild_id)
@@ -1947,9 +2614,29 @@ async def hardmute(interaction: discord.Interaction, member: discord.Member, rea
     mute_role = interaction.guild.get_role(mute_role_id)
     roles_to_remove = [r for r in member.roles if r != interaction.guild.default_role and r != mute_role]
 
+    reason_cannot = _can_add_role_reason(interaction.guild, member, mute_role)
+    if reason_cannot:
+        details = _format_error_details(reason=reason_cannot)
+        friendly, view = _error_details_view(
+            f"❌ I cannot hardmute {member.mention}.",
+            details,
+        )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
     try:
         await member.remove_roles(*roles_to_remove, reason="Hardmute")
-        await member.add_roles(mute_role, reason=reason)
+        try:
+            await member.add_roles(mute_role, reason=reason)
+        except discord.Forbidden as e:
+            try:
+                await member.add_roles(*roles_to_remove, reason="Rollback: add mute role failed")
+            except Exception:
+                pass
+            details = _format_error_details(exc=e)
+            friendly, view = _error_details_view(
+                "❌ I cannot add the mute role (missing permission or role hierarchy). Roles were restored.",
+                details,
+            )
+            return await interaction.response.send_message(friendly, ephemeral=True, view=view)
         await _notify_user_moderation_dm(
             member,
             "Hardmute",
@@ -1973,8 +2660,13 @@ async def hardmute(interaction: discord.Interaction, member: discord.Member, rea
             details=f"target_user_id={member.id}; removed_roles={len(roles_to_remove)}; reason={reason}",
             channel_id=interaction.channel.id if interaction.channel else None,
         )
-    except discord.Forbidden:
-        await interaction.response.send_message("❌ Missing permission to manage roles.", ephemeral=True)
+    except discord.Forbidden as e:
+        details = _format_error_details(exc=e)
+        friendly, view = _error_details_view(
+            "❌ Missing permission to manage roles (or role hierarchy).",
+            details,
+        )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
 
 # Event Handlers
 @bot.event
@@ -2128,7 +2820,10 @@ async def starttimer(interaction: discord.Interaction, duration: str):
     except ValueError:
         await interaction.response.send_message("\u274C Invalid format. Use like `10s`, `5m`, or `2h`.", ephemeral=True)
     except Exception as e:
-        await interaction.response.send_message(f"\u274C An error occurred: {e}", ephemeral=True)
+        await interaction.response.send_message(
+            _redact_discord_token_in_text(f"\u274C An error occurred: {e}"),
+            ephemeral=True,
+        )
 
 @tree.command(name="checktimers", description="Check your active timers.")
 async def checktimers(interaction: discord.Interaction):
@@ -2227,7 +2922,10 @@ class DmModal(discord.ui.Modal, title="Type your DM"):
                 ephemeral=True,
             )
         except Exception as e:
-            await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
+            await interaction.response.send_message(
+                _redact_discord_token_in_text(f"❌ Error: {e}"),
+                ephemeral=True,
+            )
 
 
 class DmAuthorChoiceView(discord.ui.View):
@@ -2278,7 +2976,6 @@ from discord import Interaction
 from discord.ext import commands, tasks
 
 @tree.command(name="autorole_legacy", description="Legacy autorole command (deprecated).")
-@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def autorole(interaction: discord.Interaction):
     guild_id = str(interaction.guild.id)
     config = autorole_config.get(guild_id, {})
@@ -2311,7 +3008,6 @@ async def autorole(interaction: discord.Interaction):
     event="When to apply the role (on_join, on_message, on_thread)",
     action="Add or remove the role"
 )
-@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def setautorole(interaction: discord.Interaction, role: discord.Role, event: str, action: str):
     if event not in ["on_join", "on_message", "on_thread"]:
         await interaction.response.send_message(
@@ -2361,13 +3057,11 @@ async def on_interaction(interaction: discord.Interaction):
         )
 
 @tree.command(name="say", description="Send a message as the bot to a specific channel")
-@app_commands.checks.has_permissions(manage_guild=True)
 async def say(interaction: discord.Interaction):
     await interaction.response.send_message("Select a channel to send a message:", view=SayView(interaction.guild), ephemeral=True)
 
 
 @tree.command(name="dm", description="Send a DM as the bot (requires Moderate Members)")
-@app_commands.checks.has_permissions(moderate_members=True)
 async def dm(interaction: discord.Interaction):
     await interaction.response.send_message("Select a user to DM:", view=DmView(interaction.guild), ephemeral=True)
 
@@ -2470,7 +3164,15 @@ class SimpleButtonView(discord.ui.View):
     async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.user:
             return await interaction.response.send_message("❌ This isn’t for you.", ephemeral=True)
-        await self.user.add_roles(self.role)
+        try:
+            await self.user.add_roles(self.role)
+        except discord.Forbidden as e:
+            details = _format_error_details(exc=e)
+            friendly, view = _error_details_view(
+                "❌ I cannot assign the role (missing permission or role hierarchy).",
+                details,
+            )
+            return await interaction.response.send_message(friendly, ephemeral=True, view=view)
         await interaction.response.edit_message(content="✅ You’ve been verified!", view=None)
         _dispatch_module_log_event(
             interaction.guild,
@@ -2508,7 +3210,15 @@ class CodeVerifyModal(discord.ui.Modal, title="Enter Verification Code"):
 
     async def on_submit(self, interaction: discord.Interaction):
         if self.code_input.value.strip() == self.correct_code:
-            await self.user.add_roles(self.role)
+            try:
+                await self.user.add_roles(self.role)
+            except discord.Forbidden as e:
+                details = _format_error_details(exc=e)
+                friendly, view = _error_details_view(
+                    "❌ I cannot assign the role (missing permission or role hierarchy).",
+                    details,
+                )
+                return await interaction.response.send_message(friendly, ephemeral=True, view=view)
             await interaction.response.send_message("✅ Verification successful!", ephemeral=True)
             _dispatch_module_log_event(
                 interaction.guild,
@@ -2591,7 +3301,15 @@ class ColorButton(discord.ui.Button):
             return await interaction.response.send_message("❌ This isn't your verification session.", ephemeral=True)
 
         if self.color == self.parent.correct_color:
-            await self.parent.user.add_roles(self.parent.role)
+            try:
+                await self.parent.user.add_roles(self.parent.role)
+            except discord.Forbidden as e:
+                details = _format_error_details(exc=e)
+                friendly, view = _error_details_view(
+                    "❌ I cannot assign the role (missing permission or role hierarchy).",
+                    details,
+                )
+                return await interaction.response.send_message(friendly, ephemeral=True, view=view)
             await interaction.response.send_message(f"✅ Correct! You’ve been verified.", ephemeral=True)
             _dispatch_module_log_event(
                 interaction.guild,
@@ -2691,7 +3409,6 @@ class VerifyStartView(discord.ui.View):
     app_commands.Choice(name="Keypad Code", value="code"),
     app_commands.Choice(name="Color Buttons", value="color"),
 ])
-@app_commands.checks.has_permissions(manage_guild=True)
 async def verifyconfig(interaction: discord.Interaction,
     method: app_commands.Choice[str],
     verified_role: discord.Role,
@@ -2736,8 +3453,10 @@ async def verifyconfig(interaction: discord.Interaction,
         )
     except Exception as e:
         await interaction.followup.send(
-            f"⚠️ I couldn’t send the message in {verify_channel.mention}.\n`{e}`",
-            ephemeral=True
+            _redact_discord_token_in_text(
+                f"⚠️ I couldn’t send the message in {verify_channel.mention}.\n`{e}`"
+            ),
+            ephemeral=True,
         )
 
 MODQUESTIONS_FILE = os.path.join(_storage_dir, "Config", "modquestions.json")
@@ -2750,7 +3469,6 @@ class Nickname(commands.Cog):
 
     @app_commands.command(name="nickname", description="Change Coffeecord's nickname in this server.")
     @app_commands.describe(name="The new nickname for Coffeecord.")
-    @app_commands.checks.has_permissions(manage_nicknames=True)
     async def nickname(self, interaction, name: str):
         # Check permissions
         if not interaction.guild.me.guild_permissions.manage_nicknames:
@@ -2769,17 +3487,12 @@ class Nickname(commands.Cog):
                 channel_id=interaction.channel.id if interaction.channel else None,
             )
         except Exception as e:
-            await interaction.response.send_message(f"❌ Failed to change nickname: {e}", ephemeral=True)
-
-async def setup(bot):
-    await bot.add_cog(Nickname(bot))
+            await interaction.response.send_message(
+                _redact_discord_token_in_text(f"❌ Failed to change nickname: {e}"),
+                ephemeral=True,
+            )
 
 # leveling system extracted to Modules/leveling.py
-
-    await interaction.response.send_message(message)
-    await interaction.followup.send(gif_url)
-
-MODQUESTIONS_FILE = os.path.join(_storage_dir, "Config", "modquestions.json")
 
 mod_questions = load_json(MODQUESTIONS_FILE, {})      # guild‑scoped dict
 
@@ -2804,7 +3517,6 @@ class StaffAppGroup(app_commands.Group):
         super().__init__(name="application", description="Staff application commands")
 
     @app_commands.command(name="toggle", description="Toggle staff applications on or off")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def toggle(self, interaction: discord.Interaction):
         # Your toggle logic here
         await interaction.response.send_message("Toggled staff applications!", ephemeral=True)
@@ -2818,7 +3530,6 @@ class StaffAppGroup(app_commands.Group):
         )
 
     @app_commands.command(name="addquestion", description="Add a staff application question")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def add_question(self, interaction: discord.Interaction, question: str):
         # Add question logic here
         await interaction.response.send_message(f"Added question: {question}", ephemeral=True)
@@ -2833,7 +3544,6 @@ class StaffAppGroup(app_commands.Group):
 
         #  /staffapp question remove -------------------------------------------
     @app_commands.command(name="remove", description="Remove a question")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def question_remove(self, interaction: discord.Interaction):
         qs = gcfg(str(interaction.guild_id))["questions"]
         if not qs:
@@ -2868,7 +3578,6 @@ class StaffAppGroup(app_commands.Group):
 
           #  /staffapp question list ---------------------------------------------
     @app_commands.command(name="list", description="List current questions")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def question_list(self, interaction: discord.Interaction):
         qs = gcfg(str(interaction.guild_id))["questions"]
         await interaction.response.send_message(
@@ -2880,7 +3589,6 @@ class StaffAppGroup(app_commands.Group):
         channel="Channel where applicants will run /application",
         reviewer_role="Role notified of new applications",
         pass_role="Role granted when an application is approved")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def setup(self, interaction: discord.Interaction,
                     channel:      discord.TextChannel,
                     reviewer_role: discord.Role,
@@ -2904,9 +3612,8 @@ class StaffAppGroup(app_commands.Group):
             channel_id=interaction.channel.id if interaction.channel else None,
         )
 
-async def setup(bot: commands.Bot):
-    await bot.add_cog(StaffAppGroup())  # Required if StaffAppGroup is a cog (inheriting from commands.Cog)
-    bot.tree.add_command(StaffAppGroup())  # Required if you're registering the command group manually
+# StaffAppGroup uses name="application" which conflicts with @tree.command(name="application") below;
+# the group is not registered on the command tree.
 
 def get_staff_cfg(guild_id: str) -> dict:
     return staff_app_cfg.setdefault(guild_id, {
@@ -3087,7 +3794,7 @@ async def on_guild_join(guild: discord.Guild):
         )
         print(f"[JOIN] Sent welcome message in {guild.name}")
     except Exception as e:
-        print(f"[JOIN ERROR] Failed to send welcome in {guild.name}: {e}")
+        print(_redact_discord_token_in_text(f"[JOIN ERROR] Failed to send welcome in {guild.name}: {e}"))
 
 # leveling reward and level-up logic extracted to Modules/leveling.py
 
@@ -3115,7 +3822,6 @@ def save_adaptive_slowmode_config(data):
     name="adaptive_slowmode",
     description="Enable adaptive slowmode with up to 3 rules"
 )
-@discord.app_commands.checks.has_permissions(manage_channels=True)
 async def adaptive_slowmode(
     interaction: discord.Interaction,
     enabled: bool,
@@ -3313,11 +4019,20 @@ async def on_voice_state_update(member, before, after):
             await _get_leveling_module().award_voice_xp(bot, member, active_vc_members)
 
 # ─── Console logging: all commands and processes ─────────────────────────────
-def _log_cmd(prefix: str, name: str, user: discord.abc.User, guild: discord.Guild | None, channel: discord.abc.Messageable | None) -> None:
+def _log_cmd(
+    prefix: str,
+    name: str,
+    user: discord.abc.User | None,
+    guild: discord.Guild | None,
+    channel: discord.abc.Messageable | None,
+) -> None:
     """Log command invocation to stdout (ends up in bot.log via c-cord)."""
     guild_name = guild.name if guild else "DM"
     ch_name = getattr(channel, "name", str(channel)) if channel else "?"
     full = f"{prefix}{name}"
+    if user is None:
+        print(f"[CMD] {full} | (no user) | {guild_name}#{ch_name}")
+        return
     print(f"[CMD] {full} | {user} ({user.id}) | {guild_name}#{ch_name}")
 
 
@@ -3326,10 +4041,12 @@ async def _log_slash_command(interaction: discord.Interaction) -> None:
     """Log slash command invocations to console."""
     if interaction.type != discord.InteractionType.application_command:
         return
-    if interaction.user.bot:
+    # Guild slash commands often populate `member`; some payloads omit `user`.
+    actor = interaction.user or interaction.member
+    if actor is None or getattr(actor, "bot", False):
         return
     cmd = interaction.command.qualified_name if interaction.command else "unknown"
-    _log_cmd("/", cmd, interaction.user, interaction.guild, interaction.channel)
+    _log_cmd("/", cmd, actor, interaction.guild, interaction.channel)
 
 
 @bot.before_invoke
@@ -3361,18 +4078,26 @@ async def on_command_error(ctx, error):
         pass  # Optional: silently ignore unknown commands
     else:
         # Show exact failure reason to avoid vague "failed" messages.
-        await ctx.send(f"⚠️ {type(error).__name__}: {error}")
+        await ctx.send(
+            _redact_discord_token_in_text(f"⚠️ {type(error).__name__}: {error}")
+        )
 
         # Optional: log error to console only
-        print(f"[ERROR] {type(error).__name__}: {error}")
+        print(
+            _redact_discord_token_in_text(f"[ERROR] {type(error).__name__}: {error}")
+        )
 
-async def _send_app_error(interaction: discord.Interaction, message: str) -> None:
+async def _send_app_error(
+    interaction: discord.Interaction,
+    message: str,
+    view: discord.ui.View | None = None,
+) -> None:
     """Send an ephemeral app-command error regardless of response state."""
     try:
         if interaction.response.is_done():
-            await interaction.followup.send(message, ephemeral=True)
+            await interaction.followup.send(message, ephemeral=True, view=view)
         else:
-            await interaction.response.send_message(message, ephemeral=True)
+            await interaction.response.send_message(message, ephemeral=True, view=view)
     except (discord.Forbidden, discord.HTTPException):
         pass
 
@@ -3382,52 +4107,77 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 
     if isinstance(error, app_commands.MissingPermissions):
         perms = ", ".join(error.missing_permissions)
-        return await _send_app_error(
-            interaction,
+        details = _format_error_details(reason=f"MissingPermissions: {perms}")
+        friendly, view = _error_details_view(
             f"🚫 You are missing required permission(s): `{perms}`.",
+            details,
         )
+        return await _send_app_error(interaction, friendly, view=view)
 
     if isinstance(error, app_commands.BotMissingPermissions):
         perms = ", ".join(error.missing_permissions)
-        return await _send_app_error(
-            interaction,
+        details = _format_error_details(reason=f"BotMissingPermissions: {perms}")
+        friendly, view = _error_details_view(
             f"🤖 I am missing required permission(s): `{perms}`.",
+            details,
         )
+        return await _send_app_error(interaction, friendly, view=view)
 
     if isinstance(error, app_commands.CommandOnCooldown):
-        return await _send_app_error(
-            interaction,
-            f"⏳ This command is on cooldown. Try again in `{error.retry_after:.1f}`s.",
+        details = _format_error_details(
+            reason=f"CommandOnCooldown: retry_after={error.retry_after:.1f}s"
         )
+        friendly, view = _error_details_view(
+            f"⏳ This command is on cooldown. Try again in `{error.retry_after:.1f}`s.",
+            details,
+        )
+        return await _send_app_error(interaction, friendly, view=view)
 
     if isinstance(error, module_checks.MissingRoleOrModeratePermission):
-        return await _send_app_error(
-            interaction,
+        details = _format_error_details(exc=error)
+        friendly, view = _error_details_view(
             "🚫 You need **Manage Roles**, **Moderate Members**, or **Manage Server** to use this command.",
+            details,
         )
+        return await _send_app_error(interaction, friendly, view=view)
 
     if isinstance(error, app_commands.CheckFailure):
-        return await _send_app_error(
-            interaction,
+        details = _format_error_details(exc=error)
+        friendly, view = _error_details_view(
             "🚫 You do not meet the requirements to use this command.",
+            details,
         )
+        return await _send_app_error(interaction, friendly, view=view)
 
     if isinstance(error, app_commands.TransformerError):
-        return await _send_app_error(
-            interaction,
-            f"❌ Invalid value for `{error.value}` ({error.type.__name__}).",
+        details = _format_error_details(
+            reason=f"TransformerError: value={error.value!r}, type={error.type.__name__}"
         )
+        friendly, view = _error_details_view(
+            f"❌ Invalid value for `{error.value}` ({error.type.__name__}).",
+            details,
+        )
+        return await _send_app_error(interaction, friendly, view=view)
 
-    # Unexpected error: show exact cause + print full traceback.
+    # Unexpected error: show friendly message + button for full details.
+    import traceback
     err_name = type(original).__name__
     err_text = str(original) or "No details provided."
     short_error = (err_text[:1200] + "...") if len(err_text) > 1200 else err_text
-    await _send_app_error(
-        interaction,
-        f"⚠️ Command error: `{err_name}`\nDetails: `{short_error}`",
+    tb_lines = traceback.format_exception(type(original), original, original.__traceback__)
+    full_details = "".join(tb_lines).strip()
+    details = _format_error_details(exc=original)
+    if full_details:
+        truncated = full_details[:1900] + "..." if len(full_details) > 1900 else full_details
+        details = f"{details}\n\n**Traceback:**\n```\n{truncated}```"
+    if len(details) > 1900:
+        details = details[:1900] + "..."
+    friendly, view = _error_details_view(
+        f"⚠️ Command error: `{err_name}` — {short_error[:200]}",
+        details,
     )
+    await _send_app_error(interaction, friendly, view=view)
 
-    import traceback
     cmd_name = interaction.command.qualified_name if interaction.command else "unknown"
     print(f"[APP_COMMAND_ERROR] /{cmd_name}")
     traceback.print_exception(type(original), original, original.__traceback__)
@@ -3442,7 +4192,7 @@ async def sync_commands_prefix(ctx: commands.Context):
         synced = await tree.sync()
         await ctx.send(f"✅ Synced {len(synced)} commands!")
     except Exception as e:
-        await ctx.send(f"❌ Failed to sync: {e}")
+        await ctx.send(_redact_discord_token_in_text(f"❌ Failed to sync: {e}"))
 
 
 @bot.command(name="clearchache")
@@ -3457,14 +4207,13 @@ async def clearchache_prefix(ctx: commands.Context):
         await msg.edit(content="✅ Global commands cleared and resynced successfully!")
     except Exception as e:
         if msg is not None:
-            await msg.edit(content=f"❌ Error: {e}")
+            await msg.edit(content=_redact_discord_token_in_text(f"❌ Error: {e}"))
         else:
-            await ctx.send(f"❌ Error: {e}")
-        print(f"[Sync Error] {e}")
+            await ctx.send(_redact_discord_token_in_text(f"❌ Error: {e}"))
+        print(_redact_discord_token_in_text(f"[Sync Error] {e}"))
 
 
 @tree.command(name="debugcommands", description="Print all registered commands")
-@app_commands.checks.has_permissions(manage_guild=True)
 async def debug_commands(interaction: discord.Interaction):
     cmds = tree.get_commands()
     output = "\n".join(f"/{cmd.name}" for cmd in cmds)
@@ -3515,6 +4264,114 @@ async def _delete_call_after_empty(channel_id: int, guild_id: str) -> None:
     save_calls(calls)
 
 
+def _can_add_role_reason(guild: discord.Guild, member: discord.Member, role: discord.Role) -> str | None:
+    """Return the reason the bot cannot add the role to the member, or None if OK."""
+    bot_member = guild.me
+    if not bot_member:
+        return "Bot member not found."
+    if not bot_member.guild_permissions.manage_roles:
+        return "The bot lacks **Manage Roles** permission. Grant it in Server Settings → Roles."
+    if bot_member.top_role.position <= role.position:
+        return (
+            f"The bot's role is not above the mute role ({role.name}). "
+            f"Move the bot's role above **{role.name}** in Server Settings → Roles."
+        )
+    if bot_member.top_role.position <= member.top_role.position:
+        return (
+            f"The bot's role is not above {member.display_name}'s highest role ({member.top_role.name}). "
+            f"Move the bot's role higher in Server Settings → Roles."
+        )
+    return None
+
+
+def _call_set_permissions_reason(guild: discord.Guild, target: discord.Member) -> str | None:
+    """Return the specific reason the bot cannot set channel permissions for target, or None if OK."""
+    bot_member = guild.me
+    if not bot_member:
+        return "Bot member not found."
+    if not bot_member.guild_permissions.manage_roles:
+        return "The bot lacks **Manage Roles** permission. Grant it in Server Settings → Roles."
+    bot_top = bot_member.top_role
+    target_top = target.top_role
+    if bot_top.position <= target_top.position:
+        bot_name = bot_member.display_name
+        return (
+            f"The bot's role is not above {target_top.name}. "
+            f"Move **{bot_name}**'s role above the **{target_top.name}** role in Server Settings → Roles."
+        )
+    return None
+
+
+def _format_error_details(reason: str | None = None, exc: BaseException | None = None) -> str:
+    """Format technical details for the 'Show technical details' button."""
+    parts = []
+    if exc:
+        exc_type = type(exc).__name__
+        parts.append(f"**Exception:** `{exc_type}`")
+        parts.append(f"**Message:** {exc!s}")
+        if isinstance(exc, discord.HTTPException):
+            parts.append(f"**Status:** {getattr(exc, 'status', 'N/A')}")
+            if hasattr(exc, 'code') and exc.code:
+                parts.append(f"**Code:** {exc.code}")
+    if reason:
+        parts.append(f"**Pre-check:** {reason}")
+    raw = "\n".join(parts) if parts else "No details available."
+    return _redact_discord_token_in_text(raw)
+
+
+def _error_details_view(friendly_msg: str, technical_details: str) -> tuple[str, discord.ui.View]:
+    """Build a user-friendly message and a View with a 'Show technical details' button."""
+    friendly_msg = _redact_discord_token_in_text(friendly_msg)
+    technical_details = _redact_discord_token_in_text(technical_details)
+    key = secrets.token_hex(8)
+    _error_details_cache[key] = technical_details
+    view = _ErrorDetailsView(key)
+    return friendly_msg, view
+
+
+class _ErrorDetailsView(discord.ui.View):
+    """View with a button that reveals technical error details."""
+
+    def __init__(self, cache_key: str):
+        super().__init__(timeout=300)
+        custom_id = f"{_ERROR_DETAILS_PREFIX}{cache_key}"
+        if len(custom_id) > 100:
+            custom_id = _ERROR_DETAILS_PREFIX + cache_key[: 100 - len(_ERROR_DETAILS_PREFIX)]
+        btn = discord.ui.Button(
+            label="Show technical details",
+            style=ButtonStyle.secondary,
+            custom_id=custom_id,
+        )
+        btn.callback = self._on_click
+        self.add_item(btn)
+        # Do not use _cache_key — discord.py overwrites view._cache_key with message_id in store_view().
+        self._error_details_storage_key = cache_key
+
+    async def _on_click(self, interaction: discord.Interaction):
+        storage_key = getattr(self, "_error_details_storage_key", None)
+        if storage_key is None and interaction.data:
+            cid = interaction.data.get("custom_id") or ""
+            if cid.startswith(_ERROR_DETAILS_PREFIX):
+                storage_key = cid[len(_ERROR_DETAILS_PREFIX) :]
+        details = _error_details_cache.pop(storage_key, None) if storage_key else None
+        if details:
+            await interaction.response.send_message(
+                f"```\n{details}```",
+                ephemeral=True,
+            )
+        else:
+            await interaction.response.send_message(
+                "❌ Details expired or already viewed.",
+                ephemeral=True,
+            )
+        self.stop()
+
+    async def on_timeout(self):
+        key = getattr(self, "_error_details_storage_key", None)
+        if key:
+            _error_details_cache.pop(key, None)
+
+
 def _schedule_call_empty_delete(channel_id: int, guild_id: str) -> None:
     """Schedule auto-delete if the call channel is empty for 15 seconds."""
     _cancel_call_empty_timer(channel_id)
@@ -3551,7 +4408,6 @@ call_group = app_commands.Group(name="call", description="CoffeeCord call comman
 
 
 @call_group.command(name="create", description="Create a temporary private call channel.")
-@app_commands.checks.has_permissions(manage_channels=True)
 async def call(
     interaction: discord.Interaction,
     user1: discord.Member | None = None,
@@ -3564,8 +4420,11 @@ async def call(
     await interaction.response.defer(ephemeral=True)
 
     guild = interaction.guild
+    actor = interaction.user or interaction.member
     if not guild:
-        return await interaction.followup.send("❌ Guild not found.")
+        return await interaction.followup.send("❌ Guild not found.", ephemeral=True)
+    if actor is None:
+        return await interaction.followup.send("❌ Could not resolve your user for this command.", ephemeral=True)
 
     # Collect valid members
     invited = [
@@ -3576,26 +4435,38 @@ async def call(
     # Create private channel
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False),
-        interaction.user: discord.PermissionOverwrite(view_channel=True, connect=True)
+        actor: discord.PermissionOverwrite(view_channel=True, connect=True),
     }
 
     for member in invited:
         overwrites[member] = discord.PermissionOverwrite(view_channel=True, connect=False)
 
-    channel = await guild.create_voice_channel(
-        name=f"{interaction.user.display_name}'s Call",
-        overwrites=overwrites,
-        user_limit=len(invited) + 1 if password else 0
-    )
+    try:
+        channel = await guild.create_voice_channel(
+            name=f"{actor.display_name}'s Call",
+            overwrites=overwrites,
+            user_limit=len(invited) + 1 if password else 0
+        )
+    except discord.Forbidden:
+        return await interaction.followup.send(
+            "❌ I need **Manage Channels** (and permission to manage that category) to create call channels. "
+            "Ask an admin to grant the bot **Manage Channels**.",
+            ephemeral=True,
+        )
+    except discord.HTTPException as e:
+        return await interaction.followup.send(
+            _redact_discord_token_in_text(f"❌ Could not create the call channel: {e}"),
+            ephemeral=True,
+        )
 
     # Save call info
     calls = load_calls()
     calls.setdefault(str(guild.id), {})
 
     calls[str(guild.id)][str(channel.id)] = {
-        "host_id": str(interaction.user.id),
+        "host_id": str(actor.id),
         "channel_id": str(channel.id),
-        "members": [str(m.id) for m in invited] + [str(interaction.user.id)],
+        "members": [str(m.id) for m in invited] + [str(actor.id)],
         "password": password
     }
 
@@ -3605,7 +4476,7 @@ async def call(
     for member in invited:
         try:
             msg = (
-                f"📞 **{interaction.user.display_name} is calling you!**\n"
+                f"📞 **{actor.display_name} is calling you!**\n"
                 f"➡️ Use **/call join** to join: <#{channel.id}>\n"
             )
             if password:
@@ -3625,7 +4496,7 @@ async def call(
         interaction.guild,
         "calls",
         "call_create",
-        actor=interaction.user,
+        actor=actor,
         details=f"channel_id={channel.id}; invited={len(invited)}; password_protected={bool(password)}",
         channel_id=channel.id,
     )
@@ -3643,8 +4514,13 @@ async def call_join(
     channel: discord.VoiceChannel,
     password: str | None = None
 ):
-    guild = interaction.guild
-    user = interaction.user
+    guild = interaction.guild or getattr(channel, "guild", None)
+    user = interaction.user or interaction.member
+    if guild is None or user is None:
+        return await interaction.response.send_message(
+            "❌ Use this in a server (could not resolve guild or user).",
+            ephemeral=True,
+        )
     calls = load_calls()
     guild_calls = calls.get(str(guild.id), {})
     call_data = guild_calls.get(str(channel.id))
@@ -3661,8 +4537,25 @@ async def call_join(
         if password != call_password:
             return await interaction.response.send_message("❌ Incorrect password.", ephemeral=True)
 
-    # Add user
-    await channel.set_permissions(user, view_channel=True, connect=True)
+    # Add user (requires Manage Roles + bot role above user's highest role)
+    reason = _call_set_permissions_reason(guild, user)
+    if reason:
+        details = _format_error_details(reason=reason)
+        friendly, view = _error_details_view(
+            "❌ The bot is not high enough in the role hierarchy (or lacks permissions).",
+            details,
+        )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
+    try:
+        await channel.set_permissions(user, view_channel=True, connect=True)
+    except discord.Forbidden as e:
+        details = _format_error_details(exc=e)
+        friendly, view = _error_details_view(
+            "❌ The bot is not high enough in the role hierarchy (or lacks permissions).",
+            details,
+        )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
+
     if str(user.id) not in call_data["members"]:
         call_data["members"].append(str(user.id))
 
@@ -3694,7 +4587,7 @@ async def call_join(
         interaction.guild,
         "calls",
         "call_join",
-        actor=interaction.user,
+        actor=user,
         details=f"channel_id={channel.id}; password_protected={bool(call_password)}",
         channel_id=channel.id,
     )
@@ -3704,6 +4597,8 @@ async def call_join(
 # ---------------------------------------------------
 @call_group.command(name="add", description="Add someone to your CoffeeCord call.")
 async def call_add(interaction: discord.Interaction, user: discord.Member):
+    if interaction.guild is None or interaction.user is None:
+        return await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
     calls = load_calls()
     guild_id = str(interaction.guild.id)
 
@@ -3726,7 +4621,23 @@ async def call_add(interaction: discord.Interaction, user: discord.Member):
         return
 
     # Give view_channel only; user must use /call join to get connect
-    await channel.set_permissions(user, view_channel=True, connect=False)
+    reason = _call_set_permissions_reason(interaction.guild, user)
+    if reason:
+        details = _format_error_details(reason=reason)
+        friendly, view = _error_details_view(
+            "❌ The bot is not high enough in the role hierarchy (or lacks permissions).",
+            details,
+        )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
+    try:
+        await channel.set_permissions(user, view_channel=True, connect=False)
+    except discord.Forbidden as e:
+        details = _format_error_details(exc=e)
+        friendly, view = _error_details_view(
+            "❌ The bot is not high enough in the role hierarchy (or lacks permissions).",
+            details,
+        )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
 
     # Add to call data
     if str(user.id) not in info["members"]:
@@ -3772,6 +4683,8 @@ async def call_add(interaction: discord.Interaction, user: discord.Member):
 # ---------------------------------------------------
 @call_group.command(name="remove", description="Remove someone from your CoffeeCord call.")
 async def call_remove(interaction: discord.Interaction, user: discord.Member):
+    if interaction.guild is None or interaction.user is None:
+        return await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
     calls = load_calls()
     guild_id = str(interaction.guild.id)
 
@@ -3794,7 +4707,23 @@ async def call_remove(interaction: discord.Interaction, user: discord.Member):
         return
 
     # Remove viewing & connecting permissions
-    await channel.set_permissions(user, overwrite=None)
+    reason = _call_set_permissions_reason(interaction.guild, user)
+    if reason:
+        details = _format_error_details(reason=reason)
+        friendly, view = _error_details_view(
+            "❌ The bot is not high enough in the role hierarchy (or lacks permissions).",
+            details,
+        )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
+    try:
+        await channel.set_permissions(user, overwrite=None)
+    except discord.Forbidden as e:
+        details = _format_error_details(exc=e)
+        friendly, view = _error_details_view(
+            "❌ The bot is not high enough in the role hierarchy (or lacks permissions).",
+            details,
+        )
+        return await interaction.response.send_message(friendly, ephemeral=True, view=view)
 
     # Remove from member list
     if str(user.id) in info["members"]:
@@ -3838,6 +4767,8 @@ async def call_remove(interaction: discord.Interaction, user: discord.Member):
 # ---------------------------------------------------
 @call_group.command(name="end", description="End your CoffeeCord call.")
 async def call_end(interaction: discord.Interaction):
+    if interaction.guild is None or interaction.user is None:
+        return await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
     calls = load_calls()
     guild_id = str(interaction.guild.id)
     info = get_host_call(interaction.guild.id, interaction.user.id)
@@ -3849,7 +4780,25 @@ async def call_end(interaction: discord.Interaction):
     channel = interaction.guild.get_channel(int(info["channel_id"]))
     if channel:
         _cancel_call_empty_timer(channel.id)
-        await channel.delete(reason="Call ended by host")
+        bot_member = interaction.guild.me
+        if bot_member and not bot_member.guild_permissions.manage_channels:
+            details = _format_error_details(
+                reason="Bot lacks Manage Channels permission."
+            )
+            friendly, view = _error_details_view(
+                "❌ The bot is not high enough in the role hierarchy (or lacks permissions).",
+                details,
+            )
+            return await interaction.response.send_message(friendly, ephemeral=True, view=view)
+        try:
+            await channel.delete(reason="Call ended by host")
+        except discord.Forbidden as e:
+            details = _format_error_details(exc=e)
+            friendly, view = _error_details_view(
+                "❌ The bot is not high enough in the role hierarchy (or lacks permissions).",
+                details,
+            )
+            return await interaction.response.send_message(friendly, ephemeral=True, view=view)
 
     del calls[guild_id][call_id]
     if not calls[guild_id]:
@@ -3872,6 +4821,8 @@ async def call_end(interaction: discord.Interaction):
 # ---------------------------------------------------
 @call_group.command(name="promote", description="Transfer call host role to another user.")
 async def call_promote(interaction: discord.Interaction, user: discord.Member):
+    if interaction.guild is None or interaction.user is None:
+        return await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
     calls = load_calls()
     guild_id = str(interaction.guild.id)
     info = get_host_call(interaction.guild.id, interaction.user.id)
@@ -3880,7 +4831,7 @@ async def call_promote(interaction: discord.Interaction, user: discord.Member):
         await interaction.response.send_message("❌ You aren’t the host of any active call.", ephemeral=True)
         return
 
-    if user.id not in info["members"]:
+    if str(user.id) not in info["members"]:
         await interaction.response.send_message("❌ That user isn’t in the call.", ephemeral=True)
         return
 
@@ -4015,7 +4966,7 @@ async def smooth_progress(msg, start, end, wheel, console, guild_id, view):
         try:
             await msg.edit(embed=embed, view=view)
         except Exception as e:
-            console.append(f"[ERROR] Failed to update progress: {e}")
+            console.append(_redact_discord_token_in_text(f"[ERROR] Failed to update progress: {e}"))
 
         # small sleep to allow other tasks to run
         await asyncio.sleep(0.07)
@@ -4287,7 +5238,6 @@ class InProgressControls(discord.ui.View):
 # UNINSTALL COMMAND (TOP LEVEL)
 # ==========================
 @tree.command(name="uninstall", description="Uninstall Coffeecord from this server.")
-@app_commands.checks.has_permissions(administrator=True)
 async def uninstall(interaction: discord.Interaction):
     guild = interaction.guild
     if guild is None:
@@ -4392,7 +5342,7 @@ async def uninstall(interaction: discord.Interaction):
     try:
         await msg.edit(embed=final_embed, view=None)
     except Exception as e:
-        console.append(f"[ERROR] Failed to edit final message: {e}")
+        console.append(_redact_discord_token_in_text(f"[ERROR] Failed to edit final message: {e}"))
 
     # keep visible for a short moment so the server owner can read it
     await asyncio.sleep(5)
@@ -4401,7 +5351,7 @@ async def uninstall(interaction: discord.Interaction):
     try:
         await guild.leave()
     except Exception as e:
-        console.append(f"[WARN] Failed to leave guild: {e}")
+        console.append(_redact_discord_token_in_text(f"[WARN] Failed to leave guild: {e}"))
 
     ACTIVE_UNINSTALLS.pop(guild.id, None)
 
@@ -4440,10 +5390,14 @@ async def on_ready():
                 break
             except (discord.HTTPException, discord.ConnectionError) as e:
                 if attempt < 2:
-                    print(f"[WARN] tree.sync attempt {attempt + 1} failed: {e}, retrying in 2s...")
+                    print(
+                        _redact_discord_token_in_text(
+                            f"[WARN] tree.sync attempt {attempt + 1} failed: {e}, retrying in 2s..."
+                        )
+                    )
                     await asyncio.sleep(2)
                 else:
-                    print(f"[ERROR] tree.sync failed after 3 attempts: {e}")
+                    print(_redact_discord_token_in_text(f"[ERROR] tree.sync failed after 3 attempts: {e}"))
                     raise
 
     except Exception as e:
@@ -4477,7 +5431,6 @@ def verify_payload(payload: dict, signature: str) -> bool:
 
 # ---------------- /ticket_export ----------------
 @bot.tree.command(name="ticket_export", description="Export this ticket as a downloadable signed JSON")
-@app_commands.checks.has_permissions(manage_channels=True)
 async def ticket_export(interaction: discord.Interaction):
     channel = interaction.channel
     guild_id = str(interaction.guild.id)
@@ -4544,7 +5497,6 @@ async def ticket_export(interaction: discord.Interaction):
 
 # ---------------- /ticket_import ----------------
 @bot.tree.command(name="ticket_import", description="Import a ticket from a signed JSON file")
-@app_commands.checks.has_permissions(manage_channels=True)
 @app_commands.describe(file="The exported ticket JSON file")
 async def ticket_import(interaction: discord.Interaction, file: discord.Attachment):
     # ---- Validate file ----
@@ -4677,7 +5629,10 @@ async def _run_bot_with_kofi():
     except commands.ExtensionAlreadyLoaded:
         pass
     except Exception as e:
-        print(f"Failed to load mandatory extension Modules.modules_cmd: {e}", flush=True)
+        print(
+            _redact_discord_token_in_text(f"Failed to load mandatory extension Modules.modules_cmd: {e}"),
+            flush=True,
+        )
 
     skipped_missing_extensions: list[str] = []
     loaded_count = 0
@@ -4696,7 +5651,10 @@ async def _run_bot_with_kofi():
         except commands.ExtensionAlreadyLoaded:
             continue
         except Exception as e:
-            print(f"Failed to load extension {extension}: {e}", flush=True)
+            print(
+                _redact_discord_token_in_text(f"Failed to load extension {extension}: {e}"),
+                flush=True,
+            )
 
     print(f"[module-registry] Loaded {loaded_count} extension(s).", flush=True)
 

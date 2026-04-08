@@ -753,7 +753,6 @@ class QuickSetupCog(commands.Cog):
         return "Not configured."
 
     @app_commands.command(name="setup", description="Start Coffeecord quick setup wizard.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def setup_command(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("Run this in a server.", ephemeral=True)
@@ -768,7 +767,6 @@ class QuickSetupCog(commands.Cog):
             session.message = None
 
     @app_commands.command(name="setup_resume", description="Resume your quick setup draft.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def setup_resume(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("Run this in a server.", ephemeral=True)
@@ -785,7 +783,6 @@ class QuickSetupCog(commands.Cog):
             session.message = None
 
     @app_commands.command(name="setup_cancel", description="Discard your quick setup draft.")
-    @app_commands.checks.has_permissions(manage_guild=True)
     async def setup_cancel(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("Run this in a server.", ephemeral=True)

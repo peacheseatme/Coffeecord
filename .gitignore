@@ -21,6 +21,9 @@ __pycache__/
 # Storage (runtime data; install script generates placeholders)
 Storage/
 
+# Local tarball from scripts/backup_instance_data.sh (restore after clone)
+instance_data_backup.tgz
+
 # Secret files
 *.env
 
@@ -34,3 +37,7 @@ temp_*.jpg
 
 # Old root-level data files (migrated to Storage/)
 *.json
+
+instance_data_backup.tgz
+backup_instance_data.sh
+restore_instance_data.sh

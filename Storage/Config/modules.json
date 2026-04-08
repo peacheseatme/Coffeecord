@@ -136,6 +136,15 @@
       "category": "configuration"
     },
     {
+      "id": "staff_utils",
+      "extension": "Modules.staff_utils",
+      "path": "Modules/staff_utils.py",
+      "display_name": "Staff Utilities",
+      "description": "Advanced purge, lockdown, staff notes, bulk roles, and moderation tools.",
+      "default_enabled": true,
+      "category": "moderation"
+    },
+    {
       "id": "support",
       "extension": "Modules.support",
       "path": "Modules/support.py",

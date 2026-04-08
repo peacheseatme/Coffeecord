@@ -215,6 +215,55 @@ DEFAULT_GUILD_CONFIG = {
 
 DEFAULT_CONFIG = {"default": copy.deepcopy(DEFAULT_GUILD_CONFIG)}
 
+# Applied to guild config when using `/automod preset` — tune with `/automod badword` etc.
+AUTOMOD_PRESET_STARTER_BAD_WORDS: tuple[str, ...] = (
+    # Slurs / harassment (substring list; customize per community)
+    "nigger",
+    "nigga",
+    "faggot",
+    "retard",
+    "spic",
+    "chink",
+    "kys",
+    "kill yourself",
+    # Profanity (remove if too strict for your server)
+    "fuck",
+    "shit",
+    "bitch",
+    "cunt",
+    "dick",
+    "cock",
+    "pussy",
+    # Common scam / spam phrases
+    "free nitro",
+    "discord nitro for free",
+    "claim your nitro",
+    "verify wallet",
+    "connect wallet",
+    "airdrop",
+    "send eth",
+    "send btc",
+)
+
+
+def _automod_preset_custom_regex_rules(action: str) -> list[dict[str, str]]:
+    """Concrete patterns so strict/dictatorship presets actually match messages."""
+    specs: tuple[tuple[str, str], ...] = (
+        (
+            "Steam scam URL typo",
+            r"(?i)https?://[^\s]*stea[mn][^\s]*commun",
+        ),
+        (
+            "Nitro scam text + link",
+            r"(?i)(?:claim|free|get)\s+[^\n]{0,40}nitro[^\n]{0,50}https?://",
+        ),
+        (
+            "Fake discord-themed TLD",
+            r"(?i)https?://[^\s]*discord[^\s]*\.(?:gift|fun|lol|cfd|skin)\b",
+        ),
+    )
+    return [{"name": name, "pattern": pattern, "action": action} for name, pattern in specs]
+
 
 class AutomodResult:
     def __init__(self, rule, action, reason, extra=None):
@@ -528,14 +577,27 @@ def _extract_invite_code(url: str):
         return lower.split("discord.gg/", 1)[1].split("?", 1)[0].strip("/")
     if "discord.com/invite/" in lower:
         return lower.split("discord.com/invite/", 1)[1].split("?", 1)[0].strip("/")
-        return None
+    return None
+
+
+def _bad_word_matches_content(word_lower: str, content_lower: str) -> bool:
+    """Match phrases with substring; single tokens use word boundaries to limit false positives."""
+    if " " in word_lower or len(word_lower) >= 6:
+        return word_lower in content_lower
+    try:
+        return re.search(rf"(?<!\w){re.escape(word_lower)}(?!\w)", content_lower) is not None
+    except re.error:
+        return word_lower in content_lower
 
 
 def check_bad_words(message: discord.Message, cfg: dict):
     content = message.content.lower()
     for word in cfg.get("words", []):
         word = str(word).strip()
-        if word and word.lower() in content:
+        if not word:
+            continue
+        wl = word.lower()
+        if _bad_word_matches_content(wl, content):
             return AutomodResult(
                 "bad_words",
                 cfg.get("action", "warn"),
@@ -577,10 +639,14 @@ def check_duplicate_messages(message: discord.Message, cfg: dict):
     min_duplicates = int(cfg.get("min_duplicates", 3))
     recent_identical = [c for (_, c) in cache if c == normalized]
     if len(recent_identical) >= min_duplicates:
+        extra: dict = {}
+        if str(cfg.get("action", "delete")).lower() == "timeout":
+            extra["seconds"] = int(cfg.get("timeout_seconds", 60))
         return AutomodResult(
             "duplicate_messages",
             cfg.get("action", "delete"),
             "Repeated duplicate message detected",
+            extra,
         )
     return None
 
@@ -619,10 +685,15 @@ def check_links(message: discord.Message, cfg: dict):
 def check_mentions(message: discord.Message, cfg: dict):
     total = len(message.mentions) + len(message.role_mentions)
     if total > int(cfg.get("max_mentions", 5)):
+        action = str(cfg.get("action", "warn")).lower()
+        extra: dict = {}
+        if action == "timeout":
+            extra["seconds"] = int(cfg.get("timeout_seconds", 60))
         return AutomodResult(
             "mentions",
             cfg.get("action", "warn"),
             "Too many mentions",
+            extra,
         )
     return None
 
@@ -637,10 +708,15 @@ def check_caps(message: discord.Message, cfg: dict):
     caps = sum(1 for c in letters if c.isupper())
     percent = (caps / len(letters)) * 100
     if percent >= float(cfg.get("caps_percent", 70)):
+        action = str(cfg.get("action", "delete")).lower()
+        extra: dict = {}
+        if action == "timeout":
+            extra["seconds"] = int(cfg.get("timeout_seconds", 60))
         return AutomodResult(
             "caps",
             cfg.get("action", "delete"),
             "Excessive caps usage",
+            extra,
         )
     return None
 
@@ -704,11 +780,14 @@ def check_anti_selfbot(message: discord.Message, cfg: dict):
 
     for compiled in patterns:
         if compiled.search(message.content):
+            extra: dict[str, bool | int] = {"delete_message": True}
+            if str(cfg.get("action", "delete")).lower() == "timeout":
+                extra["seconds"] = int(cfg.get("timeout_seconds", 60))
             return AutomodResult(
                 "anti_selfbot",
                 cfg.get("action", "delete"),
                 "Potential token/selfbot credential pattern detected",
-                {"delete_message": True},
+                extra,
             )
     return None
 
@@ -721,10 +800,15 @@ def check_new_user(message: discord.Message, cfg: dict):
     age_days = (discord.utils.utcnow() - message.author.created_at).days
     max_age_days = int(cfg.get("max_account_age_days", 7))
     if age_days < max_age_days:
+        action = str(cfg.get("action", "warn")).lower()
+        extra: dict = {}
+        if action == "timeout":
+            extra["seconds"] = int(cfg.get("timeout_seconds", 60))
         return AutomodResult(
             "new_user",
             cfg.get("action", "warn"),
             f"New account posting restriction ({age_days}d old account)",
+            extra,
         )
     return None
 
@@ -901,7 +985,8 @@ async def apply_action(
         elif action == "timeout":
             can_timeout, reason = can_perform_action(message.guild, message.author, "timeout")
             if can_timeout:
-                seconds = int(result.extra.get("seconds", 60))
+                default_seconds = int((rule_cfg or {}).get("timeout_seconds", 60))
+                seconds = int(result.extra.get("seconds", default_seconds))
                 if isinstance(message.author, discord.Member):
                     await notify_user_automod_action(
                         message.author,
@@ -1304,20 +1389,36 @@ PRESET_LABELS = {
     PRESET_STRICT: "Strict",
     PRESET_DICTATORSHIP: "Dictatorship",
 }
+AUTOMOD_PRESET_APPLIED_FOOTER = (
+    "Starter blocked words + link filters are active; adjust with `/automod` subcommands."
+)
 AUTOMOD_PRESET_CHOICES = [
     app_commands.Choice(name=PRESET_LABELS[PRESET_LIGHT], value=PRESET_LIGHT),
     app_commands.Choice(name=PRESET_LABELS[PRESET_MEDIUM], value=PRESET_MEDIUM),
     app_commands.Choice(name=PRESET_LABELS[PRESET_STRICT], value=PRESET_STRICT),
     app_commands.Choice(name=PRESET_LABELS[PRESET_DICTATORSHIP], value=PRESET_DICTATORSHIP),
 ]
+_PRESET_BAD_WORDS = {
+    "enabled": True,
+    "words": list(AUTOMOD_PRESET_STARTER_BAD_WORDS),
+    "action": "warn",
+    "delete_message": True,
+}
+
 AUTOMOD_PRESETS: dict[str, dict] = {
     PRESET_LIGHT: {
         "enabled": True,
         "count_rule_violations_as_warns": False,
-        "bad_words": {"enabled": True, "action": "warn", "delete_message": True},
+        "bad_words": {**_PRESET_BAD_WORDS, "action": "warn"},
         "spam": {"enabled": True, "max_messages": 8, "per_seconds": 6, "action": "warn", "timeout_seconds": 60},
         "duplicate_messages": {"enabled": False},
-        "links": {"enabled": True, "block_invites": True, "block_links": False, "action": "warn"},
+        "links": {
+            "enabled": True,
+            "block_invites": True,
+            "block_links": True,
+            "action": "warn",
+            "delete_message": True,
+        },
         "mentions": {"enabled": True, "max_mentions": 8, "action": "warn"},
         "caps": {"enabled": False, "caps_percent": 85},
         "attachments": {"enabled": False},
@@ -1329,7 +1430,7 @@ AUTOMOD_PRESETS: dict[str, dict] = {
     PRESET_MEDIUM: {
         "enabled": True,
         "count_rule_violations_as_warns": False,
-        "bad_words": {"enabled": True, "action": "warn", "delete_message": True},
+        "bad_words": {**_PRESET_BAD_WORDS, "action": "warn"},
         "spam": {"enabled": True, "max_messages": 6, "per_seconds": 5, "action": "timeout", "timeout_seconds": 120},
         "duplicate_messages": {"enabled": True, "window_seconds": 30, "min_duplicates": 3, "action": "delete"},
         "links": {"enabled": True, "block_invites": True, "block_links": True, "action": "delete"},
@@ -1344,14 +1445,25 @@ AUTOMOD_PRESETS: dict[str, dict] = {
     PRESET_STRICT: {
         "enabled": True,
         "count_rule_violations_as_warns": True,
-        "bad_words": {"enabled": True, "action": "timeout", "delete_message": True, "escalation": [{"count": 2, "action": "kick"}]},
+        "bad_words": {
+            **_PRESET_BAD_WORDS,
+            "action": "timeout",
+            "timeout_seconds": 300,
+            "escalation": [{"after": 2, "action": "kick"}],
+        },
         "spam": {"enabled": True, "max_messages": 5, "per_seconds": 4, "action": "timeout", "timeout_seconds": 300},
-        "duplicate_messages": {"enabled": True, "window_seconds": 25, "min_duplicates": 3, "action": "timeout"},
+        "duplicate_messages": {
+            "enabled": True,
+            "window_seconds": 25,
+            "min_duplicates": 3,
+            "action": "timeout",
+            "timeout_seconds": 300,
+        },
         "links": {"enabled": True, "block_invites": True, "block_links": True, "action": "delete"},
         "mentions": {"enabled": True, "max_mentions": 4, "action": "timeout", "timeout_seconds": 180},
         "caps": {"enabled": True, "min_length": 8, "caps_percent": 70, "action": "delete"},
         "attachments": {"enabled": True, "max_attachments": 4, "max_embeds": 2, "action": "delete"},
-        "custom_regex": {"enabled": True},
+        "custom_regex": {"enabled": True, "rules": _automod_preset_custom_regex_rules("delete")},
         "anti_selfbot": {"enabled": True, "action": "timeout", "timeout_seconds": 600},
         "new_user": {"enabled": True, "max_account_age_days": 7, "action": "timeout", "timeout_seconds": 300},
         "anti_raid": {"enabled": True, "window_seconds": 8, "join_threshold": 8, "cooldown_seconds": 120, "action": "timeout", "timeout_seconds": 900},
@@ -1359,14 +1471,18 @@ AUTOMOD_PRESETS: dict[str, dict] = {
     PRESET_DICTATORSHIP: {
         "enabled": True,
         "count_rule_violations_as_warns": True,
-        "bad_words": {"enabled": True, "action": "kick", "delete_message": True, "escalation": [{"count": 2, "action": "ban"}]},
+        "bad_words": {
+            **_PRESET_BAD_WORDS,
+            "action": "kick",
+            "escalation": [{"after": 2, "action": "ban"}],
+        },
         "spam": {"enabled": True, "max_messages": 4, "per_seconds": 4, "action": "kick"},
         "duplicate_messages": {"enabled": True, "window_seconds": 20, "min_duplicates": 2, "action": "kick"},
         "links": {"enabled": True, "block_invites": True, "block_links": True, "action": "kick"},
         "mentions": {"enabled": True, "max_mentions": 3, "action": "timeout", "timeout_seconds": 600},
         "caps": {"enabled": True, "min_length": 6, "caps_percent": 65, "action": "timeout", "timeout_seconds": 300},
         "attachments": {"enabled": True, "max_attachments": 2, "max_embeds": 1, "action": "delete"},
-        "custom_regex": {"enabled": True},
+        "custom_regex": {"enabled": True, "rules": _automod_preset_custom_regex_rules("kick")},
         "anti_selfbot": {"enabled": True, "action": "ban"},
         "new_user": {"enabled": True, "max_account_age_days": 30, "action": "timeout", "timeout_seconds": 1800},
         "anti_raid": {"enabled": True, "window_seconds": 6, "join_threshold": 5, "cooldown_seconds": 300, "action": "ban"},
@@ -1399,7 +1515,10 @@ class AutomodPresetView(discord.ui.View):
     async def _apply_and_confirm(self, interaction: discord.Interaction, preset_key: str) -> None:
         _apply_automod_preset(self.guild_id, preset_key)
         await interaction.response.edit_message(
-            content=f"✅ Applied automod preset: **{PRESET_LABELS[preset_key]}**",
+            content=(
+                f"✅ Applied automod preset: **{PRESET_LABELS[preset_key]}**\n"
+                f"{AUTOMOD_PRESET_APPLIED_FOOTER}"
+            ),
             view=self,
         )
 
@@ -1431,7 +1550,7 @@ async def automod_preset(
     if preset is not None:
         _apply_automod_preset(interaction.guild_id, preset.value)
         await interaction.response.send_message(
-            f"✅ Applied automod preset: **{PRESET_LABELS[preset.value]}**",
+            f"✅ Applied automod preset: **{PRESET_LABELS[preset.value]}**\n{AUTOMOD_PRESET_APPLIED_FOOTER}",
             ephemeral=True,
         )
         return

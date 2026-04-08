@@ -613,7 +613,6 @@ class TranslateCog(
         )
 
     @app_commands.command(name="reset", description="Reset a user's translation usage (admin only).")
-    @app_commands.checks.has_permissions(administrator=True)
     async def translate_reset_user(self, interaction: discord.Interaction, user: discord.User) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)

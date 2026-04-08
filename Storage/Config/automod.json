@@ -118,7 +118,7 @@
   },
   "1384771470860746753": {
     "enabled": true,
-    "count_rule_violations_as_warns": false,
+    "count_rule_violations_as_warns": true,
     "log_channel_id": 1388577818752974970,
     "whitelist": {
       "roles": [
@@ -131,25 +131,56 @@
     "channel_overrides": {},
     "bad_words": {
       "enabled": true,
-      "words": [],
-      "action": "warn",
+      "words": [
+        "nigger",
+        "nigga",
+        "faggot",
+        "retard",
+        "spic",
+        "chink",
+        "kys",
+        "kill yourself",
+        "fuck",
+        "shit",
+        "bitch",
+        "cunt",
+        "dick",
+        "cock",
+        "pussy",
+        "free nitro",
+        "discord nitro for free",
+        "claim your nitro",
+        "verify wallet",
+        "connect wallet",
+        "airdrop",
+        "send eth",
+        "send btc"
+      ],
+      "action": "timeout",
       "delete_message": true,
-      "escalation": []
+      "escalation": [
+        {
+          "after": 2,
+          "action": "kick"
+        }
+      ],
+      "timeout_seconds": 300
     },
     "spam": {
       "enabled": true,
-      "max_messages": 6,
-      "per_seconds": 5,
+      "max_messages": 5,
+      "per_seconds": 4,
       "action": "timeout",
-      "timeout_seconds": 120,
+      "timeout_seconds": 300,
       "escalation": []
     },
     "duplicate_messages": {
       "enabled": true,
-      "window_seconds": 30,
+      "window_seconds": 25,
       "min_duplicates": 3,
-      "action": "delete",
-      "escalation": []
+      "action": "timeout",
+      "escalation": [],
+      "timeout_seconds": 300
     },
     "links": {
       "enabled": true,
@@ -162,32 +193,49 @@
     },
     "mentions": {
       "enabled": true,
-      "max_mentions": 5,
-      "action": "warn",
-      "escalation": []
+      "max_mentions": 4,
+      "action": "timeout",
+      "escalation": [],
+      "timeout_seconds": 180
     },
     "caps": {
       "enabled": true,
-      "min_length": 10,
-      "caps_percent": 75,
+      "min_length": 8,
+      "caps_percent": 70,
       "action": "delete",
       "escalation": []
     },
     "attachments": {
-      "enabled": false,
-      "max_attachments": 6,
-      "max_embeds": 3,
+      "enabled": true,
+      "max_attachments": 4,
+      "max_embeds": 2,
       "action": "delete",
       "escalation": []
     },
     "custom_regex": {
-      "enabled": false,
-      "rules": [],
+      "enabled": true,
+      "rules": [
+        {
+          "name": "Steam scam URL typo",
+          "pattern": "(?i)https?://[^\\s]*stea[mn][^\\s]*commun",
+          "action": "delete"
+        },
+        {
+          "name": "Nitro scam text + link",
+          "pattern": "(?i)(?:claim|free|get)\\s+[^\\n]{0,40}nitro[^\\n]{0,50}https?://",
+          "action": "delete"
+        },
+        {
+          "name": "Fake discord-themed TLD",
+          "pattern": "(?i)https?://[^\\s]*discord[^\\s]*\\.(?:gift|fun|lol|cfd|skin)\\b",
+          "action": "delete"
+        }
+      ],
       "escalation": []
     },
     "anti_selfbot": {
       "enabled": true,
-      "action": "delete",
+      "action": "timeout",
       "use_builtin_patterns": true,
       "builtin_patterns": [
         "[MN][A-Za-z\\d]{23}\\.[\\w-]{6}\\.[\\w-]{27}",
@@ -195,22 +243,24 @@
         "(?:discord|bot).{0,20}(?:token|auth)"
       ],
       "extra_patterns": [],
-      "escalation": []
+      "escalation": [],
+      "timeout_seconds": 600
     },
     "new_user": {
       "enabled": true,
-      "max_account_age_days": 3,
-      "action": "warn",
+      "max_account_age_days": 7,
+      "action": "timeout",
       "channels_only": [],
-      "escalation": []
+      "escalation": [],
+      "timeout_seconds": 300
     },
     "anti_raid": {
       "enabled": true,
-      "window_seconds": 10,
-      "join_threshold": 12,
-      "cooldown_seconds": 60,
+      "window_seconds": 8,
+      "join_threshold": 8,
+      "cooldown_seconds": 120,
       "action": "timeout",
-      "timeout_seconds": 300
+      "timeout_seconds": 900
     },
     "warn_thresholds": {
       "3": {
