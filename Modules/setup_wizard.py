@@ -8,6 +8,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from Modules.reactionrole import DEFAULT_PANEL_COLOR, _build_panel_embed
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 WELCOME_LEAVE_PATH = BASE_DIR / "Storage" / "Config" / "welcome_leave.json"
@@ -1019,8 +1021,6 @@ class QuickSetupCog(commands.Cog):
                     channel = guild.get_channel(int(channel_id))
                     if isinstance(channel, discord.TextChannel):
                         message_text = str(rr.get("message_text", "Pick your role:")).strip() or "Pick your role:"
-                        panel = await channel.send(message_text)
-                        created_messages.append(panel)
                         mappings = []
                         emojis = list(rr.get("emojis", []))
                         for idx, rid in enumerate(role_ids[:3]):
@@ -1033,11 +1033,21 @@ class QuickSetupCog(commands.Cog):
                                     "emoji": str(emoji) if emoji else None,
                                 }
                             )
+                        panel_embed = _build_panel_embed(
+                            message_text,
+                            "",
+                            "",
+                            DEFAULT_PANEL_COLOR,
+                            mappings,
+                            guild,
+                        )
+                        panel = await channel.send(embed=panel_embed)
+                        created_messages.append(panel)
                         guild_cfg["messages"][str(panel.id)] = {
                             "channel_id": int(channel.id),
                             "mode": "button",
                             "content": message_text,
-                            "embed": {"title": "Roles", "description": "", "color": 0x5865F2},
+                            "embed": {"title": "", "description": "", "color": DEFAULT_PANEL_COLOR},
                             "mappings": mappings,
                             "max_roles": 1 if rr.get("mode") == "radio" else 0,
                             "required_role_ids": [],

@@ -51,6 +51,58 @@ REACTION_PANEL_DEFAULT_EMOJIS: tuple[str, ...] = (
     "⭐",
 )
 
+DEFAULT_PANEL_TITLE = "Reaction Roles"
+DEFAULT_PANEL_FOOTER = "Pick your roles • Coffeecord"
+DEFAULT_PANEL_COLOR = 0x5865F2
+
+
+def _build_panel_embed(
+    content: str,
+    embed_title: str,
+    embed_description: str,
+    color: int,
+    mappings: list[dict[str, Any]],
+    guild: discord.Guild,
+) -> discord.Embed:
+    """Single embed for published reaction-role panels (no plain message content)."""
+    title = ((embed_title or "").strip() or DEFAULT_PANEL_TITLE)[:256]
+    parts: list[str] = []
+    c = (content or "").strip()
+    d = (embed_description or "").strip()
+    if c:
+        parts.append(c)
+    if d:
+        if parts:
+            parts.append("")
+        parts.append(d)
+    description = "\n".join(parts) if parts else None
+    try:
+        clr = int(color) & 0xFFFFFF
+    except (TypeError, ValueError):
+        clr = DEFAULT_PANEL_COLOR
+    emb = discord.Embed(title=title, description=description, color=clr)
+    emb.set_footer(text=DEFAULT_PANEL_FOOTER)
+    if guild.icon:
+        emb.set_thumbnail(url=guild.icon.url)
+    lines: list[str] = []
+    cap = REACTION_ROLE_PANEL_MAX_ROLES
+    for i, m in enumerate(mappings):
+        if i >= cap:
+            extra = len(mappings) - cap
+            lines.append(f"_…and {extra} more._")
+            break
+        rid = int(m.get("role_id", 0))
+        label = str(m.get("label") or "Toggle Role")[:80]
+        emoji = m.get("emoji")
+        bullet = str(emoji).strip() if emoji else "•"
+        lines.append(f"{bullet} <@&{rid}> — {label}")
+    if lines:
+        field_val = "\n".join(lines)
+        if len(field_val) > 1024:
+            field_val = field_val[:1020] + "…"
+        emb.add_field(name="Roles", value=field_val, inline=False)
+    return emb
+
 
 @dataclass
 class ToggleResult:
@@ -185,7 +237,7 @@ class RRMessageModal(discord.ui.Modal, title="Reaction Role Message Setup"):
             required=False,
             max_length=2000,
             default=parent.content or "",
-            placeholder="Optional plain message text",
+            placeholder="Optional intro text (shown at top of embed)",
         )
         self.embed_title = discord.ui.TextInput(
             label="Embed title (optional)",
@@ -419,15 +471,16 @@ class ReactionRoleSetupView(discord.ui.View):
                     }
                 )
 
-        embed_to_send = None
-        if self.embed_title or self.embed_description:
-            embed_to_send = discord.Embed(
-                title=self.embed_title or None,
-                description=self.embed_description or None,
-                color=discord.Color.blurple(),
-            )
-
-        panel_message = await self.channel.send(content=self.content or None, embed=embed_to_send)
+        panel_color = DEFAULT_PANEL_COLOR
+        panel_embed = _build_panel_embed(
+            self.content,
+            self.embed_title,
+            self.embed_description,
+            panel_color,
+            mappings,
+            interaction.guild,
+        )
+        panel_message = await self.channel.send(embed=panel_embed)
 
         item_cfg = {
             "channel_id": self.channel.id,
@@ -436,7 +489,7 @@ class ReactionRoleSetupView(discord.ui.View):
             "embed": {
                 "title": self.embed_title,
                 "description": self.embed_description,
-                "color": 0x5865F2,
+                "color": panel_color,
             },
             "mappings": mappings,
             "max_roles": 0,
@@ -918,12 +971,23 @@ class ReactionRoleCog(
         if isinstance(channel, discord.TextChannel):
             try:
                 msg = await channel.fetch_message(int(message_id))
+                emb_raw = item.get("embed") or {}
+                if not isinstance(emb_raw, dict):
+                    emb_raw = {}
+                panel_embed = _build_panel_embed(
+                    str(item.get("content") or ""),
+                    str(emb_raw.get("title") or ""),
+                    str(emb_raw.get("description") or ""),
+                    int(emb_raw.get("color", DEFAULT_PANEL_COLOR) or DEFAULT_PANEL_COLOR),
+                    list(item.get("mappings") or []),
+                    interaction.guild,
+                )
                 if item["mode"] == "button":
                     view = self.build_button_view(interaction.guild.id, int(message_id), item)
-                    await msg.edit(view=view)
+                    await msg.edit(embed=panel_embed, view=view)
                     self.bot.add_view(view, message_id=int(message_id))
                 else:
-                    await msg.edit(view=None)
+                    await msg.edit(embed=panel_embed, view=None)
                     for mapping in item["mappings"]:
                         emoji_text = mapping.get("emoji")
                         if emoji_text:

@@ -458,5 +458,51 @@
       "autorole": true,
       "adaptive_slowmode": true
     }
+  },
+  "1152297668022894652": {
+    "enabled": false,
+    "log_channel_id": null,
+    "events": {
+      "message_delete": true,
+      "message_edit": true,
+      "member_join": true,
+      "member_leave": true,
+      "timeout": true,
+      "ban": true,
+      "unban": true,
+      "warn": true,
+      "automod": true,
+      "ticket_event": true,
+      "command_use": true,
+      "role_create": true,
+      "role_delete": true,
+      "role_update": true,
+      "channel_create": true,
+      "channel_delete": true,
+      "channel_update": true,
+      "voice_join": true,
+      "voice_leave": true,
+      "voice_move": true,
+      "nickname_change": true,
+      "role_assign": true,
+      "role_remove": true
+    },
+    "modules": {
+      "messages": true,
+      "members": true,
+      "moderation": true,
+      "automod": true,
+      "tickets": true,
+      "commands": true,
+      "polls": true,
+      "translation": true,
+      "verification": true,
+      "supporters": true,
+      "leveling": true,
+      "calls": true,
+      "applications": true,
+      "autorole": true,
+      "adaptive_slowmode": true
+    }
   }
 }

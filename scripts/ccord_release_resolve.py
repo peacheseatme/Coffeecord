@@ -9,6 +9,10 @@ Usage:
   GITHUB_REPO=owner/repo  optional override (from c-cord.json).
   GITHUB_TOKEN            optional; raises API rate limits and helps private repos.
 
+  With an explicit version, GitHub Releases API is tried first, then
+  git ls-remote on origin (so downgrades to older tags work even when the tag
+  was never a GitHub "release" asset).
+
 On API failure for "latest", falls back to highest local semver-like tag (run
 git fetch --tags first from the caller).
 """
@@ -116,14 +120,37 @@ def _tag_candidates(user_version: str) -> list[str]:
     return unique
 
 
-def _resolve_specific_release(owner: str, repo: str, user_version: str) -> str:
+def _resolve_tag_on_origin(root: Path, user_version: str) -> str | None:
+    """Return a tag name that exists on origin, or None (supports downgrade / tag-only releases)."""
+    for tag in _tag_candidates(user_version):
+        r = subprocess.run(
+            ["git", "-C", str(root), "ls-remote", "-q", "origin", f"refs/tags/{tag}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if r.returncode != 0:
+            continue
+        if (r.stdout or "").strip():
+            return tag
+    return None
+
+
+def _resolve_specific_release(root: Path, owner: str, repo: str, user_version: str) -> str:
     for tag in _tag_candidates(user_version):
         path = f"/repos/{owner}/{repo}/releases/tags/{urllib.parse.quote(tag, safe='')}"
         status, data, _ = _api_request(path)
         if status == 200 and isinstance(data, dict) and data.get("tag_name"):
             return str(data["tag_name"])
+    origin_tag = _resolve_tag_on_origin(root, user_version)
+    if origin_tag:
+        print(
+            f"Note: {origin_tag!r} resolved from origin tags (not a GitHub Release page).",
+            file=sys.stderr,
+        )
+        return origin_tag
     print(
-        f"No published GitHub release found for {user_version!r} (tried tag variants).",
+        f"No GitHub release or origin tag found for {user_version!r} (tried tag variants).",
         file=sys.stderr,
     )
     sys.exit(1)
@@ -181,7 +208,7 @@ def main() -> int:
     owner, repo = _repo_from_git_root(root)
 
     if user_version:
-        tag = _resolve_specific_release(owner, repo, user_version)
+        tag = _resolve_specific_release(root, owner, repo, user_version)
         print(tag)
         return 0
 

@@ -6,6 +6,7 @@ venv/
 .env
 Main/.env
 Src/.env
+Src/.env.before-restore.*
 
 # Python cache
 __pycache__/

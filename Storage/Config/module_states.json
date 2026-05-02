@@ -217,5 +217,30 @@
     "translate": true,
     "verification": true,
     "welcome_leave": true
+  },
+  "1476341182182195351": {
+    "adaptive_slowmode": true,
+    "applications": true,
+    "automod": true,
+    "autorole": true,
+    "calls": true,
+    "fun": true,
+    "kofi": true,
+    "leveling": true,
+    "logging": true,
+    "modules_cmd": true,
+    "muterole": true,
+    "nickname": true,
+    "polls": true,
+    "reactionrole": true,
+    "setup_wizard": true,
+    "staff_utils": true,
+    "support": true,
+    "test_module": true,
+    "themes": true,
+    "tickets": true,
+    "translate": true,
+    "verification": true,
+    "welcome_leave": true
   }
 }

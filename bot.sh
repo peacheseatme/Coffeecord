@@ -38,9 +38,13 @@ LOG_FILE="${LOG_DIR}/bot.log"
 ROTATE_PREFIX="${LOG_DIR}/bot_"
 
 _usage() {
-    echo -e "${BOLD}Usage:${RESET} c-cord <command> [flags]"
+    echo -e "${BOLD}Usage:${RESET} c-cord <command> [flags]   (per-clone bot.sh — see ~/.local/bin/c-cord for multi-instance)"
     echo ""
-    echo -e "${BOLD}Commands:${RESET}"
+    echo -e "${BOLD}Multi-instance (global ~/.local/bin/c-cord):${RESET}"
+    echo "  c-cord list | add <id> <path> | remove <id> | default <id> | new <id> [--path DIR] [--repo URL]"
+    echo "  c-cord start [id|all] …   stop / restart / status / logs / console / update  (optional id or all)"
+    echo ""
+    echo -e "${BOLD}Commands (this clone):${RESET}"
     echo "  start                     Start bot in the background"
     echo "  start -f / --force        Start — ignore non-fatal errors"
     echo ""
@@ -60,13 +64,15 @@ _usage() {
     echo "  console -n N              Last N lines, no follow"
     echo "  console clear             Clear the bot log file"
     echo ""
-    echo "  update [version]          Latest GitHub release (or tag) → pip → restart"
+    echo "  update [version]          Latest release, or pin / downgrade to that tag → pip → restart"
     echo "  update --branch          git pull on current branch (dev) → pip → restart"
     echo "  update -f / --force      Continue even if git/VCS step fails"
     echo ""
     echo "  module refresh            Scan Modules/ — add new files to registry"
     echo "  module refresh_registry   Alias for 'module refresh'"
     echo "  module refresh --dry-run  Preview additions without writing"
+    echo ""
+    echo "Runtime failures (token, network, Discord, your edits) are yours to diagnose."
 }
 
 _ensure_runtime_dirs() {
@@ -395,6 +401,10 @@ _start_bot() {
     while [[ $# -gt 0 ]]; do
         case "${1}" in
             -f|--force) force="true" ;;
+            *)
+                err "start: unknown argument \"${1}\" — only -f / --force is allowed."
+                exit 1
+                ;;
         esac
         shift
     done
@@ -465,6 +475,10 @@ _stop_bot() {
     while [[ $# -gt 0 ]]; do
         case "${1}" in
             -9|--kill) kill_hard="true" ;;
+            *)
+                err "stop: unknown argument \"${1}\" — only -9 / --kill is allowed."
+                exit 1
+                ;;
         esac
         shift
     done
@@ -517,6 +531,10 @@ _status_bot() {
     while [[ $# -gt 0 ]]; do
         case "${1}" in
             -v|--verbose) verbose="true" ;;
+            *)
+                err "status: unknown argument \"${1}\" — only -v / --verbose is allowed."
+                exit 1
+                ;;
         esac
         shift
     done
@@ -564,10 +582,6 @@ _status_bot() {
 #   (none) Follow log with tail -f.
 _logs_bot() {
     _ensure_runtime_dirs
-    if [[ ! -f "${LOG_FILE}" ]]; then
-        info "No log file yet. Start the bot with c-cord start"
-        return 0
-    fi
 
     if [[ "${1:-}" == "-n" ]]; then
         local n="${2:-}"
@@ -575,7 +589,26 @@ _logs_bot() {
             err "Usage: c-cord logs -n <number>"
             exit 1
         fi
+        shift 2 || true
+        if [[ $# -gt 0 ]]; then
+            err "logs: unexpected arguments after -n: $*"
+            exit 1
+        fi
+        if [[ ! -f "${LOG_FILE}" ]]; then
+            err "No log file yet. Start the bot with c-cord start"
+            exit 1
+        fi
         tail -n "${n}" "${LOG_FILE}"
+        return 0
+    fi
+
+    if [[ $# -gt 0 ]]; then
+        err "logs: unknown argument \"$1\" — use no args (follow) or -n <lines>"
+        exit 1
+    fi
+
+    if [[ ! -f "${LOG_FILE}" ]]; then
+        info "No log file yet. Start the bot with c-cord start"
         return 0
     fi
 
@@ -588,6 +621,11 @@ _console_bot() {
     _ensure_runtime_dirs
 
     if [[ "${1:-}" == "clear" ]]; then
+        shift || true
+        if [[ $# -gt 0 ]]; then
+            err "console clear takes no extra arguments (got: $*)"
+            exit 1
+        fi
         if [[ -f "${LOG_FILE}" ]]; then
             : > "${LOG_FILE}"
             ok "Bot log cleared."
@@ -597,19 +635,33 @@ _console_bot() {
         return 0
     fi
 
-    if [[ ! -f "${LOG_FILE}" ]]; then
-        info "No log file yet. Start the bot with c-cord start"
-        return 0
-    fi
-
     if [[ "${1:-}" == "-n" ]]; then
         local n="${2:-}"
         if [[ ! "${n}" =~ ^[0-9]+$ ]]; then
             err "Usage: c-cord console -n <number>"
             exit 1
         fi
+        shift 2 || true
+        if [[ $# -gt 0 ]]; then
+            err "console: unexpected arguments after -n: $*"
+            exit 1
+        fi
+        if [[ ! -f "${LOG_FILE}" ]]; then
+            err "No log file yet. Start the bot with c-cord start"
+            exit 1
+        fi
         echo -e "${BOLD}── Last ${n} lines ──${RESET}"
         tail -n "${n}" "${LOG_FILE}"
+        return 0
+    fi
+
+    if [[ $# -gt 0 ]]; then
+        err "console: unknown argument \"$1\" — use clear, -n <lines>, or no args"
+        exit 1
+    fi
+
+    if [[ ! -f "${LOG_FILE}" ]]; then
+        info "No log file yet. Start the bot with c-cord start"
         return 0
     fi
 
@@ -720,7 +772,8 @@ _update_bot() {
             )"; then
                 info "Fetching and checking out ${tag}..."
                 local fetch_ok="false"
-                if git -C "${SCRIPT_DIR}" fetch -q origin "refs/tags/${tag}:refs/tags/${tag}"; then
+                # '+' allows updating local tag ref when moving to an older release (non-FF tag moves).
+                if git -C "${SCRIPT_DIR}" fetch -q origin "+refs/tags/${tag}:refs/tags/${tag}"; then
                     fetch_ok="true"
                 elif [[ "${force}" == "true" ]]; then
                     warn "git fetch failed for tag ${tag} — skipping checkout (-f); deps/restart still run."
@@ -777,6 +830,10 @@ _module_refresh() {
     while [[ $# -gt 0 ]]; do
         case "${1}" in
             --dry-run) dry_run="true" ;;
+            *)
+                err "module refresh: unknown argument \"${1}\" — only --dry-run is allowed."
+                exit 1
+                ;;
         esac
         shift
     done

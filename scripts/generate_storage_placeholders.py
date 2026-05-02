@@ -37,6 +37,12 @@ CONFIG_PLACEHOLDERS: dict[str, object] = {
             "mentions": {"enabled": False, "max_mentions": 5, "action": "warn", "escalation": []},
         }
     },
+    "bot_branding.json": {
+        "discord_application_id": "",
+        "owner_id": 0,
+        "support_server_url": "",
+        "support_invite_url": "",
+    },
     "backgrounds.json": {},
     "command_config.json": {"guild_id": 0, "command_config": {}},
     "exit_surveys.json": {},

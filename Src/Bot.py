@@ -30,6 +30,8 @@ from discord import Member
 from typing import List
 import re
 import secrets
+import time
+import traceback
 import urllib.parse
 from contextlib import asynccontextmanager
 
@@ -40,30 +42,79 @@ _error_details_cache: dict[str, str] = {}
 _ERROR_DETAILS_PREFIX = "err:"
 _REDACTED_DISCORD_TOKEN_MARKER = "[REDACTED_DISCORD_TOKEN]"
 
-load_dotenv()
-# Load ticket.env for TICKET_SECRET (path relative to project root)
-_ticket_env = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Src", "ticket.env")
-load_dotenv(_ticket_env)
+# install.sh writes Src/.env; c-cord runs with cwd=project root, so bare load_dotenv() never sees Src/.env.
+_COFFEECORD_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ENV_PROJECT = os.path.join(_COFFEECORD_ROOT, ".env")
+_ENV_SRC = os.path.join(_COFFEECORD_ROOT, "Src", ".env")
+_TICKET_ENV_PATH = os.path.join(_COFFEECORD_ROOT, "Src", "ticket.env")
+load_dotenv(_ENV_PROJECT)
+load_dotenv(_ENV_SRC, override=True)
+load_dotenv(_TICKET_ENV_PATH, override=True)
 token = os.getenv("DISCORD_TOKEN")
 
 
-def _parse_int_env(key: str, default: int = 0) -> int:
-    raw = os.getenv(key, "").strip()
-    if not raw:
-        return default
+_BRANDING_CONFIG_PATH = os.path.join(
+    _COFFEECORD_ROOT, "Storage", "Config", "bot_branding.json"
+)
+
+
+def _load_bot_branding_config() -> dict:
+    if not os.path.isfile(_BRANDING_CONFIG_PATH):
+        return {}
     try:
-        return int(raw)
-    except ValueError:
-        return default
+        with open(_BRANDING_CONFIG_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
 
 
-def _env_str(key: str, default: str) -> str:
-    v = os.getenv(key, "").strip()
-    return v if v else default
+_BOT_BRANDING = _load_bot_branding_config()
+
+
+def _env_or_branding_str(env_key: str, branding_key: str, default: str) -> str:
+    v = (os.getenv(env_key) or "").strip()
+    if v:
+        return v
+    raw = _BOT_BRANDING.get(branding_key)
+    if raw is not None:
+        s = str(raw).strip()
+        if s:
+            return s
+    return default
+
+
+def _env_or_branding_app_id() -> str:
+    for env_key in ("DISCORD_APPLICATION_ID", "DISCORD_CLIENT_ID"):
+        v = (os.getenv(env_key) or "").strip()
+        if v:
+            return v
+    raw = _BOT_BRANDING.get("discord_application_id")
+    if raw is not None:
+        t = str(raw).strip()
+        if t:
+            return t
+    return ""
+
+
+def _env_or_branding_owner_id() -> int:
+    raw_env = os.getenv("COFFEECORD_OWNER_ID", "").strip()
+    if raw_env:
+        try:
+            return int(raw_env)
+        except ValueError:
+            return 0
+    v = _BOT_BRANDING.get("owner_id")
+    if v is not None:
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            pass
+    return 0
 
 
 _INVITE_PERMISSIONS = (os.getenv("DISCORD_INVITE_PERMISSIONS") or "8866461766385655").strip()
-_DISCORD_APP_ID = (os.getenv("DISCORD_APPLICATION_ID") or os.getenv("DISCORD_CLIENT_ID") or "").strip()
+_DISCORD_APP_ID = _env_or_branding_app_id()
 
 
 def _oauth_invite_url(application_id: str) -> str:
@@ -89,10 +140,49 @@ def _redact_discord_token_in_text(text: str) -> str:
     return text.replace(tok, _REDACTED_DISCORD_TOKEN_MARKER)
 
 
+try:
+    import psutil as _psutil
+
+    _PSUTIL_PROCESS = _psutil.Process()
+    _PSUTIL_PROCESS.cpu_percent(interval=None)
+except Exception:
+    _psutil = None
+    _PSUTIL_PROCESS = None
+
+_BOT_START_MONO = time.monotonic()
+
+
+def _print_redacted(*parts: object) -> None:
+    print(_redact_discord_token_in_text(" ".join(str(p) for p in parts)))
+
+
+def _print_traceback_redacted(exc: typing.Optional[BaseException] = None) -> None:
+    if exc is not None:
+        text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    else:
+        text = traceback.format_exc()
+    print(_redact_discord_token_in_text(text), file=sys.stderr)
+
+
+class _DiscordTokenRedactFilter(logging.Filter):
+    """Redact DISCORD_TOKEN from formatted log lines (e.g. discord.py file handler)."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = record.getMessage()
+            red = _redact_discord_token_in_text(msg)
+            if red != msg:
+                record.msg = red
+                record.args = ()
+        except Exception:
+            pass
+        return True
+
+
 # ───────── staff applications – storage helpers ─────────
 # Path setup (must be before Modules import)
 _bot_dir = os.path.dirname(os.path.abspath(__file__))
-_discordbot_root = os.path.dirname(_bot_dir)
+_discordbot_root = _COFFEECORD_ROOT
 _modules_path = os.path.join(_discordbot_root, "Modules")
 _storage_dir = os.path.join(_discordbot_root, "Storage")
 if _discordbot_root not in sys.path:
@@ -127,6 +217,7 @@ def _configure_discord_library_logging() -> None:
     handler.setFormatter(
         logging.Formatter("%(asctime)s | %(levelname)-8s | %(name)s | %(message)s")
     )
+    handler.addFilter(_DiscordTokenRedactFilter())
     dlog.addHandler(handler)
 
 
@@ -195,7 +286,7 @@ bot = commands.Bot(command_prefix=".", intents=intents, tree_cls=CoffeecordComma
 tree = bot.tree
 anti_abuse.register_dev_group(bot)
 
-OWNER_ID = _parse_int_env("COFFEECORD_OWNER_ID", 0)
+OWNER_ID = _env_or_branding_owner_id()
 
 
 def _dispatch_module_log_event(
@@ -273,8 +364,13 @@ BOT_INVITE_URL = (
     if _DISCORD_APP_ID
     else "https://discord.com/developers/applications"
 )
-SUPPORT_SERVER = _env_str("COFFEECORD_SUPPORT_SERVER_URL", "https://discord.com/")
-PERMANENT_INVITE = _env_str("COFFEECORD_SUPPORT_INVITE", SUPPORT_SERVER)
+_SUPPORT_URL_DEFAULT = "https://discord.com/"
+SUPPORT_SERVER = _env_or_branding_str(
+    "COFFEECORD_SUPPORT_SERVER_URL", "support_server_url", _SUPPORT_URL_DEFAULT
+)
+PERMANENT_INVITE = _env_or_branding_str(
+    "COFFEECORD_SUPPORT_INVITE", "support_invite_url", SUPPORT_SERVER
+)
 SUPPORTERS_FILE = os.path.join(_storage_dir, "Data", "supporters.json")
 SUPPORTER_GRACE_DAYS = 35
 pending_kofi_links: dict[str, list[int]] = {}
@@ -584,6 +680,19 @@ async def about_cmd(interaction: discord.Interaction):
     embed.add_field(name="Developer", value=developer_value, inline=False)
     embed.add_field(name="Servers", value=f"{len(interaction.client.guilds)} servers", inline=False)
     embed.add_field(name="Ping", value=f"{round(interaction.client.latency * 1000)} ms", inline=False)
+    uptime_s = time.monotonic() - _BOT_START_MONO
+    if uptime_s >= 60.0:
+        uh = int(uptime_s // 3600)
+        um = int((uptime_s % 3600) // 60)
+        embed.add_field(name="Uptime", value=f"{uh}h {um}m", inline=True)
+    if _PSUTIL_PROCESS is not None:
+        try:
+            rss_mb = _PSUTIL_PROCESS.memory_info().rss / (1024 * 1024)
+            cpu_pct = _PSUTIL_PROCESS.cpu_percent(interval=0.1)
+            embed.add_field(name="Memory", value=f"{rss_mb:.1f} MB", inline=True)
+            embed.add_field(name="CPU", value=f"{cpu_pct:.1f}%", inline=True)
+        except Exception:
+            pass
     embed.set_footer(text="Coffeecord • Made with ☕ and discord.py ❤")
 
     view = discord.ui.View()
@@ -3150,12 +3259,16 @@ def save_verify_config(data):
         json.dump(data, f, indent=4)
 
 
+_VERIFY_LEGACY_START_CUSTOM_ID = "verify_start_button"
+_VERIFY_START_CUSTOM_ID_PREFIX = "coffeecord_verify_"
+
+
 # ----------------------------------------
 # 1️⃣ SIMPLE BUTTON VERIFY
 # ----------------------------------------
 class SimpleButtonView(discord.ui.View):
     def __init__(self, user, role, log_channel):
-        super().__init__(timeout=60)
+        super().__init__(timeout=None)
         self.user = user
         self.role = role
         self.log_channel = log_channel
@@ -3199,7 +3312,7 @@ async def run_button_verify(interaction, user, role, log_channel):
 # ----------------------------------------
 class CodeVerifyModal(discord.ui.Modal, title="Enter Verification Code"):
     def __init__(self, user, correct_code, role, log_channel):
-        super().__init__(timeout=120)
+        super().__init__(timeout=None)
         self.user = user
         self.correct_code = correct_code
         self.role = role
@@ -3244,7 +3357,7 @@ class CodeVerifyModal(discord.ui.Modal, title="Enter Verification Code"):
 
 class CodeVerifyView(discord.ui.View):
     def __init__(self, user, code, role, log_channel):
-        super().__init__(timeout=120)
+        super().__init__(timeout=None)
         self.user = user
         self.code = code
         self.role = role
@@ -3278,7 +3391,7 @@ async def run_code_verify(interaction, user, role, log_channel):
 # ------------------------------------------------
 class ColorVerifyButtons(discord.ui.View):
     def __init__(self, user, correct_color, role, log_channel):
-        super().__init__(timeout=60)
+        super().__init__(timeout=None)
         self.user = user
         self.correct_color = correct_color
         self.role = role
@@ -3358,40 +3471,103 @@ async def run_color_verify(interaction, user, role, log_channel):
         "🎨 Click the button with your assigned color to verify!", view=view, ephemeral=True
     )
 
+
+async def _handle_verify_start_interaction(
+    interaction: discord.Interaction, guild_id_fallback: str
+) -> None:
+    data = load_verify_config()
+    guild_id_key = str(interaction.guild.id) if interaction.guild else guild_id_fallback
+    config = data.get(guild_id_key)
+    if not config:
+        await interaction.response.send_message("⚙️ Verification not set up.", ephemeral=True)
+        return
+
+    user = interaction.user
+    guild = interaction.guild
+    if guild is None:
+        await interaction.response.send_message("⚙️ Verification must be used in a server.", ephemeral=True)
+        return
+
+    try:
+        verified_role_id = int(config["verified_role"])
+    except (KeyError, TypeError, ValueError):
+        await interaction.response.send_message(
+            "⚙️ Verification config is invalid. Ask a moderator to run `/verifyconfig` again.",
+            ephemeral=True,
+        )
+        return
+
+    role = guild.get_role(verified_role_id)
+    if role is None:
+        await interaction.response.send_message(
+            "❌ The verified role from setup no longer exists (it may have been deleted). "
+            "Ask a moderator to run `/verifyconfig` and select the role again.",
+            ephemeral=True,
+        )
+        return
+
+    log_channel = None
+    raw_log = config.get("log_channel")
+    if raw_log is not None:
+        try:
+            _lcid = int(raw_log)
+        except (TypeError, ValueError):
+            _lcid = None
+        if _lcid is not None:
+            _ch = guild.get_channel(_lcid)
+            if isinstance(_ch, (discord.TextChannel, discord.Thread)):
+                log_channel = _ch
+
+    method = config["method"]
+
+    if role in user.roles:
+        await interaction.response.send_message("✅ You’re already verified!", ephemeral=True)
+        return
+
+    if method == "button":
+        await run_button_verify(interaction, user, role, log_channel)
+    elif method == "code":
+        await run_code_verify(interaction, user, role, log_channel)
+    elif method == "color":
+        await run_color_verify(interaction, user, role, log_channel)
+    else:
+        await interaction.response.send_message("❌ Invalid verification method.", ephemeral=True)
+
+
 # ----------------------------------------
 # VERIFY START VIEW (MAIN ENTRY)
 # ----------------------------------------
 class VerifyStartView(discord.ui.View):
+    """Persistent panel; custom_id is per-guild so every guild can register after restart."""
+
     def __init__(self, guild_id):
         super().__init__(timeout=None)
         self.guild_id = str(guild_id)
+        btn = discord.ui.Button(
+            label="Verify Me ☕",
+            style=discord.ButtonStyle.success,
+            custom_id=f"{_VERIFY_START_CUSTOM_ID_PREFIX}{self.guild_id}",
+        )
+        btn.callback = self._on_verify_start
+        self.add_item(btn)
 
-    @discord.ui.button(label="Verify Me ☕", style=discord.ButtonStyle.success, custom_id="verify_start_button")
-    async def verify_me(self, interaction: discord.Interaction, button: discord.ui.Button):
-        data = load_verify_config()
-        guild_id_key = str(interaction.guild.id) if interaction.guild else self.guild_id
-        config = data.get(guild_id_key)
-        if not config:
-            return await interaction.response.send_message("⚙️ Verification not set up.", ephemeral=True)
+    async def _on_verify_start(self, interaction: discord.Interaction) -> None:
+        await _handle_verify_start_interaction(interaction, self.guild_id)
 
-        user = interaction.user
-        guild = interaction.guild
-        role = guild.get_role(config["verified_role"])
-        log_channel = guild.get_channel(config["log_channel"])
-        method = config["method"]
 
-        if role in user.roles:
-            return await interaction.response.send_message("✅ You’re already verified!", ephemeral=True)
+class LegacyVerifyStartView(discord.ui.View):
+    """Handles verification messages created before per-guild verify custom_ids."""
 
-        # Dispatch to correct method
-        if method == "button":
-            await run_button_verify(interaction, user, role, log_channel)
-        elif method == "code":
-            await run_code_verify(interaction, user, role, log_channel)
-        elif method == "color":
-            await run_color_verify(interaction, user, role, log_channel)
-        else:
-            await interaction.response.send_message("❌ Invalid verification method.", ephemeral=True)
+    def __init__(self) -> None:
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Verify Me ☕",
+        style=discord.ButtonStyle.success,
+        custom_id=_VERIFY_LEGACY_START_CUSTOM_ID,
+    )
+    async def verify_me(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await _handle_verify_start_interaction(interaction, "")
 
 
 # ----------------------------------------
@@ -4160,7 +4336,6 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         return await _send_app_error(interaction, friendly, view=view)
 
     # Unexpected error: show friendly message + button for full details.
-    import traceback
     err_name = type(original).__name__
     err_text = str(original) or "No details provided."
     short_error = (err_text[:1200] + "...") if len(err_text) > 1200 else err_text
@@ -4179,8 +4354,8 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
     await _send_app_error(interaction, friendly, view=view)
 
     cmd_name = interaction.command.qualified_name if interaction.command else "unknown"
-    print(f"[APP_COMMAND_ERROR] /{cmd_name}")
-    traceback.print_exception(type(original), original, original.__traceback__)
+    _print_redacted(f"[APP_COMMAND_ERROR] /{cmd_name}")
+    _print_traceback_redacted(original)
 
 
 # Owner-only prefix commands (non-owner: no response)
@@ -4851,7 +5026,6 @@ async def call_promote(interaction: discord.Interaction, user: discord.Member):
 tree.add_command(call_group)
 
 import glob
-import time
 
 
 # ==========================
@@ -5356,19 +5530,19 @@ async def uninstall(interaction: discord.Interaction):
     ACTIVE_UNINSTALLS.pop(guild.id, None)
 
 
-import traceback
-
 @bot.event
 async def on_error(event, *args, **kwargs):
-    print("GLOBAL ERROR:")
-    traceback.print_exc()
+    _print_redacted("GLOBAL ERROR:")
+    _print_traceback_redacted()
 
 @bot.event
 async def on_ready():
     try:
         print(f"🤖 Logged in as {bot.user}")
         _load_reminders_and_timers()
-        bot.add_view(VerifyStartView("placeholder"))
+        for _verify_gid in load_verify_config():
+            bot.add_view(VerifyStartView(_verify_gid))
+        bot.add_view(LegacyVerifyStartView())
 
         # Shared aiohttp session for HTTP requests (dog, cat, level cards, etc.)
         # Close existing session first (on_ready can fire on reconnects)
@@ -5400,14 +5574,13 @@ async def on_ready():
                     print(_redact_discord_token_in_text(f"[ERROR] tree.sync failed after 3 attempts: {e}"))
                     raise
 
-    except Exception as e:
-        print("ERROR IN on_ready():")
-        traceback.print_exc()
+    except Exception:
+        _print_redacted("ERROR IN on_ready():")
+        _print_traceback_redacted()
 
 import json
 import hmac
 import hashlib
-import time
 import base64
 
 # Keep ticket storage path local to avoid importing ticket module at startup.

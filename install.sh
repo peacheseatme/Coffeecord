@@ -105,13 +105,22 @@ fi
 source "$VENV_DIR/bin/activate"
 success "Virtual environment activated."
 
+# Always use the venv interpreter (never system pip/python) — avoids PEP 668 on Debian/Ubuntu
+# when PATH or a broken .venv would pick /usr/bin/pip.
+VENV_PY="$VENV_DIR/bin/python"
+if [ ! -x "$VENV_PY" ]; then
+    error ".venv/bin/python is missing or not executable."
+    error "Remove the .venv directory and run install.sh again."
+    exit 1
+fi
+
 # ──────────────────────────────────────────────────────────────
 # 3. Install / upgrade pip, then install dependencies
 # ──────────────────────────────────────────────────────────────
 header "Step 3 — Installing dependencies"
 
 info "Upgrading pip..."
-pip install --upgrade pip --quiet
+"$VENV_PY" -m pip install --upgrade pip --quiet
 
 if [ ! -f "$SCRIPT_DIR/requirements.txt" ]; then
     error "requirements.txt not found in project root ($SCRIPT_DIR)."
@@ -119,13 +128,13 @@ if [ ! -f "$SCRIPT_DIR/requirements.txt" ]; then
 fi
 
 info "Installing packages from requirements.txt  (this may take a minute)..."
-pip install -r "$SCRIPT_DIR/requirements.txt" --quiet
+"$VENV_PY" -m pip install -r "$SCRIPT_DIR/requirements.txt" --quiet
 success "All dependencies installed."
 
-if ! python -c 'import pkg_resources' 2>/dev/null; then
+if ! "$VENV_PY" -c 'import pkg_resources' 2>/dev/null; then
     warn "pkg_resources missing (setuptools too new). Installing compatible version..."
-    pip install 'setuptools>=69.0,<75' --quiet
-    if python -c 'import pkg_resources' 2>/dev/null; then
+    "$VENV_PY" -m pip install 'setuptools>=69.0,<75' --quiet
+    if "$VENV_PY" -c 'import pkg_resources' 2>/dev/null; then
         success "pkg_resources restored."
     else
         error "Could not restore pkg_resources. pet-pet-gif may fail at runtime."
@@ -156,7 +165,7 @@ done
 
 info "Generating Storage placeholder files (if missing)..."
 if [ -f "$SCRIPT_DIR/scripts/generate_storage_placeholders.py" ]; then
-    "$PYTHON_CMD" "$SCRIPT_DIR/scripts/generate_storage_placeholders.py" || true
+    "$VENV_PY" "$SCRIPT_DIR/scripts/generate_storage_placeholders.py" || true
 else
     warn "scripts/generate_storage_placeholders.py not found; Storage files may need manual creation."
 fi
@@ -237,6 +246,28 @@ while [ -z "$DISCORD_TOKEN" ]; do
     fi
 done
 
+# ── Preserve active assignments from old .env (install used to wipe these) ──
+PRESERVED_FROM_ENV=""
+if [ -f "$ENV_FILE" ]; then
+    _preserve_env_key() {
+        local key="$1"
+        local line
+        line="$(grep -E "^${key}=" "$ENV_FILE" 2>/dev/null | tail -n1 || true)"
+        if [ -n "$line" ]; then
+            PRESERVED_FROM_ENV+="${line}"$'\n'
+        fi
+    }
+    _preserve_env_key DISCORD_APPLICATION_ID
+    _preserve_env_key DISCORD_CLIENT_ID
+    _preserve_env_key COFFEECORD_OWNER_ID
+    _preserve_env_key COFFEECORD_SUPPORT_SERVER_URL
+    _preserve_env_key COFFEECORD_SUPPORT_INVITE
+    _preserve_env_key DISCORD_INVITE_PERMISSIONS
+    _preserve_env_key ENABLE_PRESENCE_INTENT
+    _preserve_env_key KOFI_VERIFICATION_TOKEN
+    _preserve_env_key KOFI_PORT
+fi
+
 # ── Write .env file — Ko-fi lines are commented out by default ──
 info "Writing Src/.env ..."
 {
@@ -256,6 +287,11 @@ info "Writing Src/.env ..."
     echo "# COFFEECORD_OWNER_ID=      # your user ID for /about + owner commands"
     echo "# COFFEECORD_SUPPORT_SERVER_URL="
     echo "# COFFEECORD_SUPPORT_INVITE="
+    if [ -n "$PRESERVED_FROM_ENV" ]; then
+        echo ""
+        echo "# ── Carried over from your previous Src/.env (re-run install) ──"
+        printf '%s' "$PRESERVED_FROM_ENV"
+    fi
 } > "$ENV_FILE"
 success "Src/.env written."
 
@@ -271,12 +307,20 @@ BOT_SH_PATH="$SCRIPT_DIR/bot.sh"
 mkdir -p "$BIN_DIR"
 chmod +x "$BOT_SH_PATH"
 
-cat > "$CMD_PATH" <<WRAPPER
-#!/usr/bin/env bash
-exec "$BOT_SH_PATH" "\$@"
-WRAPPER
+if [[ ! -f "$SCRIPT_DIR/scripts/ccord_dispatch.sh" ]]; then
+    error "scripts/ccord_dispatch.sh not found; cannot install c-cord dispatcher."
+    exit 1
+fi
+# Multi-instance dispatcher: inject this clone's scripts/ path for ccord_registry.py
+sed "s|__COFFEECORD_SCRIPTS_DIR__|${SCRIPT_DIR}/scripts|g" \
+    "$SCRIPT_DIR/scripts/ccord_dispatch.sh" > "$CMD_PATH"
 chmod +x "$CMD_PATH"
-success "Installed c-cord  →  $CMD_PATH"
+success "Installed c-cord (multi-instance dispatcher)  →  $CMD_PATH"
+
+if command -v python3 >/dev/null 2>&1; then
+    info "Registering this clone in ~/.config/c-cord/instances.json (if new)..."
+    python3 "$SCRIPT_DIR/scripts/ccord_registry.py" add-self "$SCRIPT_DIR" || warn "Could not auto-register instance (run: python3 scripts/ccord_registry.py add-self \"$SCRIPT_DIR\")."
+fi
 
 # Add ~/.local/bin to PATH in shell config if it isn't already on PATH
 _ensure_path_entry() {
@@ -317,7 +361,7 @@ header "Step 7 — Syntax check"
 FILES_OK=true
 for pyfile in Src/Bot.py Modules/automod.py Modules/tickets.py Modules/leveling.py; do
     if [ -f "$SCRIPT_DIR/$pyfile" ]; then
-        if python -m py_compile "$SCRIPT_DIR/$pyfile" 2>/dev/null; then
+        if "$VENV_PY" -m py_compile "$SCRIPT_DIR/$pyfile" 2>/dev/null; then
             success "$pyfile"
         else
             error "$pyfile  ← syntax error"
@@ -351,7 +395,7 @@ echo -e "    ${CYAN}c-cord status -v${RESET}            — Status + recent log 
 echo -e "    ${CYAN}c-cord logs${RESET}                 — Follow log live"
 echo -e "    ${CYAN}c-cord logs -n 50${RESET}           — Last 50 lines"
 echo -e "    ${CYAN}c-cord update${RESET}               — latest GitHub release → deps → restart"
-echo -e "    ${CYAN}c-cord update 1.0.3${RESET}         — pin to that release"
+echo -e "    ${CYAN}c-cord update 1.0.3${RESET}         — pin or downgrade to that release/tag"
 echo -e "    ${CYAN}c-cord update --branch${RESET}      — git pull (dev on main)"
 echo -e "    ${CYAN}c-cord update -f${RESET}            — continue if git step fails"
 echo -e "    ${CYAN}c-cord module refresh${RESET}       — Register new drop-in modules"

@@ -274,7 +274,7 @@
   },
   "1476341182182195351": {
     "enabled": true,
-    "count_rule_violations_as_warns": false,
+    "count_rule_violations_as_warns": true,
     "log_channel_id": null,
     "whitelist": {
       "roles": [
@@ -291,31 +291,52 @@
     "bad_words": {
       "enabled": true,
       "words": [
+        "nigger",
+        "nigga",
+        "faggot",
+        "retard",
+        "spic",
+        "chink",
+        "kys",
+        "kill yourself",
         "fuck",
         "shit",
-        "idiot",
-        "nigger",
-        "dumbass",
-        "motherfucker"
+        "bitch",
+        "cunt",
+        "dick",
+        "cock",
+        "pussy",
+        "free nitro",
+        "discord nitro for free",
+        "claim your nitro",
+        "verify wallet",
+        "connect wallet",
+        "airdrop",
+        "send eth",
+        "send btc"
       ],
-      "action": "warn",
+      "action": "kick",
       "delete_message": true,
-      "escalation": [],
-      "match_type": "contains"
+      "escalation": [
+        {
+          "after": 2,
+          "action": "ban"
+        }
+      ]
     },
     "spam": {
       "enabled": true,
-      "max_messages": 5,
-      "per_seconds": 6,
-      "action": "timeout",
+      "max_messages": 4,
+      "per_seconds": 4,
+      "action": "kick",
       "timeout_seconds": 60,
       "escalation": []
     },
     "duplicate_messages": {
-      "enabled": false,
-      "window_seconds": 30,
-      "min_duplicates": 3,
-      "action": "delete",
+      "enabled": true,
+      "window_seconds": 20,
+      "min_duplicates": 2,
+      "action": "kick",
       "escalation": []
     },
     "links": {
@@ -324,37 +345,55 @@
       "block_links": true,
       "allowed_domains": [],
       "allowed_invite_codes": [],
-      "action": "delete",
+      "action": "kick",
       "escalation": []
     },
     "mentions": {
       "enabled": true,
-      "max_mentions": 5,
-      "action": "warn",
-      "escalation": []
+      "max_mentions": 3,
+      "action": "timeout",
+      "escalation": [],
+      "timeout_seconds": 600
     },
     "caps": {
       "enabled": true,
-      "min_length": 10,
-      "caps_percent": 70,
-      "action": "delete",
-      "escalation": []
+      "min_length": 6,
+      "caps_percent": 65,
+      "action": "timeout",
+      "escalation": [],
+      "timeout_seconds": 300
     },
     "attachments": {
-      "enabled": false,
-      "max_attachments": 6,
-      "max_embeds": 3,
+      "enabled": true,
+      "max_attachments": 2,
+      "max_embeds": 1,
       "action": "delete",
       "escalation": []
     },
     "custom_regex": {
-      "enabled": false,
-      "rules": [],
+      "enabled": true,
+      "rules": [
+        {
+          "name": "Steam scam URL typo",
+          "pattern": "(?i)https?://[^\\s]*stea[mn][^\\s]*commun",
+          "action": "kick"
+        },
+        {
+          "name": "Nitro scam text + link",
+          "pattern": "(?i)(?:claim|free|get)\\s+[^\\n]{0,40}nitro[^\\n]{0,50}https?://",
+          "action": "kick"
+        },
+        {
+          "name": "Fake discord-themed TLD",
+          "pattern": "(?i)https?://[^\\s]*discord[^\\s]*\\.(?:gift|fun|lol|cfd|skin)\\b",
+          "action": "kick"
+        }
+      ],
       "escalation": []
     },
     "anti_selfbot": {
-      "enabled": false,
-      "action": "delete",
+      "enabled": true,
+      "action": "ban",
       "use_builtin_patterns": true,
       "builtin_patterns": [
         "[MN][A-Za-z\\d]{23}\\.[\\w-]{6}\\.[\\w-]{27}",
@@ -365,18 +404,19 @@
       "escalation": []
     },
     "new_user": {
-      "enabled": false,
-      "max_account_age_days": 7,
-      "action": "warn",
+      "enabled": true,
+      "max_account_age_days": 30,
+      "action": "timeout",
       "channels_only": [],
-      "escalation": []
+      "escalation": [],
+      "timeout_seconds": 1800
     },
     "anti_raid": {
-      "enabled": false,
-      "window_seconds": 10,
-      "join_threshold": 10,
-      "cooldown_seconds": 60,
-      "action": "timeout",
+      "enabled": true,
+      "window_seconds": 6,
+      "join_threshold": 5,
+      "cooldown_seconds": 300,
+      "action": "ban",
       "timeout_seconds": 300
     },
     "warn_thresholds": {

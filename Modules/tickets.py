@@ -57,9 +57,10 @@ def register_persistent_views(bot_instance):
     """Call this from your main on_ready to restore ticket panels after restart."""
     data = load_json(TICKETS_FILE, {})
     for guild_id, guild_data in data.items():
-        # Restore the main ticket-creation panel(s) for each configured guild.
         bot_instance.add_view(TicketPanel(guild_id))
-        # Restore control panels for currently tracked ticket channels.
+        panel_mid = guild_data.get("panel_message_id")
+        if panel_mid is not None and str(panel_mid).isdigit():
+            bot_instance.add_view(TicketPanel(guild_id), message_id=int(panel_mid))
         for channel_id in guild_data.get("tickets", {}).keys():
             bot_instance.add_view(TicketControlPanel(guild_id, int(channel_id)))
     print("✅ Persistent ticket views registered")
@@ -122,9 +123,8 @@ async def ticket_setup(
         "support_roles": [r.id for r in roles],
         "ticket_types": ticket_types,
         "ticket_message": message,
-        "tickets": {}
+        "tickets": {},
     }
-    save_json(TICKETS_FILE, data)
 
     embed = discord.Embed(
         title="🎫 Support Tickets",
@@ -132,7 +132,14 @@ async def ticket_setup(
         color=discord.Color.blue()
     )
 
-    await channel.send(embed=embed, view=TicketPanel(guild_id))
+    panel_msg = await channel.send(embed=embed, view=TicketPanel(guild_id))
+    data[guild_id]["panel_message_id"] = panel_msg.id
+    save_json(TICKETS_FILE, data)
+    try:
+        bot.add_view(TicketPanel(guild_id))
+        bot.add_view(TicketPanel(guild_id), message_id=panel_msg.id)
+    except Exception:
+        pass
     _dispatch_ticket_event(
         interaction.guild,
         interaction.user,
@@ -240,6 +247,10 @@ async def create_ticket(interaction: Interaction, ticket_type: str, guild_id: st
         )
 
         await channel.send(embed=embed, view=TicketControlPanel(guild_id, channel.id))
+        try:
+            bot.add_view(TicketControlPanel(guild_id, channel.id))
+        except Exception:
+            pass
         _dispatch_ticket_event(
             interaction.guild,
             interaction.user,
