@@ -63,6 +63,9 @@ DEFAULT_SLASH_COMMAND_RULES: dict[str, dict[str, Any]] = {
     "uninstall": _all("administrator"),
     "ticket_export": _all("manage_channels"),
     "ticket_import": _all("manage_channels"),
+    # --- Modules/quests.py ---
+    "quests list": _everyone(),
+    "quests checkin": _everyone(),
     # --- Modules/leveling.py ---
     "xpset": _all("manage_guild"),
     "xp config": _all("manage_guild"),

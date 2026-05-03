@@ -118,6 +118,15 @@
       "category": "engagement"
     },
     {
+      "id": "quests",
+      "extension": "Modules.quests",
+      "path": "Modules/quests.py",
+      "display_name": "Quests",
+      "description": "Configurable quests, daily check-in, reaction and message goals with XP rewards.",
+      "default_enabled": true,
+      "category": "engagement"
+    },
+    {
       "id": "reactionrole",
       "extension": "Modules.reactionrole",
       "path": "Modules/reactionrole.py",

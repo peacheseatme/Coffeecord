@@ -232,6 +232,7 @@
     "muterole": true,
     "nickname": true,
     "polls": true,
+    "quests": true,
     "reactionrole": true,
     "setup_wizard": true,
     "staff_utils": true,

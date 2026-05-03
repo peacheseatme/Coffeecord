@@ -147,6 +147,15 @@ REGISTRY_DEFAULT: dict[str, list[dict[str, Any]]] = {
             "category": "engagement",
         },
         {
+            "id": "quests",
+            "extension": "Modules.quests",
+            "path": "Modules/quests.py",
+            "display_name": "Quests",
+            "description": "Configurable quests, daily check-in, reaction and message goals with XP rewards.",
+            "default_enabled": True,
+            "category": "engagement",
+        },
+        {
             "id": "applications",
             "extension": "Modules.applications",
             "path": "Modules/applications.py",

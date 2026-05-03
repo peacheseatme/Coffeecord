@@ -489,6 +489,44 @@ async def award_reaction_xp(bot: commands.Bot, reaction: discord.Reaction, user:
     await _check_level_up(bot, guild_id, user_id, reaction.message.channel)
 
 
+async def award_quest_xp(
+    bot: commands.Bot,
+    guild: discord.Guild,
+    user_id: int,
+    xp_amount: int,
+    channel: Optional[discord.abc.Messageable] = None,
+) -> None:
+    """Grant flat XP for quest rewards (same path as message/reaction XP)."""
+    if xp_amount <= 0:
+        return
+    if not await is_module_enabled(guild.id, "leveling"):
+        return
+    guild_id = str(guild.id)
+    uid = str(user_id)
+    xp_data = _load_json(XP_FILE, {})
+    config = _load_json(CONFIG_FILE, {})
+    guild_cfg = _guild_leveling_cfg(config, guild_id)
+    xp_data.setdefault(guild_id, {})
+    if uid not in xp_data[guild_id]:
+        xp_data[guild_id][uid] = _default_xp_user(guild_cfg)
+    u = xp_data[guild_id][uid]
+    _normalize_user_level(u)
+    u["xp"] = int(u.get("xp", 0)) + int(xp_amount)
+    _save_json(XP_FILE, xp_data)
+    announce: Optional[discord.abc.Messageable] = channel
+    if announce is None:
+        if guild.system_channel and guild.system_channel.permissions_for(guild.me).send_messages:
+            announce = guild.system_channel
+        else:
+            for ch in guild.text_channels:
+                perms = ch.permissions_for(guild.me)
+                if perms.send_messages and perms.view_channel:
+                    announce = ch
+                    break
+    if announce is not None:
+        await _check_level_up(bot, guild_id, uid, announce)
+
+
 async def award_voice_xp(
     bot: commands.Bot,
     member: discord.Member,
