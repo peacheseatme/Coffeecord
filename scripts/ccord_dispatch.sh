@@ -18,7 +18,7 @@ Usage:
   c-cord default <id>
   c-cord new <id> [--path DIR] [--repo URL]   (flags may be before or after <id>)
 
-  c-cord <start|stop|restart|status|logs|console|update> [id|all] [args...]
+  c-cord <start|stop|restart|status|logs|console|update|repair> [id|all] [args...]
     id   — instance id from "c-cord list" (omit for default)
     all  — run for every registered instance
 
@@ -189,7 +189,7 @@ main() {
       fi
       exec "${root}/bot.sh" module "$@"
       ;;
-    start|stop|restart|status|logs|console)
+    start|stop|restart|status|logs|console|repair)
       local spec="default"
       if [[ $# -ge 1 ]]; then
         if [[ "$1" == "all" ]]; then

@@ -1,6 +1,8 @@
 import asyncio
 import json
 import logging
+import time
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Optional
 
@@ -8,7 +10,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from Modules.module_registry import is_module_enabled
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+MODULE_ID = "welcome_leave"
 CONFIG_PATH = BASE_DIR / "Storage" / "Config" / "welcome_leave.json"
 SURVEY_PATH = BASE_DIR / "Storage" / "Config" / "exit_surveys.json"
 
@@ -18,6 +23,14 @@ _SURVEY_LOCK = asyncio.Lock()
 
 WELCOME_DEFAULT_MESSAGE = "Welcome {user_mention} to {server_name}! We now have {member_count} members."
 LEAVE_DEFAULT_MESSAGE = "Goodbye {user_name}. We're sad to see you go!"
+
+DEFAULT_STICKY_MESSAGE = "📌 **Welcome** — read the rules, grab roles, and say hello!"
+STICKY_RATE_WINDOW_S = 60.0
+STICKY_HIGH_RATE_THRESHOLD = 100
+STICKY_BUMP_DEBOUNCE_LOW_S = 0.35
+STICKY_BUMP_DEBOUNCE_HIGH_S = 5.0
+
+_WELCOME_STICKY_BUMP_LOCKS: dict[tuple[int, int], asyncio.Lock] = defaultdict(lambda: asyncio.Lock())
 
 
 def _default_section(message: str) -> dict[str, Any]:
@@ -29,12 +42,22 @@ def _default_section(message: str) -> dict[str, Any]:
     }
 
 
+def _default_welcome_section() -> dict[str, Any]:
+    d = _default_section(WELCOME_DEFAULT_MESSAGE)
+    d["delivery"] = "channel"
+    d["sticky_enabled"] = False
+    d["sticky_message"] = DEFAULT_STICKY_MESSAGE
+    d["sticky_embed_enabled"] = False
+    d["sticky_last_message_id"] = None
+    return d
+
+
 def _default_guild_config() -> dict[str, Any]:
     leave_cfg = _default_section(LEAVE_DEFAULT_MESSAGE)
     leave_cfg["exit_survey_enabled"] = False
     leave_cfg["exit_survey_log_channel_id"] = None
     return {
-        "welcome": _default_section(WELCOME_DEFAULT_MESSAGE),
+        "welcome": _default_welcome_section(),
         "leave": leave_cfg,
     }
 
@@ -56,11 +79,37 @@ def _normalize_section(raw: Any, default_message: str, *, include_survey: bool =
     return section
 
 
+def normalize_welcome_section(raw: Any) -> dict[str, Any]:
+    """Merge raw welcome dict with defaults (delivery, sticky, persisted sticky id)."""
+    base = _default_welcome_section()
+    if not isinstance(raw, dict):
+        return base
+    base["enabled"] = bool(raw.get("enabled", False))
+    cid = raw.get("channel_id")
+    base["channel_id"] = cid if isinstance(cid, int) else None
+    message = raw.get("message")
+    if isinstance(message, str) and message.strip():
+        base["message"] = message.strip()
+    base["embed_enabled"] = bool(raw.get("embed_enabled", False))
+    delivery = str(raw.get("delivery", "channel")).lower().strip()
+    if delivery not in ("channel", "dm", "both"):
+        delivery = "channel"
+    base["delivery"] = delivery
+    base["sticky_enabled"] = bool(raw.get("sticky_enabled", False))
+    sm = raw.get("sticky_message")
+    if isinstance(sm, str) and sm.strip():
+        base["sticky_message"] = sm.strip()
+    base["sticky_embed_enabled"] = bool(raw.get("sticky_embed_enabled", False))
+    slid = raw.get("sticky_last_message_id")
+    base["sticky_last_message_id"] = slid if isinstance(slid, int) else None
+    return base
+
+
 def _normalize_guild_config(raw: Any) -> dict[str, Any]:
     if not isinstance(raw, dict):
         return _default_guild_config()
     return {
-        "welcome": _normalize_section(raw.get("welcome"), WELCOME_DEFAULT_MESSAGE),
+        "welcome": normalize_welcome_section(raw.get("welcome")),
         "leave": _normalize_section(raw.get("leave"), LEAVE_DEFAULT_MESSAGE, include_survey=True),
     }
 
@@ -117,12 +166,29 @@ async def save_welcome_leave_config(guild_id: int, data: dict[str, Any]) -> None
         await asyncio.to_thread(_write_json_sync, CONFIG_PATH, root)
 
 
+async def _patch_welcome_keys(guild_id: int, **welcome_updates: Any) -> None:
+    cfg = await load_welcome_leave_config(guild_id)
+    w = dict(cfg["welcome"])
+    w.update(welcome_updates)
+    cfg["welcome"] = normalize_welcome_section(w)
+    await save_welcome_leave_config(guild_id, cfg)
+
+
 def _render_message(template: str, member: discord.Member) -> str:
     return (
         template.replace("{user_mention}", member.mention)
         .replace("{user_name}", member.display_name)
         .replace("{server_name}", member.guild.name)
         .replace("{member_count}", str(member.guild.member_count or 0))
+    )
+
+
+def _render_sticky_message(template: str, guild: discord.Guild) -> str:
+    return (
+        template.replace("{server_name}", guild.name)
+        .replace("{member_count}", str(guild.member_count or 0))
+        .replace("{user_mention}", "")
+        .replace("{user_name}", "")
     )
 
 
@@ -140,6 +206,67 @@ def _get_bot_member(guild: discord.Guild, bot_user_id: Optional[int]) -> Optiona
     if me is not None:
         return me
     return guild.get_member(bot_user_id)
+
+
+async def _send_embed_or_plain(
+    destination: discord.abc.Messageable,
+    *,
+    text: str,
+    title: str,
+    color: discord.Color,
+    embed_enabled: bool,
+    thumbnail_url: Optional[str],
+    footer_guild_name: str,
+    me: discord.Member,
+) -> tuple[bool, str]:
+    if embed_enabled:
+        if isinstance(destination, discord.TextChannel):
+            perms = destination.permissions_for(me)
+            if not perms.embed_links:
+                return False, "missing_embed_permissions"
+        embed = discord.Embed(title=title, description=text, color=color)
+        if thumbnail_url:
+            embed.set_thumbnail(url=thumbnail_url)
+        embed.set_footer(text=f"{footer_guild_name} • Coffeecord")
+        try:
+            await destination.send(embed=embed)
+            return True, "sent"
+        except discord.HTTPException:
+            return False, "send_failed"
+    try:
+        await destination.send(text)
+        return True, "sent"
+    except discord.HTTPException:
+        return False, "send_failed"
+
+
+async def _send_welcome_to_dm(
+    bot: commands.Bot,
+    member: discord.Member,
+    section: dict[str, Any],
+    *,
+    title: str,
+    color: discord.Color,
+) -> tuple[bool, str]:
+    me = _get_bot_member(member.guild, bot.user.id if bot.user else None)
+    if me is None:
+        return False, "bot_member_missing"
+    message_text = _render_message(str(section.get("message", "")).strip() or WELCOME_DEFAULT_MESSAGE, member)
+    thumb = member.display_avatar.url if member.display_avatar else None
+    try:
+        dm = await member.create_dm()
+    except discord.HTTPException:
+        return False, "dm_open_failed"
+    return await _send_embed_or_plain(
+        dm,
+        text=message_text,
+        title=title,
+        color=color,
+        embed_enabled=bool(section.get("embed_enabled", False)),
+        thumbnail_url=thumb,
+        footer_guild_name=member.guild.name,
+        me=me,
+    )
 
 
 async def _send_configured_message(
@@ -166,24 +293,58 @@ async def _send_configured_message(
         return False, "missing_send_permissions"
 
     message_text = _render_message(str(section.get("message", "")).strip() or WELCOME_DEFAULT_MESSAGE, member)
+    thumb = member.display_avatar.url if member.display_avatar else None
     if section.get("embed_enabled", False):
         if not perms.embed_links:
             return False, "missing_embed_permissions"
-        embed = discord.Embed(title=title, description=message_text, color=color)
-        avatar = member.display_avatar.url if member.display_avatar else None
-        if avatar:
-            embed.set_thumbnail(url=avatar)
-        embed.set_footer(text=f"{member.guild.name} • Coffeecord")
-        try:
-            await channel.send(embed=embed)
-            return True, "sent"
-        except discord.HTTPException:
-            return False, "send_failed"
-    try:
-        await channel.send(message_text)
-        return True, "sent"
-    except discord.HTTPException:
-        return False, "send_failed"
+        return await _send_embed_or_plain(
+            channel,
+            text=message_text,
+            title=title,
+            color=color,
+            embed_enabled=True,
+            thumbnail_url=thumb,
+            footer_guild_name=member.guild.name,
+            me=me,
+        )
+    return await _send_embed_or_plain(
+        channel,
+        text=message_text,
+        title=title,
+        color=color,
+        embed_enabled=False,
+        thumbnail_url=thumb,
+        footer_guild_name=member.guild.name,
+        me=me,
+    )
+
+
+async def _send_welcome_for_member(
+    bot: commands.Bot,
+    member: discord.Member,
+    section: dict[str, Any],
+    *,
+    title: str,
+    color: discord.Color,
+    ignore_enabled: bool = False,
+) -> None:
+    if not ignore_enabled and not section.get("enabled", False):
+        return
+    delivery = str(section.get("delivery", "channel")).lower()
+    if delivery not in ("channel", "dm", "both"):
+        delivery = "channel"
+
+    if delivery in ("channel", "both"):
+        ok, reason = await _send_configured_message(
+            bot, member, section, title=title, color=color, ignore_enabled=True
+        )
+        if not ok and delivery == "channel":
+            LOGGER.warning("Welcome channel send failed for guild %s: %s", member.guild.id, reason)
+
+    if delivery in ("dm", "both"):
+        ok_dm, reason_dm = await _send_welcome_to_dm(bot, member, section, title=title, color=color)
+        if not ok_dm:
+            LOGGER.warning("Welcome DM failed for guild %s user %s: %s", member.guild.id, member.id, reason_dm)
 
 
 async def _save_exit_survey(guild_id: int, user_id: int, reason: str) -> None:
@@ -303,6 +464,97 @@ async def _attempt_exit_survey(
     )
 
 
+class _StickyBumpController:
+    """Trailing debounce: bump delay is 5s when >100 msgs/min in channel, else ~0.35s."""
+
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
+        self._history: dict[tuple[int, int], deque[float]] = defaultdict(lambda: deque(maxlen=2000))
+        self._pending: dict[tuple[int, int], asyncio.Task[None]] = {}
+
+    def _debounce_seconds(self, key: tuple[int, int]) -> float:
+        now = time.monotonic()
+        dq = self._history[key]
+        while dq and now - dq[0] > STICKY_RATE_WINDOW_S:
+            dq.popleft()
+        if len(dq) > STICKY_HIGH_RATE_THRESHOLD:
+            return STICKY_BUMP_DEBOUNCE_HIGH_S
+        return STICKY_BUMP_DEBOUNCE_LOW_S
+
+    def schedule(self, guild_id: int, channel_id: int, coro_factory: Any) -> None:
+        key = (guild_id, channel_id)
+        if key in self._pending:
+            self._pending[key].cancel()
+        delay = self._debounce_seconds(key)
+
+        async def _run() -> None:
+            try:
+                await asyncio.sleep(delay)
+                await coro_factory()
+            except asyncio.CancelledError:
+                return
+            except Exception:
+                LOGGER.exception("Sticky bump failed for guild %s channel %s", guild_id, channel_id)
+            finally:
+                self._pending.pop(key, None)
+
+        self._pending[key] = asyncio.create_task(_run())
+
+    def note_user_message(self, guild_id: int, channel_id: int) -> None:
+        self._history[(guild_id, channel_id)].append(time.monotonic())
+
+
+async def _execute_sticky_bump(bot: commands.Bot, guild: discord.Guild, welcome_cfg: dict[str, Any]) -> None:
+    if not welcome_cfg.get("sticky_enabled", False):
+        return
+    channel = _resolve_text_channel(guild, welcome_cfg.get("channel_id"))
+    if channel is None:
+        return
+    lock_key = (guild.id, channel.id)
+    async with _WELCOME_STICKY_BUMP_LOCKS[lock_key]:
+        await _execute_sticky_bump_locked(bot, guild, welcome_cfg, channel)
+
+
+async def _execute_sticky_bump_locked(
+    bot: commands.Bot,
+    guild: discord.Guild,
+    welcome_cfg: dict[str, Any],
+    channel: discord.TextChannel,
+) -> None:
+    me = guild.me or (guild.get_member(bot.user.id) if bot.user else None)
+    if me is None:
+        return
+    perms = channel.permissions_for(me)
+    if not perms.send_messages or not perms.view_channel:
+        return
+    if not perms.manage_messages:
+        LOGGER.warning("Sticky disabled for guild %s: bot needs Manage Messages to delete old sticky.", guild.id)
+        return
+
+    sticky_text = str(welcome_cfg.get("sticky_message") or "").strip() or DEFAULT_STICKY_MESSAGE
+    body = _render_sticky_message(sticky_text, guild)
+    old_id = welcome_cfg.get("sticky_last_message_id")
+    if isinstance(old_id, int):
+        try:
+            old = await channel.fetch_message(old_id)
+            await old.delete()
+        except (discord.HTTPException, discord.NotFound):
+            pass
+
+    try:
+        if welcome_cfg.get("sticky_embed_enabled", False) and perms.embed_links:
+            embed = discord.Embed(title="📌 Notice", description=body, color=discord.Color.blurple())
+            embed.set_footer(text=guild.name)
+            msg = await channel.send(embed=embed)
+        else:
+            msg = await channel.send(body)
+    except discord.HTTPException:
+        LOGGER.warning("Sticky send failed in guild %s", guild.id)
+        return
+
+    await _patch_welcome_keys(guild.id, sticky_last_message_id=msg.id)
+
+
 class WelcomeCog(
     commands.GroupCog,
     group_name="welcome",
@@ -310,13 +562,25 @@ class WelcomeCog(
 ):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
+        self._sticky = _StickyBumpController(bot)
 
     @app_commands.command(name="config", description="Configure welcome message settings.")
     @app_commands.describe(
-        channel="Channel where welcome messages are sent.",
+        channel="Channel where welcome messages are sent (and sticky, if enabled).",
         message="Message text. Supports placeholders like {user_mention}.",
         enabled="Enable or disable welcome messages.",
         use_embed="Send as embed instead of plain text.",
+        delivery="Send welcome in channel, DM, or both.",
+        sticky_enabled="Re-post a sticky notice at the bottom of the welcome channel when people chat.",
+        sticky_message="Sticky text (use {server_name} {member_count}; not per-user).",
+        sticky_use_embed="Send sticky as embed.",
+    )
+    @app_commands.choices(
+        delivery=[
+            app_commands.Choice(name="Channel only", value="channel"),
+            app_commands.Choice(name="DM only", value="dm"),
+            app_commands.Choice(name="Channel and DM", value="both"),
+        ]
     )
     async def config(
         self,
@@ -325,23 +589,43 @@ class WelcomeCog(
         message: str,
         enabled: bool = True,
         use_embed: bool = False,
+        delivery: str = "channel",
+        sticky_enabled: bool = False,
+        sticky_message: Optional[str] = None,
+        sticky_use_embed: bool = False,
     ) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
             return
 
+        dlv = delivery if delivery in ("channel", "dm", "both") else "channel"
+        sm = sticky_message.strip() if isinstance(sticky_message, str) and sticky_message.strip() else DEFAULT_STICKY_MESSAGE
+
         cfg = await load_welcome_leave_config(interaction.guild.id)
-        cfg["welcome"] = {
-            "enabled": bool(enabled),
-            "channel_id": channel.id,
-            "message": message.strip() or WELCOME_DEFAULT_MESSAGE,
-            "embed_enabled": bool(use_embed),
-        }
+        cfg["welcome"] = normalize_welcome_section(
+            {
+                **cfg.get("welcome", {}),
+                "enabled": bool(enabled),
+                "channel_id": channel.id,
+                "message": message.strip() or WELCOME_DEFAULT_MESSAGE,
+                "embed_enabled": bool(use_embed),
+                "delivery": dlv,
+                "sticky_enabled": bool(sticky_enabled),
+                "sticky_message": sm,
+                "sticky_embed_enabled": bool(sticky_use_embed),
+            }
+        )
         await save_welcome_leave_config(interaction.guild.id, cfg)
         await interaction.response.send_message(
-            f"✅ Welcome config updated.\nChannel: {channel.mention}\nEnabled: `{enabled}`\nEmbed: `{use_embed}`",
+            f"✅ Welcome config updated.\n"
+            f"Channel: {channel.mention}\nEnabled: `{enabled}`\nEmbed: `{use_embed}`\n"
+            f"Delivery: `{dlv}`\nSticky: `{sticky_enabled}`\n",
             ephemeral=True,
         )
+        if sticky_enabled and interaction.guild:
+            asyncio.create_task(
+                _execute_sticky_bump(self.bot, interaction.guild, cfg["welcome"]),
+            )
 
     @app_commands.command(name="test", description="Send a test welcome message.")
     async def test(self, interaction: discord.Interaction) -> None:
@@ -349,25 +633,47 @@ class WelcomeCog(
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
             return
         cfg = await load_welcome_leave_config(interaction.guild.id)
-        ok, reason = await _send_configured_message(
-            self.bot,
-            interaction.user if isinstance(interaction.user, discord.Member) else interaction.guild.me,
-            cfg["welcome"],
-            title="Welcome!",
-            color=discord.Color.green(),
-            ignore_enabled=True,
-        )
-        if ok:
+        member = interaction.user if isinstance(interaction.user, discord.Member) else interaction.guild.me
+        if member is None:
+            await interaction.response.send_message("Could not resolve member.", ephemeral=True)
+            return
+        delivery = str(cfg["welcome"].get("delivery", "channel")).lower()
+        results: list[str] = []
+
+        if delivery in ("channel", "both"):
+            ok, reason = await _send_configured_message(
+                self.bot,
+                member,
+                cfg["welcome"],
+                title="Welcome!",
+                color=discord.Color.green(),
+                ignore_enabled=True,
+            )
+            results.append(f"channel: {'ok' if ok else reason}")
+        if delivery in ("dm", "both"):
+            ok_dm, reason_dm = await _send_welcome_to_dm(
+                self.bot,
+                member,
+                cfg["welcome"],
+                title="Welcome!",
+                color=discord.Color.green(),
+            )
+            results.append(f"dm: {'ok' if ok_dm else reason_dm}")
+
+        ch_ok = delivery in ("channel", "both") and any(r.startswith("channel: ok") for r in results)
+        dm_ok = delivery in ("dm", "both") and any(r.startswith("dm: ok") for r in results)
+        if ch_ok or dm_ok:
             from Modules.themes import get_command_response_for_interaction
+
             msg = get_command_response_for_interaction(
                 interaction,
                 "success",
-                "✅ Sent a welcome test message.",
+                "✅ Sent welcome test (" + ", ".join(results) + ").",
             )
             await interaction.response.send_message(msg, ephemeral=True)
         else:
             await interaction.response.send_message(
-                f"⚠️ Could not send welcome test message (`{reason}`). Check channel and bot permissions.",
+                "⚠️ Could not send welcome test: " + ", ".join(results),
                 ephemeral=True,
             )
 
@@ -375,15 +681,53 @@ class WelcomeCog(
     async def on_member_join(self, member: discord.Member) -> None:
         try:
             cfg = await load_welcome_leave_config(member.guild.id)
-            await _send_configured_message(
+            w = cfg["welcome"]
+            await _send_welcome_for_member(
                 self.bot,
                 member,
-                cfg["welcome"],
+                w,
                 title="Welcome!",
                 color=discord.Color.green(),
             )
+            if w.get("sticky_enabled", False) and isinstance(w.get("channel_id"), int):
+                self._sticky.note_user_message(member.guild.id, int(w["channel_id"]))
+
+                async def bump() -> None:
+                    fresh = await load_welcome_leave_config(member.guild.id)
+                    g = self.bot.get_guild(member.guild.id)
+                    if g is None:
+                        return
+                    await _execute_sticky_bump(self.bot, g, fresh["welcome"])
+
+                self._sticky.schedule(member.guild.id, int(w["channel_id"]), bump)
         except Exception:
             LOGGER.exception("Failed to process welcome message for guild %s", member.guild.id)
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message) -> None:
+        if message.guild is None or message.author.bot:
+            return
+        if not await is_module_enabled(message.guild.id, MODULE_ID):
+            return
+        try:
+            cfg = await load_welcome_leave_config(message.guild.id)
+            w = cfg["welcome"]
+            if not w.get("sticky_enabled", False):
+                return
+            if not isinstance(w.get("channel_id"), int) or message.channel.id != w["channel_id"]:
+                return
+            self._sticky.note_user_message(message.guild.id, message.channel.id)
+
+            async def bump() -> None:
+                fresh = await load_welcome_leave_config(message.guild.id)
+                g = self.bot.get_guild(message.guild.id)
+                if g is None:
+                    return
+                await _execute_sticky_bump(self.bot, g, fresh["welcome"])
+
+            self._sticky.schedule(message.guild.id, message.channel.id, bump)
+        except Exception:
+            LOGGER.exception("Sticky on_message failed for guild %s", message.guild.id)
 
 
 class LeaveCog(
@@ -457,6 +801,7 @@ class LeaveCog(
         )
         if ok:
             from Modules.themes import get_command_response_for_interaction
+
             msg = get_command_response_for_interaction(
                 interaction,
                 "success",
@@ -496,7 +841,6 @@ class LeaveCog(
 
 
 async def setup(bot: commands.Bot) -> None:
-    # Auto-create JSON files on startup for easy first-time setup.
     await _load_root_config()
     async with _SURVEY_LOCK:
         survey_data = await asyncio.to_thread(_read_json_sync, SURVEY_PATH, {})

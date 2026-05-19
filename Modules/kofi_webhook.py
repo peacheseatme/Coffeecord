@@ -46,8 +46,12 @@ class KoFiWebhookServer:
 
         runner = web.AppRunner(app)
         await runner.setup()
-        site = web.TCPSite(runner, host=host, port=port)
-        await site.start()
+        try:
+            site = web.TCPSite(runner, host=host, port=port)
+            await site.start()
+        except BaseException:
+            await runner.cleanup()
+            raise
         self._runner = runner
 
     async def stop(self) -> None:

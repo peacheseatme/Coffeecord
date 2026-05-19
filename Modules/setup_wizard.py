@@ -9,6 +9,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from Modules.reactionrole import DEFAULT_PANEL_COLOR, _build_panel_embed
+from Modules.welcome_leave import normalize_welcome_section
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -907,12 +908,18 @@ class QuickSetupCog(commands.Cog):
                     cfg = {}
                 if "welcome" in selected:
                     w = draft["welcome"]
-                    cfg["welcome"] = {
-                        "enabled": bool(w["enabled"]),
-                        "channel_id": int(w["channel_id"]) if w.get("channel_id") else None,
-                        "message": str(w["message"]),
-                        "embed_enabled": bool(w["embed_enabled"]),
-                    }
+                    prev_w = cfg.get("welcome")
+                    if not isinstance(prev_w, dict):
+                        prev_w = {}
+                    cfg["welcome"] = normalize_welcome_section(
+                        {
+                            **prev_w,
+                            "enabled": bool(w["enabled"]),
+                            "channel_id": int(w["channel_id"]) if w.get("channel_id") else None,
+                            "message": str(w["message"]),
+                            "embed_enabled": bool(w["embed_enabled"]),
+                        }
+                    )
                 if "leave" in selected:
                     l = draft["leave"]
                     existing_leave = cfg.get("leave", {})

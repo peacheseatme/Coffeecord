@@ -281,12 +281,15 @@ intents.members = True
 ENABLE_PRESENCE_INTENT = os.getenv("ENABLE_PRESENCE_INTENT", "1").strip().lower() in {"1", "true", "yes", "on"}
 intents.presences = ENABLE_PRESENCE_INTENT
 
-bot = commands.Bot(command_prefix=".", intents=intents, tree_cls=CoffeecordCommandTree)
+OWNER_ID = _env_or_branding_owner_id()
+_bot_kwargs: dict = {"command_prefix": ".", "intents": intents, "tree_cls": CoffeecordCommandTree}
+if OWNER_ID:
+    _bot_kwargs["owner_id"] = OWNER_ID
+
+bot = commands.Bot(**_bot_kwargs)
 
 tree = bot.tree
 anti_abuse.register_dev_group(bot)
-
-OWNER_ID = _env_or_branding_owner_id()
 
 
 def _dispatch_module_log_event(
@@ -5844,8 +5847,20 @@ async def _run_bot_with_kofi():
             pending_links=pending_kofi_links,
             on_payload=handle_kofi_payload,
         )
-        await kofi_server.start(host="0.0.0.0", port=kofi_port)
-        print(f"Ko-fi webhook server listening on :{kofi_port}")
+        try:
+            await kofi_server.start(host="0.0.0.0", port=kofi_port)
+            print(f"Ko-fi webhook server listening on :{kofi_port}", flush=True)
+        except OSError as e:
+            print(
+                _redact_discord_token_in_text(
+                    f"[Ko-fi] Webhook server could not bind 0.0.0.0:{kofi_port} ({e}). "
+                    "Port may be in use (another Coffeecord, ngrok, or other app). "
+                    "Set KOFI_PORT in Src/.env to a free port, stop the other process, or run `c-cord stop` on the other clone. "
+                    "Starting Discord without the local Ko-fi listener."
+                ),
+                flush=True,
+            )
+            kofi_server = None
     else:
         print("Ko-fi webhook disabled (KOFI_VERIFICATION_TOKEN is not set).")
 

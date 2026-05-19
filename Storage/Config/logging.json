@@ -49,7 +49,7 @@
     "enabled": true,
     "log_channel_id": 1388577818752974970,
     "events": {
-      "message_delete": true,
+      "message_delete": false,
       "message_edit": true,
       "member_join": true,
       "member_leave": true,

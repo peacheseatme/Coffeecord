@@ -320,7 +320,27 @@ spam_cache = defaultdict(list)
 duplicate_cache = defaultdict(list)
 join_cache = defaultdict(list)
 raid_mode_until = defaultdict(float)
+# One punitive DM/action burst per member per window (stops spam → 7 timeout DMs).
+AUTOMOD_PUNISH_COOLDOWN_MIN_S = 30.0
+automod_punish_until: dict[tuple[int, int], float] = {}
 save_json(CONFIG_PATH, config)
+
+
+def _punish_key(guild_id: int, user_id: int) -> tuple[int, int]:
+    return (guild_id, user_id)
+
+
+def _punish_cooldown_active(key: tuple[int, int]) -> bool:
+    return time.monotonic() < automod_punish_until.get(key, 0.0)
+
+
+def _arm_punish_cooldown(key: tuple[int, int], seconds: float) -> None:
+    duration = max(float(seconds), AUTOMOD_PUNISH_COOLDOWN_MIN_S)
+    automod_punish_until[key] = time.monotonic() + duration
+
+
+def _get_warn_count(guild_id: int, user_id: int) -> int:
+    return len(warns.get(str(guild_id), {}).get(str(user_id), []))
 
 
 def get_guild_config(guild_id: int) -> dict:
@@ -614,12 +634,23 @@ def check_spam(message: discord.Message, cfg: dict):
     cache.append(now)
     per_seconds = int(cfg.get("per_seconds", 10))
     cache[:] = [t for t in cache if now - t <= per_seconds]
-    if len(cache) > int(cfg.get("max_messages", 5)):
+    max_messages = int(cfg.get("max_messages", 5))
+    if len(cache) > max_messages:
+        timeout_seconds = int(cfg.get("timeout_seconds", 60))
+        configured_action = str(cfg.get("action", "timeout")).lower()
+        if _punish_cooldown_active(key):
+            # Still delete spam during cooldown; do not re-timeout or re-DM.
+            return AutomodResult(
+                "spam",
+                "delete",
+                "Message spam (ongoing)",
+                {"delete_message": True},
+            )
         return AutomodResult(
             "spam",
-            cfg.get("action", "timeout"),
+            configured_action,
             "Message spam",
-            {"seconds": int(cfg.get("timeout_seconds", 60))},
+            {"seconds": timeout_seconds},
         )
     return None
 
@@ -639,12 +670,21 @@ def check_duplicate_messages(message: discord.Message, cfg: dict):
     min_duplicates = int(cfg.get("min_duplicates", 3))
     recent_identical = [c for (_, c) in cache if c == normalized]
     if len(recent_identical) >= min_duplicates:
+        dup_key = (message.guild.id, message.author.id)
+        configured_action = str(cfg.get("action", "delete")).lower()
         extra: dict = {}
-        if str(cfg.get("action", "delete")).lower() == "timeout":
+        if configured_action == "timeout":
             extra["seconds"] = int(cfg.get("timeout_seconds", 60))
+        if _punish_cooldown_active(dup_key) and configured_action in ("timeout", "kick", "ban", "warn"):
+            return AutomodResult(
+                "duplicate_messages",
+                "delete",
+                "Repeated duplicate message detected (ongoing)",
+                {"delete_message": True},
+            )
         return AutomodResult(
             "duplicate_messages",
-            cfg.get("action", "delete"),
+            configured_action,
             "Repeated duplicate message detected",
             extra,
         )
@@ -829,6 +869,9 @@ async def apply_warn_threshold_action(
     action = str(action).lower()
     reason = f"Reached {warn_count} warnings"
     action_taken = "log_only"
+    pkey = _punish_key(member.guild.id, member.id)
+    if action in ("mute", "timeout", "kick", "ban") and _punish_cooldown_active(pkey):
+        return f"{action} (threshold skipped, punish cooldown)"
 
     try:
         if action == "warn":
@@ -850,6 +893,7 @@ async def apply_warn_threshold_action(
                     discord.utils.utcnow() + timedelta(seconds=seconds),
                     reason=reason,
                 )
+                _arm_punish_cooldown(pkey, seconds)
                 action_taken = f"mute ({seconds}s timeout)"
             else:
                 action_taken = f"blocked: {blocked}"
@@ -869,6 +913,7 @@ async def apply_warn_threshold_action(
                     discord.utils.utcnow() + timedelta(seconds=seconds),
                     reason=reason,
                 )
+                _arm_punish_cooldown(pkey, seconds)
                 action_taken = f"timeout ({seconds}s)"
             else:
                 action_taken = f"blocked: {blocked}"
@@ -883,6 +928,7 @@ async def apply_warn_threshold_action(
                     rule="warn_threshold",
                 )
                 await member.kick(reason=reason)
+                _arm_punish_cooldown(pkey, 300)
                 action_taken = "kick"
             else:
                 action_taken = f"blocked: {blocked}"
@@ -897,6 +943,7 @@ async def apply_warn_threshold_action(
                     rule="warn_threshold",
                 )
                 await member.ban(reason=reason, delete_message_days=0)
+                _arm_punish_cooldown(pkey, 600)
                 action_taken = "ban"
             else:
                 action_taken = f"blocked: {blocked}"
@@ -913,6 +960,10 @@ async def _record_automod_warn(
     reason: str,
     rule_name: str,
 ) -> tuple[int, str | None]:
+    pkey = _punish_key(message.guild.id, message.author.id)
+    if _punish_cooldown_active(pkey):
+        return _get_warn_count(message.guild.id, message.author.id), None
+
     count = add_warn(message.guild.id, message.author.id, reason)
     _dispatch_custom_event(
         "coffeecord_warn",
@@ -932,6 +983,7 @@ async def _record_automod_warn(
             message.guild.name,
             rule=rule_name,
         )
+        _arm_punish_cooldown(pkey, 20.0)
         threshold_action = await apply_warn_threshold_action(message.author, count, guild_cfg)
     return count, threshold_action
 
@@ -983,23 +1035,8 @@ async def apply_action(
                 action_taken += f", threshold={threshold_action}"
 
         elif action == "timeout":
-            can_timeout, reason = can_perform_action(message.guild, message.author, "timeout")
-            if can_timeout:
-                default_seconds = int((rule_cfg or {}).get("timeout_seconds", 60))
-                seconds = int(result.extra.get("seconds", default_seconds))
-                if isinstance(message.author, discord.Member):
-                    await notify_user_automod_action(
-                        message.author,
-                        "timeout",
-                        result.reason,
-                        message.guild.name,
-                        rule=result.rule,
-                        duration_seconds=seconds,
-                    )
-                await message.author.timeout(
-                    discord.utils.utcnow() + timedelta(seconds=seconds),
-                    reason=f"Automod: {result.reason}",
-                )
+            pkey = _punish_key(message.guild.id, message.author.id)
+            if _punish_cooldown_active(pkey):
                 if delete_message:
                     can_delete, _ = can_perform_action(message.guild, message.author, "delete")
                     if can_delete:
@@ -1007,41 +1044,78 @@ async def apply_action(
                             await message.delete()
                         except discord.HTTPException:
                             pass
-                action_taken = f"timeout ({seconds}s)"
+                action_taken = "timeout (skipped, punish cooldown)"
             else:
-                action_taken = f"blocked: {reason}"
+                can_timeout, reason = can_perform_action(message.guild, message.author, "timeout")
+                if can_timeout:
+                    default_seconds = int((rule_cfg or {}).get("timeout_seconds", 60))
+                    seconds = int(result.extra.get("seconds", default_seconds))
+                    if isinstance(message.author, discord.Member):
+                        await notify_user_automod_action(
+                            message.author,
+                            "timeout",
+                            result.reason,
+                            message.guild.name,
+                            rule=result.rule,
+                            duration_seconds=seconds,
+                        )
+                    await message.author.timeout(
+                        discord.utils.utcnow() + timedelta(seconds=seconds),
+                        reason=f"Automod: {result.reason}",
+                    )
+                    _arm_punish_cooldown(pkey, seconds)
+                    if delete_message:
+                        can_delete, _ = can_perform_action(message.guild, message.author, "delete")
+                        if can_delete:
+                            try:
+                                await message.delete()
+                            except discord.HTTPException:
+                                pass
+                    action_taken = f"timeout ({seconds}s)"
+                else:
+                    action_taken = f"blocked: {reason}"
 
         elif action == "kick":
-            can_kick, reason = can_perform_action(message.guild, message.author, "kick")
-            if can_kick:
-                if isinstance(message.author, discord.Member):
-                    await notify_user_automod_action(
-                        message.author,
-                        "kick",
-                        result.reason,
-                        message.guild.name,
-                        rule=result.rule,
-                    )
-                await message.author.kick(reason=f"Automod: {result.reason}")
-                action_taken = "kick"
+            pkey = _punish_key(message.guild.id, message.author.id)
+            if _punish_cooldown_active(pkey):
+                action_taken = "kick (skipped, punish cooldown)"
             else:
-                action_taken = f"blocked: {reason}"
+                can_kick, reason = can_perform_action(message.guild, message.author, "kick")
+                if can_kick:
+                    if isinstance(message.author, discord.Member):
+                        await notify_user_automod_action(
+                            message.author,
+                            "kick",
+                            result.reason,
+                            message.guild.name,
+                            rule=result.rule,
+                        )
+                    await message.author.kick(reason=f"Automod: {result.reason}")
+                    _arm_punish_cooldown(pkey, 300)
+                    action_taken = "kick"
+                else:
+                    action_taken = f"blocked: {reason}"
 
         elif action == "ban":
-            can_ban, reason = can_perform_action(message.guild, message.author, "ban")
-            if can_ban:
-                if isinstance(message.author, discord.Member):
-                    await notify_user_automod_action(
-                        message.author,
-                        "ban",
-                        result.reason,
-                        message.guild.name,
-                        rule=result.rule,
-                    )
-                await message.author.ban(reason=f"Automod: {result.reason}", delete_message_days=0)
-                action_taken = "ban"
+            pkey = _punish_key(message.guild.id, message.author.id)
+            if _punish_cooldown_active(pkey):
+                action_taken = "ban (skipped, punish cooldown)"
             else:
-                action_taken = f"blocked: {reason}"
+                can_ban, reason = can_perform_action(message.guild, message.author, "ban")
+                if can_ban:
+                    if isinstance(message.author, discord.Member):
+                        await notify_user_automod_action(
+                            message.author,
+                            "ban",
+                            result.reason,
+                            message.guild.name,
+                            rule=result.rule,
+                        )
+                    await message.author.ban(reason=f"Automod: {result.reason}", delete_message_days=0)
+                    _arm_punish_cooldown(pkey, 600)
+                    action_taken = "ban"
+                else:
+                    action_taken = f"blocked: {reason}"
 
         else:
             action_taken = f"unsupported action: {action}"

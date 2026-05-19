@@ -264,11 +264,22 @@
     },
     "warn_thresholds": {
       "3": {
-        "action": "timeout",
-        "seconds": 300
+        "action": "mute",
+        "seconds": 14400
       },
       "5": {
         "action": "kick"
+      },
+      "1": {
+        "action": "timeout",
+        "seconds": 300
+      },
+      "2": {
+        "action": "mute",
+        "seconds": 1800
+      },
+      "4": {
+        "action": "ban"
       }
     }
   },

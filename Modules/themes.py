@@ -212,10 +212,11 @@ def _invalidate_guild_cache(guild_id: int) -> None:
     json_cache.invalidate(THEMES_CONFIG_PATH)
 
 
-def _substitute(text: str, **kwargs: str) -> str:
+def _substitute(template: str, **kwargs: str) -> str:
+    out = template
     for k, v in kwargs.items():
-        text = text.replace(f"{{{k}}}", str(v) if v is not None else "")
-    return text
+        out = out.replace(f"{{{k}}}", str(v) if v is not None else "")
+    return out
 
 
 def render_moderation_embed(

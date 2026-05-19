@@ -4,7 +4,12 @@
       "enabled": true,
       "channel_id": 1386804649839038484,
       "message": "Welcome {user_mention}! Take a look around and make sure you read teh rules!",
-      "embed_enabled": true
+      "embed_enabled": true,
+      "delivery": "channel",
+      "sticky_enabled": false,
+      "sticky_message": "\ud83d\udccc **Welcome** \u2014 read the rules, grab roles, and say hello!",
+      "sticky_embed_enabled": false,
+      "sticky_last_message_id": null
     },
     "leave": {
       "enabled": true,
@@ -20,7 +25,12 @@
       "enabled": true,
       "channel_id": 1477809276608184380,
       "message": "Welcome {user_mention} to {server_name}! We now have {member_count} members.",
-      "embed_enabled": true
+      "embed_enabled": true,
+      "delivery": "channel",
+      "sticky_enabled": false,
+      "sticky_message": "\ud83d\udccc **Welcome** \u2014 read the rules, grab roles, and say hello!",
+      "sticky_embed_enabled": false,
+      "sticky_last_message_id": null
     },
     "leave": {
       "enabled": true,
@@ -36,7 +46,12 @@
       "enabled": true,
       "channel_id": 787720264342437889,
       "message": "test",
-      "embed_enabled": true
+      "embed_enabled": true,
+      "delivery": "channel",
+      "sticky_enabled": false,
+      "sticky_message": "\ud83d\udccc **Welcome** \u2014 read the rules, grab roles, and say hello!",
+      "sticky_embed_enabled": false,
+      "sticky_last_message_id": null
     },
     "leave": {
       "enabled": true,
@@ -52,7 +67,12 @@
       "enabled": false,
       "channel_id": null,
       "message": "Welcome {user_mention} to {server_name}! We now have {member_count} members.",
-      "embed_enabled": false
+      "embed_enabled": false,
+      "delivery": "channel",
+      "sticky_enabled": false,
+      "sticky_message": "\ud83d\udccc **Welcome** \u2014 read the rules, grab roles, and say hello!",
+      "sticky_embed_enabled": false,
+      "sticky_last_message_id": null
     },
     "leave": {
       "enabled": false,
@@ -68,7 +88,12 @@
       "enabled": false,
       "channel_id": null,
       "message": "Welcome {user_mention} to {server_name}! We now have {member_count} members.",
-      "embed_enabled": false
+      "embed_enabled": false,
+      "delivery": "channel",
+      "sticky_enabled": false,
+      "sticky_message": "\ud83d\udccc **Welcome** \u2014 read the rules, grab roles, and say hello!",
+      "sticky_embed_enabled": false,
+      "sticky_last_message_id": null
     },
     "leave": {
       "enabled": false,
@@ -84,7 +109,12 @@
       "enabled": false,
       "channel_id": null,
       "message": "Welcome {user_mention} to {server_name}! We now have {member_count} members.",
-      "embed_enabled": false
+      "embed_enabled": false,
+      "delivery": "channel",
+      "sticky_enabled": false,
+      "sticky_message": "\ud83d\udccc **Welcome** \u2014 read the rules, grab roles, and say hello!",
+      "sticky_embed_enabled": false,
+      "sticky_last_message_id": null
     },
     "leave": {
       "enabled": false,
@@ -100,7 +130,12 @@
       "enabled": false,
       "channel_id": null,
       "message": "Welcome {user_mention} to {server_name}! We now have {member_count} members.",
-      "embed_enabled": false
+      "embed_enabled": false,
+      "delivery": "channel",
+      "sticky_enabled": false,
+      "sticky_message": "\ud83d\udccc **Welcome** \u2014 read the rules, grab roles, and say hello!",
+      "sticky_embed_enabled": false,
+      "sticky_last_message_id": null
     },
     "leave": {
       "enabled": false,

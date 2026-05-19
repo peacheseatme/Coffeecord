@@ -398,6 +398,7 @@ echo -e "    ${CYAN}c-cord update${RESET}               — latest GitHub releas
 echo -e "    ${CYAN}c-cord update 1.0.3${RESET}         — pin or downgrade to that release/tag"
 echo -e "    ${CYAN}c-cord update --branch${RESET}      — git pull (dev on main)"
 echo -e "    ${CYAN}c-cord update -f${RESET}            — continue if git step fails"
+echo -e "    ${CYAN}c-cord repair${RESET}               — restore missing tracked files (git) + Storage JSON; ${CYAN}--storage-only${RESET} for JSON only"
 echo -e "    ${CYAN}c-cord module refresh${RESET}       — Register new drop-in modules"
 echo -e "    ${CYAN}c-cord module refresh_registry${RESET} — Alias for module refresh"
 echo -e "    ${CYAN}c-cord module refresh --dry-run${RESET}  — Preview without writing"

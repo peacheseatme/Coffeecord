@@ -93,6 +93,15 @@ REGISTRY_DEFAULT: dict[str, list[dict[str, Any]]] = {
             "category": "configuration",
         },
         {
+            "id": "sticky_msg",
+            "extension": "Modules.sticky_msg",
+            "path": "Modules/sticky_msg.py",
+            "display_name": "Sticky Messages",
+            "description": "Named sticky notices re-posted at the bottom of configured channels.",
+            "default_enabled": True,
+            "category": "configuration",
+        },
+        {
             "id": "setup_wizard",
             "extension": "Modules.setup_wizard",
             "path": "Modules/setup_wizard.py",

@@ -42,7 +42,7 @@ _usage() {
     echo ""
     echo -e "${BOLD}Multi-instance (global ~/.local/bin/c-cord):${RESET}"
     echo "  c-cord list | add <id> <path> | remove <id> | default <id> | new <id> [--path DIR] [--repo URL]"
-    echo "  c-cord start [id|all] …   stop / restart / status / logs / console / update  (optional id or all)"
+    echo "  c-cord start [id|all] …   stop / restart / status / logs / console / update / repair  (optional id or all)"
     echo ""
     echo -e "${BOLD}Commands (this clone):${RESET}"
     echo "  start                     Start bot in the background"
@@ -71,6 +71,11 @@ _usage() {
     echo "  module refresh            Scan Modules/ — add new files to registry"
     echo "  module refresh_registry   Alias for 'module refresh'"
     echo "  module refresh --dry-run  Preview additions without writing"
+    echo ""
+    echo "  repair [--repair] [--dry-run] [--exclude <file>]…   git restore missing tracked files, then Storage JSON + bot_sys.cfg"
+    echo "    --storage-only   Skip git (only known Storage/Config, Storage/Data JSON, bot_sys.cfg)"
+    echo "    [--remote origin] [--ref origin/main] [--no-fetch] [--no-storage]"
+    echo "    (repeat --exclude basename e.g. xp.json to skip overwriting custom data)"
     echo ""
     echo "Runtime failures (token, network, Discord, your edits) are yours to diagnose."
 }
@@ -822,6 +827,24 @@ _update_bot() {
     echo "  - Bot state         : running"
 }
 
+# ── repair ───────────────────────────────────────────────────────────────────
+# Same as: (cd repo && "${py}" scripts/repair_clone.py "$@") — exec so argv/exit match the script.
+# Default: git fetch + restore missing tracked files, then storage repair. Use --storage-only for JSON only.
+# Flags: [--repair] [--storage-only] --dry-run --exclude … | [--remote] [--ref] [--no-fetch] [--no-storage]
+_repair_storage() {
+    local py_cmd="${PYTHON_BIN}"
+    if [[ ! -x "${py_cmd}" ]]; then
+        warn "Venv python missing; using python3 for repair."
+        py_cmd="python3"
+    fi
+    if [[ ! -f "${SCRIPT_DIR}/scripts/repair_clone.py" ]]; then
+        err "Missing ${SCRIPT_DIR}/scripts/repair_clone.py"
+        exit 1
+    fi
+    cd "${SCRIPT_DIR}" || exit 1
+    exec "${py_cmd}" "./scripts/repair_clone.py" "$@"
+}
+
 # ── module refresh ────────────────────────────────────────────────────────────
 # Flags:
 #   --dry-run   Show what would be added without writing to modules.json.
@@ -894,6 +917,9 @@ main() {
             ;;
         update)
             _update_bot "$@"
+            ;;
+        repair)
+            _repair_storage "$@"
             ;;
         module)
             local subcmd="${1:-}"

@@ -10,6 +10,15 @@
       "category": "moderation"
     },
     {
+      "id": "anti_abuse",
+      "extension": "Modules.anti_abuse",
+      "path": "Modules/anti_abuse.py",
+      "display_name": "Anti Abuse",
+      "description": "",
+      "default_enabled": true,
+      "category": "utilities"
+    },
+    {
       "id": "applications",
       "extension": "Modules.applications",
       "path": "Modules/applications.py",
@@ -37,11 +46,38 @@
       "category": "configuration"
     },
     {
+      "id": "bot_config",
+      "extension": "Modules.bot_config",
+      "path": "Modules/bot_config.py",
+      "display_name": "Bot Config",
+      "description": "",
+      "default_enabled": true,
+      "category": "utilities"
+    },
+    {
       "id": "calls",
       "extension": "Modules.calls",
       "path": "Modules/calls.py",
       "display_name": "Calls",
       "description": "Private call channels and call membership management.",
+      "default_enabled": true,
+      "category": "utilities"
+    },
+    {
+      "id": "checks",
+      "extension": "Modules.checks",
+      "path": "Modules/checks.py",
+      "display_name": "Checks",
+      "description": "",
+      "default_enabled": true,
+      "category": "utilities"
+    },
+    {
+      "id": "command_perm_overrides",
+      "extension": "Modules.command_perm_overrides",
+      "path": "Modules/command_perm_overrides.py",
+      "display_name": "Command Perm Overrides",
+      "description": "",
       "default_enabled": true,
       "category": "utilities"
     },
@@ -53,6 +89,15 @@
       "description": "8ball, flipcoin, hug, kiss, dog, cat, roast, and other fun commands.",
       "default_enabled": true,
       "category": "engagement"
+    },
+    {
+      "id": "json_cache",
+      "extension": "Modules.json_cache",
+      "path": "Modules/json_cache.py",
+      "display_name": "Json Cache",
+      "description": "",
+      "default_enabled": true,
+      "category": "utilities"
     },
     {
       "id": "kofi",
@@ -152,6 +197,15 @@
       "description": "Advanced purge, lockdown, staff notes, bulk roles, and moderation tools.",
       "default_enabled": true,
       "category": "moderation"
+    },
+    {
+      "id": "sticky_msg",
+      "extension": "Modules.sticky_msg",
+      "path": "Modules/sticky_msg.py",
+      "display_name": "Sticky Msg",
+      "description": "",
+      "default_enabled": true,
+      "category": "utilities"
     },
     {
       "id": "support",

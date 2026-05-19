@@ -91,6 +91,10 @@ DEFAULT_SLASH_COMMAND_RULES: dict[str, dict[str, Any]] = {
     "welcome test": _all("manage_guild"),
     "leave config": _all("manage_guild"),
     "leave test": _all("manage_guild"),
+    # --- Modules/sticky_msg.py ---
+    "sticky_msg create": _all("manage_guild"),
+    "sticky_msg remove": _all("manage_guild"),
+    "sticky_msg list": _all("manage_guild"),
     # --- Modules/reactionrole.py ---
     "reactionrole create": _all("manage_guild"),
     "reactionrole list": _all("manage_guild"),
