@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import discord
+from discord.ext import commands
+from Modules.i18n import t
+from Modules.dev_broadcast import register_dev_broadcast_commands
 
 # -----------------------------
 # Configuration
@@ -25,9 +29,15 @@ GUILD_TEMP_BLOCK_SECONDS = 5 * 60
 
 MAX_CONCURRENT_TASKS = 10
 
-USER_RATE_LIMIT_MESSAGE = "You are sending commands too quickly. Please slow down."
-USER_BLOCK_MESSAGE = "You are temporarily blocked from using this bot due to excessive command usage."
-GUILD_BLOCK_MESSAGE = "This server has temporarily exceeded Coffeecord command limits. Please wait a few minutes."
+USER_RATE_LIMIT_MESSAGE_KEY = "anti_abuse.rate_limit"
+USER_BLOCK_MESSAGE_KEY = "anti_abuse.user_block"
+GUILD_BLOCK_MESSAGE_KEY = "anti_abuse.guild_block"
+USER_RATE_LIMIT_MESSAGE_DEFAULT = "You are sending commands too quickly. Please slow down."
+USER_BLOCK_MESSAGE_DEFAULT = "You are temporarily blocked from using this bot due to excessive command usage."
+GUILD_BLOCK_MESSAGE_DEFAULT = "This server has temporarily exceeded Coffeecord command limits. Please wait a few minutes."
+BLACKLIST_REJECT_MESSAGE = "Error 1234"
+
+_MENTION_RE = re.compile(r"^<@!?(\d+)>$")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT_DIR / "data"
@@ -105,6 +115,33 @@ def unban_guild(guild_id: int) -> None:
     _save_id_set(BANNED_GUILDS_FILE, "banned_guilds", banned_guilds)
 
 
+async def resolve_user_identifier(bot: commands.Bot, identifier: str) -> int | None:
+    """Resolve a Discord user id from numeric id, mention, or username.
+
+    Usernames are matched against members in guilds this bot shares with the user
+    (display name, global name, or legacy username#discriminator). Bans are always
+    stored by numeric user id.
+    """
+    raw = identifier.strip()
+    if not raw:
+        return None
+
+    mention = _MENTION_RE.match(raw)
+    if mention:
+        return int(mention.group(1))
+
+    if raw.isdigit():
+        return int(raw)
+
+    lookup = raw.lstrip("@")
+    for guild in bot.guilds:
+        member = guild.get_member_named(lookup)
+        if member is not None:
+            return member.id
+
+    return None
+
+
 def _prune_window(bucket: deque[float], window_seconds: float, now_monotonic: float) -> None:
     cutoff = now_monotonic - window_seconds
     while bucket and bucket[0] < cutoff:
@@ -156,6 +193,10 @@ async def _safe_reply(interaction: discord.Interaction, message: str) -> None:
         pass
 
 
+async def _guard_message(user_id: int, key: str, default: str) -> str:
+    return await t(user_id, key, default=default)
+
+
 async def should_allow_interaction(interaction: discord.Interaction) -> bool:
     """
     Global pre-command guard.
@@ -173,10 +214,12 @@ async def should_allow_interaction(interaction: discord.Interaction) -> bool:
     user_id = int(interaction.user.id)
     guild_id = int(interaction.guild.id) if interaction.guild is not None else None
 
-    # Permanent blacklist: silent ignore.
+    # Permanent blacklist: generic rejection (no ban details leaked).
     if user_id in banned_users:
+        await _safe_reply(interaction, BLACKLIST_REJECT_MESSAGE)
         return False
     if guild_id is not None and guild_id in banned_guilds:
+        await _safe_reply(interaction, BLACKLIST_REJECT_MESSAGE)
         return False
 
     # Temporary user block.
@@ -185,7 +228,10 @@ async def should_allow_interaction(interaction: discord.Interaction) -> bool:
         notice_until = _user_block_notice_until.get(user_id, 0.0)
         if now_monotonic >= notice_until:
             _user_block_notice_until[user_id] = user_unblock_at
-            await _safe_reply(interaction, USER_BLOCK_MESSAGE)
+            await _safe_reply(
+                interaction,
+                await _guard_message(user_id, USER_BLOCK_MESSAGE_KEY, USER_BLOCK_MESSAGE_DEFAULT),
+            )
         return False
 
     # Temporary guild block.
@@ -195,7 +241,10 @@ async def should_allow_interaction(interaction: discord.Interaction) -> bool:
             notice_until = _guild_block_notice_until.get(guild_id, 0.0)
             if now_monotonic >= notice_until:
                 _guild_block_notice_until[guild_id] = min(guild_unblock_at, now_monotonic + 15)
-                await _safe_reply(interaction, GUILD_BLOCK_MESSAGE)
+                await _safe_reply(
+                    interaction,
+                    await _guard_message(user_id, GUILD_BLOCK_MESSAGE_KEY, GUILD_BLOCK_MESSAGE_DEFAULT),
+                )
             return False
 
     # Track usage.
@@ -218,7 +267,10 @@ async def should_allow_interaction(interaction: discord.Interaction) -> bool:
         blocked_users[user_id] = unblock_at
         _user_block_notice_until[user_id] = unblock_at
         print(f"[ANTI-SPAM] User blocked: {user_id}", flush=True)
-        await _safe_reply(interaction, USER_BLOCK_MESSAGE)
+        await _safe_reply(
+            interaction,
+            await _guard_message(user_id, USER_BLOCK_MESSAGE_KEY, USER_BLOCK_MESSAGE_DEFAULT),
+        )
         return False
 
     # Short per-user rate limit.
@@ -226,7 +278,10 @@ async def should_allow_interaction(interaction: discord.Interaction) -> bool:
         notice_until = _user_rate_notice_until.get(user_id, 0.0)
         if now_monotonic >= notice_until:
             _user_rate_notice_until[user_id] = now_monotonic + USER_RATE_LIMIT_WINDOW_SECONDS
-            await _safe_reply(interaction, USER_RATE_LIMIT_MESSAGE)
+            await _safe_reply(
+                interaction,
+                await _guard_message(user_id, USER_RATE_LIMIT_MESSAGE_KEY, USER_RATE_LIMIT_MESSAGE_DEFAULT),
+            )
         return False
 
     # Guild abuse protection.
@@ -237,7 +292,10 @@ async def should_allow_interaction(interaction: discord.Interaction) -> bool:
             blocked_guilds[guild_id] = unblock_at
             _guild_block_notice_until[guild_id] = unblock_at
             print(f"[ANTI-SPAM] Guild cooldown triggered: {guild_id}", flush=True)
-            await _safe_reply(interaction, GUILD_BLOCK_MESSAGE)
+            await _safe_reply(
+                interaction,
+                await _guard_message(user_id, GUILD_BLOCK_MESSAGE_KEY, GUILD_BLOCK_MESSAGE_DEFAULT),
+            )
             return False
 
     return True
@@ -249,27 +307,41 @@ async def heavy_task_slot():
         yield
 
 
-from discord.ext import commands
-
-
 def register_dev_group(bot: commands.Bot) -> None:
     if bot.get_command("dev") is not None:
         return
 
-    @bot.group(name="dev", invoke_without_command=True)
+    @bot.group(name="dev", invoke_without_command=True, hidden=True)
     async def dev_group(ctx: commands.Context) -> None:
         if ctx.invoked_subcommand is None:
-            await ctx.send("Usage: `.dev banuser <id>`, `.dev unbanuser <id>`, `.dev banguild <id>`, `.dev unguild <id>`")
+            await ctx.send(
+                "Usage: `.dev banuser <id|@mention|username>`, `.dev unbanuser <id|@mention|username>`, "
+                "`.dev banguild <id>`, `.dev unguild <id>`, `.dev announce_language [send]`"
+            )
 
     @dev_group.command(name="banuser")
     @commands.is_owner()
-    async def dev_banuser(ctx: commands.Context, user_id: int) -> None:
+    async def dev_banuser(ctx: commands.Context, user: str) -> None:
+        user_id = await resolve_user_identifier(bot, user)
+        if user_id is None:
+            await ctx.send(
+                "Could not resolve that user. Use a numeric id, @mention, or a username from a server "
+                "this bot is in (usernames are matched to ids at ban time)."
+            )
+            return
         ban_user(user_id)
         await ctx.send(f"User `{user_id}` has been permanently blacklisted.")
 
     @dev_group.command(name="unbanuser")
     @commands.is_owner()
-    async def dev_unbanuser(ctx: commands.Context, user_id: int) -> None:
+    async def dev_unbanuser(ctx: commands.Context, user: str) -> None:
+        user_id = await resolve_user_identifier(bot, user)
+        if user_id is None:
+            await ctx.send(
+                "Could not resolve that user. Use a numeric id, @mention, or a username from a server "
+                "this bot is in."
+            )
+            return
         unban_user(user_id)
         await ctx.send(f"User `{user_id}` has been removed from blacklist.")
 
@@ -284,3 +356,5 @@ def register_dev_group(bot: commands.Bot) -> None:
     async def dev_unguild(ctx: commands.Context, guild_id: int) -> None:
         unban_guild(guild_id)
         await ctx.send(f"Guild `{guild_id}` has been removed from blacklist.")
+
+    register_dev_broadcast_commands(dev_group)

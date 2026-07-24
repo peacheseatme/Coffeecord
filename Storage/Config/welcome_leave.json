@@ -127,6 +127,27 @@
   },
   "1406814562484752475": {
     "welcome": {
+      "enabled": true,
+      "channel_id": 1528926833075294328,
+      "message": "Welcome {user_mention}! Take a look around and make sure you read teh rules!",
+      "embed_enabled": true,
+      "delivery": "channel",
+      "sticky_enabled": false,
+      "sticky_message": "\ud83d\udccc **Welcome** \u2014 read the rules, grab roles, and say hello!",
+      "sticky_embed_enabled": false,
+      "sticky_last_message_id": null
+    },
+    "leave": {
+      "enabled": true,
+      "channel_id": 1528926833075294328,
+      "message": "We're sad to see you go {user_name}.",
+      "embed_enabled": true,
+      "exit_survey_enabled": true,
+      "exit_survey_log_channel_id": 1528926849885933728
+    }
+  },
+  "1425599169921417351": {
+    "welcome": {
       "enabled": false,
       "channel_id": null,
       "message": "Welcome {user_mention} to {server_name}! We now have {member_count} members.",

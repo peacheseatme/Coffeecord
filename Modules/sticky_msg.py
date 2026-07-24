@@ -21,6 +21,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from Modules.i18n import t_sync
 from Modules.module_registry import is_module_enabled
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,6 +39,7 @@ MAX_STICKY_RULES_SUPPORTER = 50
 SUPPORTER_GRACE_DAYS = 35
 
 SUPPORTERS_FILE = BASE_DIR / "Storage" / "Data" / "supporters.json"
+STICKY_MSG_I18N_PREFIX = "sticky_msg."
 
 STICKY_RATE_WINDOW_S = 60.0
 STICKY_HIGH_RATE_THRESHOLD = 100
@@ -46,6 +48,10 @@ STICKY_BUMP_DEBOUNCE_HIGH_S = 5.0
 
 # Serialize bumps per (guild, channel) so overlapping debounced tasks cannot post duplicates.
 _CHANNEL_BUMP_LOCKS: dict[tuple[int, int], asyncio.Lock] = defaultdict(lambda: asyncio.Lock())
+
+
+def _sticky_text_sync(user_id: int | None, key: str, *, default: str, **params: str) -> str:
+    return t_sync(user_id, f"{STICKY_MSG_I18N_PREFIX}{key}", default=default, **params)
 
 
 def _read_json_sync(path: Path, default: dict[str, Any]) -> dict[str, Any]:
@@ -251,7 +257,11 @@ async def _bump_channel_stickies(bot: commands.Bot, guild: discord.Guild, channe
             body = _render_sticky_body(str(rule.get("message", "")), guild)
             try:
                 if rule.get("embed_enabled") and perms.embed_links:
-                    embed = discord.Embed(title="📌 Sticky", description=body[:4096], color=discord.Color.blurple())
+                    embed = discord.Embed(
+                        title=_sticky_text_sync(guild.id, "embed_title", default="📌 Sticky"),
+                        description=body[:4096],
+                        color=discord.Color.blurple(),
+                    )
                     embed.set_footer(text=f"{guild.name} • {rule_id}")
                     msg = await channel.send(embed=embed)
                 else:
@@ -271,7 +281,10 @@ class StickyMsgCog(
         self.bot = bot
         self._scheduler = _ChannelBumpScheduler()
 
-    @app_commands.command(name="create", description="Create or replace a named sticky in a channel.")
+    @app_commands.command(
+        name="create",
+        description="Create or replace a named sticky in a channel.",
+)
     @app_commands.rename(sticky_id="rule_id")
     @app_commands.describe(
         sticky_id="Unique rule id (1–100 chars: letters, digits, `_`, `-`; stored lowercase).",
@@ -289,28 +302,53 @@ class StickyMsgCog(
         use_embed: bool = False,
     ) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("Use this in a server.", ephemeral=True)
+            await interaction.response.send_message(
+                t_sync(interaction.user.id, "common.guild_only"),
+                ephemeral=True,
+            )
             return
         rid = _normalize_rule_id(sticky_id)
         if rid is None:
             await interaction.response.send_message(
-                "Invalid `rule_id`. Use 1–100 characters: letters, digits, `_`, `-` only.",
+                _sticky_text_sync(
+                    interaction.guild.id,
+                    "invalid_rule_id",
+                    default="Invalid `rule_id`. Use 1-100 characters: letters, digits, `_`, `-` only.",
+                ),
                 ephemeral=True,
             )
             return
         me = interaction.guild.me
         if me is None:
-            await interaction.response.send_message("Bot member not available.", ephemeral=True)
+            await interaction.response.send_message(
+                _sticky_text_sync(
+                    interaction.guild.id,
+                    "bot_member_unavailable",
+                    default="Bot member not available.",
+                ),
+                ephemeral=True,
+            )
             return
         perms = channel.permissions_for(me)
         if not perms.send_messages or not perms.view_channel or not perms.manage_messages:
             await interaction.response.send_message(
-                "I need **Send Messages**, **View Channel**, and **Manage Messages** in that channel.",
+                _sticky_text_sync(
+                    interaction.guild.id,
+                    "missing_channel_perms",
+                    default="I need **Send Messages**, **View Channel**, and **Manage Messages** in that channel.",
+                ),
                 ephemeral=True,
             )
             return
         if use_embed and not perms.embed_links:
-            await interaction.response.send_message("I need **Embed Links** in that channel for embed stickies.", ephemeral=True)
+            await interaction.response.send_message(
+                _sticky_text_sync(
+                    interaction.guild.id,
+                    "missing_embed_perms",
+                    default="I need **Embed Links** in that channel for embed stickies.",
+                ),
+                ephemeral=True,
+            )
             return
 
         rules = await _get_guild_rules(interaction.guild.id)
@@ -322,7 +360,13 @@ class StickyMsgCog(
                 else ""
             )
             await interaction.response.send_message(
-                f"Maximum **{limit}** sticky rules per server for your account. Remove one first.{hint}",
+                _sticky_text_sync(
+                    interaction.guild.id,
+                    "max_rules_reached",
+                    default="Maximum **{limit}** sticky rules per server for your account. Remove one first.{hint}",
+                    limit=str(limit),
+                    hint=hint,
+                ),
                 ephemeral=True,
             )
             return
@@ -335,12 +379,21 @@ class StickyMsgCog(
         }
         await _set_guild_rules(interaction.guild.id, rules)
         await interaction.response.send_message(
-            f"✅ Sticky `{rid}` set for {channel.mention}. It will move to the bottom after new messages.",
+            _sticky_text_sync(
+                interaction.guild.id,
+                "create_success",
+                default="✅ Sticky `{rule_id}` set for {channel}. It will move to the bottom after new messages.",
+                rule_id=rid,
+                channel=channel.mention,
+            ),
             ephemeral=True,
         )
         asyncio.create_task(_bump_channel_stickies(self.bot, interaction.guild, channel.id))
 
-    @app_commands.command(name="remove", description="Remove a named sticky rule (and try to delete its last post).")
+    @app_commands.command(
+        name="remove",
+        description="Remove a named sticky rule (and try to delete its last post).",
+)
     @app_commands.rename(sticky_id="rule_id")
     @app_commands.describe(sticky_id="The sticky rule id to remove.")
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -350,18 +403,33 @@ class StickyMsgCog(
         sticky_id: app_commands.Range[str, 1, 100],
     ) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("Use this in a server.", ephemeral=True)
+            await interaction.response.send_message(
+                t_sync(interaction.user.id, "common.guild_only"),
+                ephemeral=True,
+            )
             return
         rid = _normalize_rule_id(sticky_id)
         if rid is None:
             await interaction.response.send_message(
-                "Invalid `rule_id`. Use 1–100 characters: letters, digits, `_`, `-` only.",
+                _sticky_text_sync(
+                    interaction.guild.id,
+                    "invalid_rule_id",
+                    default="Invalid `rule_id`. Use 1-100 characters: letters, digits, `_`, `-` only.",
+                ),
                 ephemeral=True,
             )
             return
         rules = await _get_guild_rules(interaction.guild.id)
         if rid not in rules:
-            await interaction.response.send_message(f"No sticky rule named `{rid}`.", ephemeral=True)
+            await interaction.response.send_message(
+                _sticky_text_sync(
+                    interaction.guild.id,
+                    "remove_not_found",
+                    default="No sticky rule named `{rule_id}`.",
+                    rule_id=rid,
+                ),
+                ephemeral=True,
+            )
             return
         rule = rules.pop(rid)
         await _set_guild_rules(interaction.guild.id, rules)
@@ -375,17 +443,38 @@ class StickyMsgCog(
                     await m.delete()
                 except (discord.HTTPException, discord.NotFound):
                     pass
-        await interaction.response.send_message(f"✅ Removed sticky `{rid}`.", ephemeral=True)
+        await interaction.response.send_message(
+            _sticky_text_sync(
+                interaction.guild.id,
+                "remove_success",
+                default="✅ Removed sticky `{rule_id}`.",
+                rule_id=rid,
+            ),
+            ephemeral=True,
+        )
 
-    @app_commands.command(name="list", description="List sticky rules for this server.")
+    @app_commands.command(
+        name="list",
+        description="List sticky rules for this server.",
+)
     @app_commands.checks.has_permissions(manage_guild=True)
     async def list_rules(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("Use this in a server.", ephemeral=True)
+            await interaction.response.send_message(
+                t_sync(interaction.user.id, "common.guild_only"),
+                ephemeral=True,
+            )
             return
         rules = await _get_guild_rules(interaction.guild.id)
         if not rules:
-            await interaction.response.send_message("No sticky rules configured.", ephemeral=True)
+            await interaction.response.send_message(
+                _sticky_text_sync(
+                    interaction.guild.id,
+                    "list_empty",
+                    default="No sticky rules configured.",
+                ),
+                ephemeral=True,
+            )
             return
         lines = []
         for rid in sorted(rules.keys()):
@@ -394,7 +483,11 @@ class StickyMsgCog(
             ch_name = ch.mention if isinstance(ch, discord.TextChannel) else f"`{r['channel_id']}`"
             lines.append(f"**{rid}** → {ch_name} ({'embed' if r.get('embed_enabled') else 'plain'})")
         embed = discord.Embed(
-            title="Sticky rules",
+            title=_sticky_text_sync(
+                interaction.guild.id,
+                "list_title",
+                default="Sticky rules",
+            ),
             description="\n".join(lines)[:4096],
             color=discord.Color.dark_teal(),
         )

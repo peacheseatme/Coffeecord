@@ -10,6 +10,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from Modules.i18n import t_sync
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = BASE_DIR / "Storage" / "Config" / "autorole_config.json"
 
@@ -25,6 +27,11 @@ DEFAULT_CONDITIONS = {
 }
 
 VALID_EVENTS = {"member_join", "first_message", "verified", "reaction_add", "level_up"}
+AUTOROLE_I18N_PREFIX = "autorole."
+
+
+def _autorole_text_sync(user_id: int | None, key: str, *, default: str, **params: str) -> str:
+    return t_sync(user_id, f"{AUTOROLE_I18N_PREFIX}{key}", default=default, **params)
 
 
 def _read_config_sync() -> dict[str, Any]:
@@ -159,7 +166,14 @@ class _AutoRoleSetupView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.invoker_id:
-            await interaction.response.send_message("This setup panel belongs to someone else.", ephemeral=True)
+            await interaction.response.send_message(
+                _autorole_text_sync(
+                    interaction.guild.id if interaction.guild else None,
+                    "setup_panel_owner_only",
+                    default="This setup panel belongs to someone else.",
+                ),
+                ephemeral=True,
+            )
             return False
         return True
 
@@ -178,7 +192,15 @@ class _EventSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         self.parent_view.selected_event = self.values[0]
-        await interaction.response.send_message(f"Event set to `{self.values[0]}`.", ephemeral=True)
+        await interaction.response.send_message(
+            _autorole_text_sync(
+                interaction.guild.id if interaction.guild else None,
+                "event_set",
+                default="Event set to `{event}`.",
+                event=self.values[0],
+            ),
+            ephemeral=True,
+        )
 
 
 class _RolePicker(discord.ui.RoleSelect):
@@ -189,7 +211,15 @@ class _RolePicker(discord.ui.RoleSelect):
     async def callback(self, interaction: discord.Interaction) -> None:
         self.parent_view.selected_roles = [r for r in self.values if isinstance(r, discord.Role)]
         role_text = ", ".join(r.mention for r in self.parent_view.selected_roles)
-        await interaction.response.send_message(f"Roles selected: {role_text}", ephemeral=True)
+        await interaction.response.send_message(
+            _autorole_text_sync(
+                interaction.guild.id if interaction.guild else None,
+                "roles_selected",
+                default="Roles selected: {roles}",
+                roles=role_text,
+            ),
+            ephemeral=True,
+        )
 
 
 class _SaveButton(discord.ui.Button):
@@ -199,7 +229,14 @@ class _SaveButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         if not self.parent_view.selected_roles:
-            await interaction.response.send_message("Pick at least one role first.", ephemeral=True)
+            await interaction.response.send_message(
+                _autorole_text_sync(
+                    interaction.guild.id if interaction.guild else None,
+                    "pick_one_role",
+                    default="Pick at least one role first.",
+                ),
+                ephemeral=True,
+            )
             return
         role_ids = [r.id for r in self.parent_view.selected_roles]
         cfg = await self.parent_view.cog.load_autorole_config(interaction.guild.id)
@@ -212,12 +249,36 @@ class _SaveButton(discord.ui.Button):
         }
         cfg["rules"].append(rule)
         await self.parent_view.cog.save_autorole_config(interaction.guild.id, cfg)
-        embed = discord.Embed(title="Auto Role Rule Added", color=discord.Color.green())
-        embed.add_field(name="Rule ID", value=rule["id"], inline=False)
-        embed.add_field(name="Event", value=rule["event"], inline=True)
-        embed.add_field(name="Delay", value=f"{rule['delay_seconds']}s", inline=True)
-        embed.add_field(name="Roles", value=", ".join(f"<@&{rid}>" for rid in rule["roles"])[:1024], inline=False)
-        await interaction.response.edit_message(content="✅ Rule saved.", embed=embed, view=None)
+        gid = interaction.guild.id if interaction.guild else None
+        embed = discord.Embed(
+            title=_autorole_text_sync(gid, "rule_added_title", default="Auto Role Rule Added"),
+            color=discord.Color.green(),
+        )
+        embed.add_field(
+            name=_autorole_text_sync(gid, "field_rule_id", default="Rule ID"),
+            value=rule["id"],
+            inline=False,
+        )
+        embed.add_field(
+            name=_autorole_text_sync(gid, "field_event", default="Event"),
+            value=rule["event"],
+            inline=True,
+        )
+        embed.add_field(
+            name=_autorole_text_sync(gid, "field_delay", default="Delay"),
+            value=f"{rule['delay_seconds']}s",
+            inline=True,
+        )
+        embed.add_field(
+            name=_autorole_text_sync(gid, "field_roles", default="Roles"),
+            value=", ".join(f"<@&{rid}>" for rid in rule["roles"])[:1024],
+            inline=False,
+        )
+        await interaction.response.edit_message(
+            content=_autorole_text_sync(gid, "rule_saved", default="✅ Rule saved."),
+            embed=embed,
+            view=None,
+        )
         self.parent_view.stop()
 
 
@@ -411,37 +472,69 @@ class AutoRoleCog(
                     int(pending["due_at"]),
                 )
 
-    @app_commands.command(name="status", description="Show current auto role configuration.")
+    @app_commands.command(
+        name="status",
+        description="Show current auto role configuration.",
+)
     async def autorole_status(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(t_sync(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         cfg = await self.load_autorole_config(interaction.guild.id)
         rules = cfg.get("rules", [])
-        embed = discord.Embed(title="Auto Roles Status", color=discord.Color.blurple(), timestamp=discord.utils.utcnow())
-        embed.add_field(name="Enabled", value="Yes" if cfg.get("enabled", True) else "No", inline=True)
-        embed.add_field(name="Rule Count", value=str(len(rules)), inline=True)
+        embed = discord.Embed(
+            title=_autorole_text_sync(interaction.user.id, "status_title", default="Auto Roles Status"),
+            color=discord.Color.blurple(),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(
+            name=_autorole_text_sync(interaction.user.id, "field_enabled", default="Enabled"),
+            value=t_sync(interaction.user.id, "common.yes") if cfg.get("enabled", True) else t_sync(interaction.user.id, "common.no"),
+            inline=True,
+        )
+        embed.add_field(
+            name=_autorole_text_sync(interaction.user.id, "field_rule_count", default="Rule Count"),
+            value=str(len(rules)),
+            inline=True,
+        )
         lines = []
         for rule in rules[:10]:
             roles = ", ".join(f"<@&{rid}>" for rid in rule["roles"])
             lines.append(f"`{rule['id']}` • `{rule['event']}` -> {roles}")
-        embed.add_field(name="Rules", value="\n".join(lines) if lines else "No rules configured.", inline=False)
+        embed.add_field(
+            name=_autorole_text_sync(interaction.user.id, "field_rules", default="Rules"),
+            value="\n".join(lines)
+            if lines
+            else _autorole_text_sync(interaction.user.id, "no_rules", default="No rules configured."),
+            inline=False,
+        )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="toggle", description="Enable or disable auto roles for this server.")
+    @app_commands.command(
+        name="toggle",
+        description="Enable or disable auto roles for this server.",
+)
     async def autorole_toggle(self, interaction: discord.Interaction, enabled: Optional[bool] = None) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(t_sync(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         cfg = await self.load_autorole_config(interaction.guild.id)
         cfg["enabled"] = (not bool(cfg.get("enabled", True))) if enabled is None else bool(enabled)
         await self.save_autorole_config(interaction.guild.id, cfg)
         await interaction.response.send_message(
-            f"Auto roles are now **{'enabled' if cfg['enabled'] else 'disabled'}**.",
+            _autorole_text_sync(
+                interaction.guild.id,
+                "toggle_result",
+                default="Auto roles are now **{state}**.",
+                state="enabled" if cfg["enabled"] else "disabled",
+            ),
             ephemeral=True,
         )
 
-    @app_commands.command(name="add", description="Create an auto role rule with a simple interactive setup.")
+    @app_commands.command(
+        name="add",
+        description="Create an auto role rule with a simple interactive setup.",
+)
     @app_commands.describe(
         event="When this rule should run.",
         delay_seconds="Optional delay before assigning roles.",
@@ -472,7 +565,7 @@ class AutoRoleCog(
         require_not_timed_out: bool = False,
     ) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(t_sync(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         conditions = {
             "min_account_age_days": max(min_account_age_days, 0),
@@ -489,30 +582,51 @@ class AutoRoleCog(
             conditions=conditions,
         )
         await interaction.response.send_message(
-            "Select an event and role(s), then press **Save Rule**.",
+            _autorole_text_sync(
+                interaction.guild.id,
+                "add_prompt",
+                default="Select an event and role(s), then press **Save Rule**.",
+            ),
             view=view,
             ephemeral=True,
         )
 
-    @app_commands.command(name="remove", description="Remove an auto role rule by ID.")
+    @app_commands.command(
+        name="remove",
+        description="Remove an auto role rule by ID.",
+)
     async def autorole_remove(self, interaction: discord.Interaction, rule_id: str) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(t_sync(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         cfg = await self.load_autorole_config(interaction.guild.id)
         before = len(cfg["rules"])
         cfg["rules"] = [r for r in cfg["rules"] if r["id"] != rule_id]
         cfg["pending"] = [p for p in cfg.get("pending", []) if p.get("rule_id") != rule_id]
         if len(cfg["rules"]) == before:
-            await interaction.response.send_message("Rule not found.", ephemeral=True)
+            await interaction.response.send_message(
+                _autorole_text_sync(interaction.user.id, "rule_not_found", default="Rule not found."),
+                ephemeral=True,
+            )
             return
         await self.save_autorole_config(interaction.guild.id, cfg)
-        await interaction.response.send_message(f"Removed rule `{rule_id}`.", ephemeral=True)
+        await interaction.response.send_message(
+            _autorole_text_sync(
+                interaction.guild.id,
+                "rule_removed",
+                default="Removed rule `{rule_id}`.",
+                rule_id=rule_id,
+            ),
+            ephemeral=True,
+        )
 
-    @app_commands.command(name="test", description="Simulate which auto role rules apply to you.")
+    @app_commands.command(
+        name="test",
+        description="Simulate which auto role rules apply to you.",
+)
     async def autorole_test(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None or not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(t_sync(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         cfg = await self.load_autorole_config(interaction.guild.id)
         member = interaction.user
@@ -524,8 +638,15 @@ class AutoRoleCog(
                 lines.append(f"✅ `{rule['id']}` ({rule['event']}) -> would apply {len(assignable)} role(s)")
             else:
                 lines.append(f"❌ `{rule['id']}` ({rule['event']}) -> {'; '.join(failures)[:180]}")
-        embed = discord.Embed(title="Auto Role Test", color=discord.Color.gold())
-        embed.description = "\n".join(lines) if lines else "No rules configured."
+        embed = discord.Embed(
+            title=_autorole_text_sync(interaction.user.id, "test_title", default="Auto Role Test"),
+            color=discord.Color.gold(),
+        )
+        embed.description = (
+            "\n".join(lines)
+            if lines
+            else _autorole_text_sync(interaction.user.id, "no_rules", default="No rules configured.")
+        )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @commands.Cog.listener()

@@ -60,13 +60,11 @@ _usage() {
     echo "  logs                      Follow log (tail -f)"
     echo "  logs -n N                 Last N lines, no follow"
     echo ""
-    echo "  console                   Live console — tail bot log (commands, errors, etc.)"
-    echo "  console -n N              Last N lines, no follow"
-    echo "  console clear             Clear the bot log file"
+    echo "  console                   Interactive host REPL (run slash commands; bot must be running)"
     echo ""
-    echo "  update [version]          Latest release, or pin / downgrade to that tag → pip → restart"
+    echo "  update [version]          Latest GitHub Release (or pin tag) → pip → restart"
     echo "  update --branch          git pull on current branch (dev) → pip → restart"
-    echo "  update -f / --force      Continue even if git/VCS step fails"
+    echo "  update -f / --force      Continue even if git/archive step fails"
     echo ""
     echo "  module refresh            Scan Modules/ — add new files to registry"
     echo "  module refresh_registry   Alias for 'module refresh'"
@@ -101,6 +99,12 @@ _ensure_ticket_env() {
             echo "#"
             echo "TICKET_SECRET=${secret}"
             echo "#"
+            echo "# HOST_CONSOLE_TOKEN secures the local c-cord console REPL (Unix socket only)."
+            echo "HOST_CONSOLE_TOKEN=$(openssl rand -hex 24 2>/dev/null || echo "${secret}")"
+            echo "#"
+            echo "# BACKUP_SECRET signs encrypted server backup payloads (/backup)."
+            echo "BACKUP_SECRET=$(openssl rand -hex 16 2>/dev/null || echo "${secret}")"
+            echo "#"
             echo "# TICKET_LOG_CHANNEL_ID=   # Channel ID to post ticket event logs"
             echo "# TICKET_MAX_PER_USER=3    # Max open tickets per user (0 = unlimited)"
             echo "# TICKET_TRANSCRIPT_ENABLED=true  # Save transcript HTML on close"
@@ -111,6 +115,22 @@ _ensure_ticket_env() {
         echo "" >> "${TICKET_ENV_FILE}"
         echo "TICKET_SECRET=${secret}" >> "${TICKET_ENV_FILE}"
         ok "TICKET_SECRET added."
+    elif ! grep -qE '^HOST_CONSOLE_TOKEN=' "${TICKET_ENV_FILE}" 2>/dev/null; then
+        info "Adding HOST_CONSOLE_TOKEN to Src/ticket.env..."
+        secret="$(openssl rand -hex 24 2>/dev/null || LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 48)"
+        echo "" >> "${TICKET_ENV_FILE}"
+        echo "# HOST_CONSOLE_TOKEN secures the local c-cord console REPL (127.0.0.1 / Unix socket only)." >> "${TICKET_ENV_FILE}"
+        echo "HOST_CONSOLE_TOKEN=${secret}" >> "${TICKET_ENV_FILE}"
+        ok "HOST_CONSOLE_TOKEN added."
+    fi
+
+    if [[ -f "${TICKET_ENV_FILE}" ]] && ! grep -qE '^BACKUP_SECRET=' "${TICKET_ENV_FILE}" 2>/dev/null; then
+        info "Adding BACKUP_SECRET to Src/ticket.env..."
+        backup_secret="$(openssl rand -hex 16 2>/dev/null || echo "${secret}")"
+        echo "" >> "${TICKET_ENV_FILE}"
+        echo "# BACKUP_SECRET signs encrypted server backup payloads (/backup)." >> "${TICKET_ENV_FILE}"
+        echo "BACKUP_SECRET=${backup_secret}" >> "${TICKET_ENV_FILE}"
+        ok "BACKUP_SECRET added."
     fi
 }
 
@@ -621,64 +641,35 @@ _logs_bot() {
 }
 
 # ── console ───────────────────────────────────────────────────────────────────
-# Live view of bot output (commands, errors, etc.). Same as logs with a header.
+# Interactive host REPL — run slash/owner commands against the live bot process.
 _console_bot() {
-    _ensure_runtime_dirs
-
-    if [[ "${1:-}" == "clear" ]]; then
-        shift || true
-        if [[ $# -gt 0 ]]; then
-            err "console clear takes no extra arguments (got: $*)"
-            exit 1
-        fi
-        if [[ -f "${LOG_FILE}" ]]; then
-            : > "${LOG_FILE}"
-            ok "Bot log cleared."
-        else
-            info "No log file yet."
-        fi
-        return 0
-    fi
-
-    if [[ "${1:-}" == "-n" ]]; then
-        local n="${2:-}"
-        if [[ ! "${n}" =~ ^[0-9]+$ ]]; then
-            err "Usage: c-cord console -n <number>"
-            exit 1
-        fi
-        shift 2 || true
-        if [[ $# -gt 0 ]]; then
-            err "console: unexpected arguments after -n: $*"
-            exit 1
-        fi
-        if [[ ! -f "${LOG_FILE}" ]]; then
-            err "No log file yet. Start the bot with c-cord start"
-            exit 1
-        fi
-        echo -e "${BOLD}── Last ${n} lines ──${RESET}"
-        tail -n "${n}" "${LOG_FILE}"
-        return 0
-    fi
-
     if [[ $# -gt 0 ]]; then
-        err "console: unknown argument \"$1\" — use clear, -n <lines>, or no args"
+        if [[ "${1:-}" == "clear" || "${1:-}" == "-n" ]]; then
+            warn "Log tailing moved to c-cord logs (e.g. c-cord logs -n ${2:-50})."
+            _logs_bot "$@"
+            return $?
+        fi
+        err "console: unknown argument \"$1\" — use no args for the REPL"
         exit 1
     fi
 
-    if [[ ! -f "${LOG_FILE}" ]]; then
-        info "No log file yet. Start the bot with c-cord start"
-        return 0
+    if [[ ! -x "${PYTHON_BIN}" ]]; then
+        err "Python venv not found. Run install.sh first."
+        exit 1
     fi
 
-    echo -e "${BOLD}── Live console (Ctrl+C to exit) ──${RESET}"
-    tail -f "${LOG_FILE}"
+    exec "${PYTHON_BIN}" "${SCRIPT_DIR}/scripts/ccord_console.py"
 }
 
 # ── update ───────────────────────────────────────────────────────────────────
 # Optional positional: release version (e.g. 1.0.3); omit = latest GitHub release.
 # Flags:
 #   --branch       git pull on current branch instead of release checkout
-#   -f / --force   Continue even when git fetch/checkout/pull fails
+#   -f / --force   Continue even when git fetch/checkout/pull / archive apply fails
+#
+# Release path: prefer git fetch+checkout of the resolved tag; on missing .git or
+# git failure, download the GitHub zipball/tarball and overlay (preserves Storage/,
+# .venv/, Src/.env, etc.).
 _update_bot() {
     local force="false"
     local branch_mode="false"
@@ -749,61 +740,76 @@ _update_bot() {
             fi
         fi
     else
-        if [[ ! -d "${SCRIPT_DIR}/.git" ]] || ! command -v git >/dev/null 2>&1; then
+        local release_json=""
+        local tag=""
+        info "Resolving GitHub release${version_arg:+ (${version_arg})}..."
+        if release_json="$(
+            GITHUB_REPO="${GITHUB_REPO:-}" GITHUB_TOKEN="${GITHUB_TOKEN:-}" \
+                "${PYTHON_BIN}" "${SCRIPT_DIR}/scripts/ccord_release_resolve.py" --json \
+                "${SCRIPT_DIR}" ${version_arg:+"${version_arg}"}
+        )"; then
+            tag="$(
+                "${PYTHON_BIN}" -c 'import json,sys; print(json.loads(sys.argv[1])["tag"])' "${release_json}"
+            )"
+        else
             if [[ "${force}" == "true" ]]; then
-                warn "Not a git repository or git unavailable; cannot checkout a release."
-                vcs_summary="release: skipped"
+                warn "Could not resolve a release tag — continuing anyway (-f)."
+                vcs_summary="release: resolve failed (ignored)"
             else
-                err "Release update requires a git clone and git. Use c-cord update --branch on a clone, or install from git."
                 exit 1
             fi
-        else
-            local dirty
-            dirty="$(git -C "${SCRIPT_DIR}" status --porcelain 2>/dev/null || true)"
-            if [[ -n "${dirty}" ]]; then
-                if [[ "${force}" == "true" ]]; then
-                    warn "Working tree has uncommitted changes; proceeding (-f). checkout may fail."
-                else
+        fi
+
+        local applied="false"
+        if [[ -n "${tag}" ]]; then
+            local try_git="false"
+            if [[ -d "${SCRIPT_DIR}/.git" ]] && command -v git >/dev/null 2>&1; then
+                local dirty
+                dirty="$(git -C "${SCRIPT_DIR}" status --porcelain 2>/dev/null || true)"
+                if [[ -n "${dirty}" && "${force}" != "true" ]]; then
                     err "Working tree has uncommitted changes. Commit, stash, or use c-cord update -f."
                     exit 1
                 fi
+                if [[ -n "${dirty}" ]]; then
+                    warn "Working tree has uncommitted changes; proceeding (-f). checkout may fail."
+                fi
+                try_git="true"
             fi
 
-            local tag
-            info "Resolving GitHub release${version_arg:+ (${version_arg})}..."
-            if tag="$(
-                GITHUB_REPO="${GITHUB_REPO:-}" GITHUB_TOKEN="${GITHUB_TOKEN:-}" \
-                    "${PYTHON_BIN}" "${SCRIPT_DIR}/scripts/ccord_release_resolve.py" "${SCRIPT_DIR}" ${version_arg:+"${version_arg}"}
-            )"; then
+            if [[ "${try_git}" == "true" ]]; then
                 info "Fetching and checking out ${tag}..."
                 local fetch_ok="false"
                 # '+' allows updating local tag ref when moving to an older release (non-FF tag moves).
                 if git -C "${SCRIPT_DIR}" fetch -q origin "+refs/tags/${tag}:refs/tags/${tag}"; then
                     fetch_ok="true"
-                elif [[ "${force}" == "true" ]]; then
-                    warn "git fetch failed for tag ${tag} — skipping checkout (-f); deps/restart still run."
-                    vcs_summary="release: fetch failed (ignored)"
                 else
-                    err "git fetch failed for tag ${tag}."
-                    exit 1
+                    warn "git fetch failed for tag ${tag}; will try release archive."
                 fi
                 if [[ "${fetch_ok}" == "true" ]]; then
                     if git -C "${SCRIPT_DIR}" checkout -q "${tag}"; then
-                        vcs_summary="release: ${tag}"
-                    elif [[ "${force}" == "true" ]]; then
-                        warn "git checkout ${tag} failed — continuing anyway (-f)."
-                        vcs_summary="release: checkout failed (ignored)"
+                        vcs_summary="release: ${tag} (git)"
+                        applied="true"
                     else
-                        err "git checkout ${tag} failed."
-                        exit 1
+                        warn "git checkout ${tag} failed; will try release archive."
                     fi
                 fi
-            else
-                if [[ "${force}" == "true" ]]; then
-                    warn "Could not resolve a release tag — continuing anyway (-f)."
-                    vcs_summary="release: resolve failed (ignored)"
+            fi
+
+            if [[ "${applied}" != "true" ]]; then
+                info "Applying GitHub release archive for ${tag}..."
+                if GITHUB_TOKEN="${GITHUB_TOKEN:-}" \
+                    "${PYTHON_BIN}" "${SCRIPT_DIR}/scripts/ccord_release_apply.py" \
+                    "${SCRIPT_DIR}" --json-line "${release_json}"; then
+                    vcs_summary="release: ${tag} (archive)"
+                    applied="true"
                 else
-                    exit 1
+                    if [[ "${force}" == "true" ]]; then
+                        warn "Release archive apply failed — continuing anyway (-f)."
+                        vcs_summary="release: archive failed (ignored)"
+                    else
+                        err "Could not update to ${tag} via git or release archive."
+                        exit 1
+                    fi
                 fi
             fi
         fi

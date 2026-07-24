@@ -10,6 +10,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from Modules.i18n import t_sync
 from . import json_cache
 from .module_registry import is_module_enabled
 
@@ -48,6 +49,11 @@ TARGET_TYPE_CHOICES = [
 __module_display_name__ = "Staff Utilities"
 __module_description__ = "Advanced staff moderation utilities with safety flows."
 __module_category__ = "moderation"
+STAFF_UTILS_I18N_PREFIX = "staff_utils."
+
+
+def _staff_text_sync(user_id: int | None, key: str, *, default: str, **params: str) -> str:
+    return t_sync(user_id, f"{STAFF_UTILS_I18N_PREFIX}{key}", default=default, **params)
 
 
 def _now_iso() -> str:
@@ -206,15 +212,19 @@ def _apply_lockdown_allows_to_overwrite(
 async def _check_staff_module_enabled(interaction: discord.Interaction) -> bool:
     if interaction.guild is None:
         await interaction.response.send_message(
-            embed=_embed("Server Only", "Use this command in a server.", discord.Color.red()),
+            embed=_embed(
+                _staff_text_sync(None, "server_only_title", default="Server Only"),
+                _staff_text_sync(None, "server_only_body", default="Use this command in a server."),
+                discord.Color.red(),
+            ),
             ephemeral=True,
         )
         return False
     if not await is_module_enabled(interaction.guild.id, "staff_utils"):
         await interaction.response.send_message(
             embed=_embed(
-                "Module Disabled",
-                "Staff utilities are disabled in this server. Enable with `/modules`.",
+                _staff_text_sync(interaction.user.id, "module_disabled_title", default="Module Disabled"),
+                _staff_text_sync(interaction.user.id, "module_disabled_body", default="Staff utilities are disabled in this server. Enable with `/modules`."),
                 discord.Color.orange(),
             ),
             ephemeral=True,
@@ -231,7 +241,10 @@ class ConfirmCancelView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("Only the command invoker can use this.", ephemeral=True)
+            await interaction.response.send_message(
+                _staff_text_sync(interaction.user.id, "invoker_only", default="Only the command invoker can use this."),
+                ephemeral=True,
+            )
             return False
         return True
 
@@ -242,7 +255,11 @@ class ConfirmCancelView(discord.ui.View):
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
     async def cancel(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await interaction.response.edit_message(
-            embed=_embed("Cancelled", "No action was applied.", discord.Color.light_grey()),
+            embed=_embed(
+                _staff_text_sync(interaction.user.id, "cancelled_title", default="Cancelled"),
+                _staff_text_sync(interaction.user.id, "cancelled_body", default="No action was applied."),
+                discord.Color.light_grey(),
+            ),
             view=None,
         )
         self.stop()
@@ -256,7 +273,10 @@ class PurgeStopView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("Only the command invoker can stop this purge.", ephemeral=True)
+            await interaction.response.send_message(
+                _staff_text_sync(interaction.user.id, "purge_stop_owner_only", default="Only the command invoker can stop this purge."),
+                ephemeral=True,
+            )
             return False
         return True
 
@@ -264,7 +284,11 @@ class PurgeStopView(discord.ui.View):
     async def stop(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         self.stop_event.set()
         await interaction.response.edit_message(
-            embed=_embed("Stopping Purge", "Emergency stop requested. Finishing current delete action.", discord.Color.orange()),
+            embed=_embed(
+                _staff_text_sync(interaction.user.id, "stopping_purge_title", default="Stopping Purge"),
+                _staff_text_sync(interaction.user.id, "stopping_purge_body", default="Emergency stop requested. Finishing current delete action."),
+                discord.Color.orange(),
+            ),
             view=self,
         )
 
@@ -341,7 +365,10 @@ class StaffUtilityCog(commands.Cog):
         except (discord.Forbidden, discord.HTTPException):
             pass
 
-    @app_commands.command(name="purge", description="Advanced purge with filters and confirmation.")
+    @app_commands.command(
+        name="purge",
+        description="Advanced purge with filters and confirmation.",
+)
     @app_commands.describe(
         limit="How many recent messages to scan (1-1000)",
         user="Only messages by this user",
@@ -365,7 +392,11 @@ class StaffUtilityCog(commands.Cog):
             return
         if interaction.channel is None or not isinstance(interaction.channel, discord.TextChannel):
             await interaction.response.send_message(
-                embed=_embed("Unsupported Channel", "Use this in a text channel.", discord.Color.red()),
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "unsupported_channel_title", default="Unsupported Channel"),
+                    _staff_text_sync(interaction.user.id, "unsupported_channel_body", default="Use this in a text channel."),
+                    discord.Color.red(),
+                ),
                 ephemeral=True,
             )
             return
@@ -401,7 +432,13 @@ class StaffUtilityCog(commands.Cog):
 
         if not candidates:
             await interaction.response.send_message(
-                embed=_embed("Purge Preview", "\n".join(lines) + "\n\nNo messages matched.", discord.Color.orange()),
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "purge_preview_title", default="Purge Preview"),
+                    "\n".join(lines)
+                    + "\n\n"
+                    + _staff_text_sync(interaction.user.id, "purge_no_matches", default="No messages matched."),
+                    discord.Color.orange(),
+                ),
                 ephemeral=True,
             )
             return
@@ -410,7 +447,11 @@ class StaffUtilityCog(commands.Cog):
             stop_event = asyncio.Event()
             view = PurgeStopView(confirm_interaction.user.id, stop_event)
             await confirm_interaction.response.edit_message(
-                embed=_embed("Purge Running", "Deleting matched messages…", discord.Color.orange()),
+                embed=_embed(
+                    _staff_text_sync(confirm_interaction.user.id, "purge_running_title", default="Purge Running"),
+                    _staff_text_sync(confirm_interaction.user.id, "purge_running_body", default="Deleting matched messages..."),
+                    discord.Color.orange(),
+                ),
                 view=view,
             )
             deleted = 0
@@ -421,15 +462,33 @@ class StaffUtilityCog(commands.Cog):
                     deleted += 1
                 if idx % 20 == 0:
                     await confirm_interaction.edit_original_response(
-                        embed=_embed("Purge Running", f"Processed **{idx}/{len(candidates)}** · Deleted **{deleted}**", discord.Color.orange()),
+                        embed=_embed(
+                            _staff_text_sync(confirm_interaction.user.id, "purge_running_title", default="Purge Running"),
+                            _staff_text_sync(
+                                confirm_interaction.guild_id,
+                                "purge_progress",
+                                default="Processed **{processed}/{total}** · Deleted **{deleted}**",
+                                processed=str(idx),
+                                total=str(len(candidates)),
+                                deleted=str(deleted),
+                            ),
+                            discord.Color.orange(),
+                        ),
                         view=view,
                     )
                 await asyncio.sleep(PURGE_DELETE_DELAY_SECONDS)
             status = "stopped early" if stop_event.is_set() else "completed"
             await confirm_interaction.edit_original_response(
                 embed=_embed(
-                    "Purge Complete",
-                    f"Purge {status}. Deleted **{deleted}** of **{len(candidates)}** matched messages.",
+                    _staff_text_sync(confirm_interaction.user.id, "purge_complete_title", default="Purge Complete"),
+                    _staff_text_sync(
+                        confirm_interaction.guild_id,
+                        "purge_complete_body",
+                        default="Purge {status}. Deleted **{deleted}** of **{total}** matched messages.",
+                        status=status,
+                        deleted=str(deleted),
+                        total=str(len(candidates)),
+                    ),
                     discord.Color.green(),
                 ),
                 view=None,
@@ -437,13 +496,18 @@ class StaffUtilityCog(commands.Cog):
             print(f"[staff_utils] purge guild={interaction.guild_id} channel={interaction.channel_id} deleted={deleted}")
 
         preview = _embed(
-            "Purge Preview",
-            "\n".join(lines) + "\n\nPress **Confirm** to delete matched messages.",
+            _staff_text_sync(interaction.user.id, "purge_preview_title", default="Purge Preview"),
+            "\n".join(lines)
+            + "\n\n"
+            + _staff_text_sync(interaction.user.id, "purge_confirm_prompt", default="Press **Confirm** to delete matched messages."),
             discord.Color.blurple(),
         )
         await interaction.response.send_message(embed=preview, view=ConfirmCancelView(interaction.user.id, _confirm_purge), ephemeral=True)
 
-    @app_commands.command(name="lock", description="Lock a channel for @everyone (send messages off).")
+    @app_commands.command(
+        name="lock",
+        description="Lock a channel for @everyone (send messages off).",
+)
     @app_commands.default_permissions(manage_channels=True)
     @app_commands.checks.has_permissions(manage_channels=True)
     async def lock(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None) -> None:
@@ -451,17 +515,46 @@ class StaffUtilityCog(commands.Cog):
             return
         target = channel or interaction.channel
         if not isinstance(target, discord.TextChannel):
-            await interaction.response.send_message(embed=_embed("Invalid Channel", "Choose a text channel.", discord.Color.red()), ephemeral=True)
+            await interaction.response.send_message(
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "invalid_channel_title", default="Invalid Channel"),
+                    _staff_text_sync(interaction.user.id, "invalid_channel_body", default="Choose a text channel."),
+                    discord.Color.red(),
+                ),
+                ephemeral=True,
+            )
             return
         overwrite = target.overwrites_for(target.guild.default_role)
         overwrite.send_messages = False
         try:
             await target.set_permissions(target.guild.default_role, overwrite=overwrite, reason=f"Locked by {interaction.user}")
-            await interaction.response.send_message(embed=_embed("Channel Locked", f"{target.mention} is now locked.", discord.Color.green()), ephemeral=True)
+            await interaction.response.send_message(
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "channel_locked_title", default="Channel Locked"),
+                    _staff_text_sync(interaction.user.id, "channel_locked_body", default="{channel} is now locked.", channel=target.mention),
+                    discord.Color.green(),
+                ),
+                ephemeral=True,
+            )
         except (discord.Forbidden, discord.HTTPException) as exc:
-            await interaction.response.send_message(embed=_embed("Lock Failed", f"Could not lock channel: `{type(exc).__name__}`", discord.Color.red()), ephemeral=True)
+            await interaction.response.send_message(
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "lock_failed_title", default="Lock Failed"),
+                    _staff_text_sync(
+                        interaction.guild_id,
+                        "lock_failed_body",
+                        default="Could not lock channel: `{error}`",
+                        error=type(exc).__name__,
+                    ),
+                    discord.Color.red(),
+                ),
+                ephemeral=True,
+            )
 
-    @app_commands.command(name="unlock", description="Unlock a channel for @everyone.")
+    @app_commands.command(
+        name="unlock",
+        description="Unlock a channel for @everyone.",
+)
     @app_commands.default_permissions(manage_channels=True)
     @app_commands.checks.has_permissions(manage_channels=True)
     async def unlock(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None) -> None:
@@ -469,17 +562,46 @@ class StaffUtilityCog(commands.Cog):
             return
         target = channel or interaction.channel
         if not isinstance(target, discord.TextChannel):
-            await interaction.response.send_message(embed=_embed("Invalid Channel", "Choose a text channel.", discord.Color.red()), ephemeral=True)
+            await interaction.response.send_message(
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "invalid_channel_title", default="Invalid Channel"),
+                    _staff_text_sync(interaction.user.id, "invalid_channel_body", default="Choose a text channel."),
+                    discord.Color.red(),
+                ),
+                ephemeral=True,
+            )
             return
         overwrite = target.overwrites_for(target.guild.default_role)
         overwrite.send_messages = None
         try:
             await target.set_permissions(target.guild.default_role, overwrite=overwrite, reason=f"Unlocked by {interaction.user}")
-            await interaction.response.send_message(embed=_embed("Channel Unlocked", f"{target.mention} is now unlocked.", discord.Color.green()), ephemeral=True)
+            await interaction.response.send_message(
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "channel_unlocked_title", default="Channel Unlocked"),
+                    _staff_text_sync(interaction.user.id, "channel_unlocked_body", default="{channel} is now unlocked.", channel=target.mention),
+                    discord.Color.green(),
+                ),
+                ephemeral=True,
+            )
         except (discord.Forbidden, discord.HTTPException) as exc:
-            await interaction.response.send_message(embed=_embed("Unlock Failed", f"Could not unlock channel: `{type(exc).__name__}`", discord.Color.red()), ephemeral=True)
+            await interaction.response.send_message(
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "unlock_failed_title", default="Unlock Failed"),
+                    _staff_text_sync(
+                        interaction.guild_id,
+                        "unlock_failed_body",
+                        default="Could not unlock channel: `{error}`",
+                        error=type(exc).__name__,
+                    ),
+                    discord.Color.red(),
+                ),
+                ephemeral=True,
+            )
 
-    @app_commands.command(name="slowmode", description="Set channel slowmode in seconds.")
+    @app_commands.command(
+        name="slowmode",
+        description="Set channel slowmode in seconds.",
+)
     @app_commands.default_permissions(manage_channels=True)
     @app_commands.checks.has_permissions(manage_channels=True)
     async def slowmode(
@@ -492,15 +614,39 @@ class StaffUtilityCog(commands.Cog):
             return
         target = channel or interaction.channel
         if not isinstance(target, discord.TextChannel):
-            await interaction.response.send_message(embed=_embed("Invalid Channel", "Choose a text channel.", discord.Color.red()), ephemeral=True)
+            await interaction.response.send_message(
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "invalid_channel_title", default="Invalid Channel"),
+                    _staff_text_sync(interaction.user.id, "invalid_channel_body", default="Choose a text channel."),
+                    discord.Color.red(),
+                ),
+                ephemeral=True,
+            )
             return
         try:
             await target.edit(slowmode_delay=int(time), reason=f"Slowmode set by {interaction.user}")
-            await interaction.response.send_message(embed=_embed("Slowmode Updated", f"{target.mention} slowmode set to **{time}s**.", discord.Color.green()), ephemeral=True)
+            await interaction.response.send_message(
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "slowmode_updated_title", default="Slowmode Updated"),
+                    _staff_text_sync(interaction.user.id, "slowmode_updated_body", default="{channel} slowmode set to **{seconds}s**.", channel=target.mention, seconds=str(time)),
+                    discord.Color.green(),
+                ),
+                ephemeral=True,
+            )
         except (discord.Forbidden, discord.HTTPException) as exc:
-            await interaction.response.send_message(embed=_embed("Slowmode Failed", f"Could not update slowmode: `{type(exc).__name__}`", discord.Color.red()), ephemeral=True)
+            await interaction.response.send_message(
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "slowmode_failed_title", default="Slowmode Failed"),
+                    _staff_text_sync(interaction.user.id, "slowmode_failed_body", default="Could not update slowmode: `{error}`", error=type(exc).__name__),
+                    discord.Color.red(),
+                ),
+                ephemeral=True,
+            )
 
-    @app_commands.command(name="nuke", description="Delete and recreate a channel (with confirmation).")
+    @app_commands.command(
+        name="nuke",
+        description="Delete and recreate a channel (with confirmation).",
+)
     @app_commands.default_permissions(manage_channels=True)
     @app_commands.checks.has_permissions(manage_channels=True)
     @app_commands.checks.cooldown(1, 20.0, key=lambda i: (i.guild_id, i.user.id))
@@ -509,7 +655,14 @@ class StaffUtilityCog(commands.Cog):
             return
         target = channel or interaction.channel
         if not isinstance(target, discord.TextChannel):
-            await interaction.response.send_message(embed=_embed("Invalid Channel", "Choose a text channel.", discord.Color.red()), ephemeral=True)
+            await interaction.response.send_message(
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "invalid_channel_title", default="Invalid Channel"),
+                    _staff_text_sync(interaction.user.id, "invalid_channel_body", default="Choose a text channel."),
+                    discord.Color.red(),
+                ),
+                ephemeral=True,
+            )
             return
 
         async def _confirm_nuke(confirm_interaction: discord.Interaction) -> None:
@@ -518,26 +671,42 @@ class StaffUtilityCog(commands.Cog):
                 await clone.edit(position=target.position, category=target.category)
                 await target.delete(reason=f"Nuked by {confirm_interaction.user}")
                 await confirm_interaction.response.edit_message(
-                    embed=_embed("Channel Nuked", f"Recreated channel: {clone.mention}", discord.Color.green()),
+                    embed=_embed(
+                        _staff_text_sync(confirm_interaction.user.id, "channel_nuked_title", default="Channel Nuked"),
+                        _staff_text_sync(confirm_interaction.user.id, "channel_nuked_body", default="Recreated channel: {channel}", channel=clone.mention),
+                        discord.Color.green(),
+                    ),
                     view=None,
                 )
             except (discord.Forbidden, discord.HTTPException) as exc:
                 await confirm_interaction.response.edit_message(
-                    embed=_embed("Nuke Failed", f"Could not nuke channel: `{type(exc).__name__}`", discord.Color.red()),
+                    embed=_embed(
+                        _staff_text_sync(confirm_interaction.user.id, "nuke_failed_title", default="Nuke Failed"),
+                        _staff_text_sync(confirm_interaction.user.id, "nuke_failed_body", default="Could not nuke channel: `{error}`", error=type(exc).__name__),
+                        discord.Color.red(),
+                    ),
                     view=None,
                 )
 
         await interaction.response.send_message(
             embed=_embed(
-                "Confirm Nuke",
-                f"This will delete and recreate {target.mention}.\nThis is destructive.",
+                _staff_text_sync(interaction.user.id, "confirm_nuke_title", default="Confirm Nuke"),
+                _staff_text_sync(
+                    interaction.guild_id,
+                    "confirm_nuke_body",
+                    default="This will delete and recreate {channel}.\nThis is destructive.",
+                    channel=target.mention,
+                ),
                 discord.Color.red(),
             ),
             view=ConfirmCancelView(interaction.user.id, _confirm_nuke),
             ephemeral=True,
         )
 
-    @app_commands.command(name="giverole", description="Give a role to all/humans/bots with progress feedback.")
+    @app_commands.command(
+        name="giverole",
+        description="Give a role to all/humans/bots with progress feedback.",
+)
     @app_commands.describe(target_type="Who receives the role", role="Role to assign")
     @app_commands.choices(target_type=TARGET_TYPE_CHOICES)
     @app_commands.default_permissions(manage_roles=True)
@@ -557,7 +726,11 @@ class StaffUtilityCog(commands.Cog):
         bot_member = interaction.guild.me
         if bot_member is None or bot_member.top_role <= role:
             await interaction.followup.send(
-                embed=_embed("Role Hierarchy Error", "Bot role must be above the target role.", discord.Color.red()),
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "role_hierarchy_error_title", default="Role Hierarchy Error"),
+                    _staff_text_sync(interaction.user.id, "role_hierarchy_error_body", default="Bot role must be above the target role."),
+                    discord.Color.red(),
+                ),
                 ephemeral=True,
             )
             return
@@ -602,7 +775,10 @@ class StaffUtilityCog(commands.Cog):
         )
         print(f"[staff_utils] giverole guild={interaction.guild_id} target={target_type.value} role={role.id} changed={changed}")
 
-    @app_commands.command(name="removerole", description="Remove a role from all/humans/bots with progress feedback.")
+    @app_commands.command(
+        name="removerole",
+        description="Remove a role from all/humans/bots with progress feedback.",
+)
     @app_commands.describe(target_type="Who loses the role", role="Role to remove")
     @app_commands.choices(target_type=TARGET_TYPE_CHOICES)
     @app_commands.default_permissions(manage_roles=True)
@@ -622,7 +798,11 @@ class StaffUtilityCog(commands.Cog):
         bot_member = interaction.guild.me
         if bot_member is None or bot_member.top_role <= role:
             await interaction.followup.send(
-                embed=_embed("Role Hierarchy Error", "Bot role must be above the target role.", discord.Color.red()),
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "role_hierarchy_error_title", default="Role Hierarchy Error"),
+                    _staff_text_sync(interaction.user.id, "role_hierarchy_error_body", default="Bot role must be above the target role."),
+                    discord.Color.red(),
+                ),
                 ephemeral=True,
             )
             return
@@ -667,7 +847,10 @@ class StaffUtilityCog(commands.Cog):
         )
         print(f"[staff_utils] removerole guild={interaction.guild_id} target={target_type.value} role={role.id} changed={changed}")
 
-    @app_commands.command(name="userinfo", description="Show detailed user and moderation history information.")
+    @app_commands.command(
+        name="userinfo",
+        description="Show detailed user and moderation history information.",
+)
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.checks.has_permissions(moderate_members=True)
     async def userinfo(self, interaction: discord.Interaction, user: Optional[discord.Member] = None) -> None:
@@ -678,7 +861,11 @@ class StaffUtilityCog(commands.Cog):
         target = user or interaction.user
         if not isinstance(target, discord.Member):
             await interaction.response.send_message(
-                embed=_embed("Unavailable", "Could not resolve that member in this server.", discord.Color.red()),
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "unavailable_title", default="Unavailable"),
+                    _staff_text_sync(interaction.user.id, "unavailable_member_body", default="Could not resolve that member in this server."),
+                    discord.Color.red(),
+                ),
                 ephemeral=True,
             )
             return
@@ -817,7 +1004,10 @@ class StaffUtilityCog(commands.Cog):
 
         return channels_touched, scanned, edits
 
-    @app_commands.command(name="lockdown", description="Apply emergency lockdown restrictions to this server.")
+    @app_commands.command(
+        name="lockdown",
+        description="Apply emergency lockdown restrictions to this server.",
+)
     @app_commands.describe(
         cutoff_role=(
             "Lock applies to @everyone and every role at or below this role. "
@@ -859,7 +1049,11 @@ class StaffUtilityCog(commands.Cog):
         active = await self._is_locked_down(interaction.guild.id)
         if active is not None:
             await interaction.response.send_message(
-                embed=_embed("Lockdown Already Active", "Run `/unlockdown` before applying again.", discord.Color.orange()),
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "lockdown_active_title", default="Lockdown Already Active"),
+                    _staff_text_sync(interaction.user.id, "lockdown_active_body", default="Run `/unlockdown` before applying again."),
+                    discord.Color.orange(),
+                ),
                 ephemeral=True,
             )
             return
@@ -878,7 +1072,11 @@ class StaffUtilityCog(commands.Cog):
 
         async def _confirm_lockdown(confirm_interaction: discord.Interaction) -> None:
             await confirm_interaction.response.edit_message(
-                embed=_embed("Applying Lockdown", "Applying permission overrides…", discord.Color.orange()),
+                embed=_embed(
+                    _staff_text_sync(confirm_interaction.user.id, "applying_lockdown_title", default="Applying Lockdown"),
+                    _staff_text_sync(confirm_interaction.user.id, "applying_lockdown_body", default="Applying permission overrides..."),
+                    discord.Color.orange(),
+                ),
                 view=None,
             )
             touched, scanned, edits = await self._apply_lockdown(
@@ -902,13 +1100,17 @@ class StaffUtilityCog(commands.Cog):
                 f"excluded_channels: **{len(excluded_ids)}**",
             ]
             await confirm_interaction.edit_original_response(
-                embed=_embed("Lockdown Active", "\n".join(summary), discord.Color.red()),
+                embed=_embed(
+                    _staff_text_sync(confirm_interaction.user.id, "lockdown_active_summary_title", default="Lockdown Active"),
+                    "\n".join(summary),
+                    discord.Color.red(),
+                ),
                 view=None,
             )
             print(f"[staff_utils] lockdown guild={interaction.guild_id} touched={touched} edits={edits}")
 
         preview = _embed(
-            "Confirm Lockdown",
+            _staff_text_sync(interaction.user.id, "confirm_lockdown_title", default="Confirm Lockdown"),
             (
                 "This applies restrictions to **@everyone** and **every role at or below** your cutoff role.\n"
                 f"Cutoff: {cutoff_role.mention}\n"
@@ -919,7 +1121,10 @@ class StaffUtilityCog(commands.Cog):
         )
         await interaction.response.send_message(embed=preview, view=ConfirmCancelView(interaction.user.id, _confirm_lockdown), ephemeral=True)
 
-    @app_commands.command(name="unlockdown", description="Restore channel permissions saved by /lockdown.")
+    @app_commands.command(
+        name="unlockdown",
+        description="Restore channel permissions saved by /lockdown.",
+)
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.checks.has_permissions(manage_guild=True)
     async def unlockdown(self, interaction: discord.Interaction) -> None:
@@ -934,7 +1139,11 @@ class StaffUtilityCog(commands.Cog):
             row = _lockdown_guild_row(data, guild.id)
             if not isinstance(row, dict) or not row.get("active", False):
                 await interaction.response.send_message(
-                    embed=_embed("No Lockdown Active", "There is no active lockdown to restore.", discord.Color.orange()),
+                    embed=_embed(
+                        _staff_text_sync(interaction.user.id, "no_lockdown_title", default="No Lockdown Active"),
+                        _staff_text_sync(interaction.user.id, "no_lockdown_body", default="There is no active lockdown to restore."),
+                        discord.Color.orange(),
+                    ),
                     ephemeral=True,
                 )
                 return
@@ -976,8 +1185,13 @@ class StaffUtilityCog(commands.Cog):
 
         await interaction.followup.send(
             embed=_embed(
-                "Lockdown Removed",
-                f"Restored **{restored}** role/channel permission overwrite(s) from the saved snapshot.",
+                _staff_text_sync(interaction.user.id, "lockdown_removed_title", default="Lockdown Removed"),
+                _staff_text_sync(
+                    interaction.guild_id,
+                    "lockdown_removed_body",
+                    default="Restored **{count}** role/channel permission overwrite(s) from the saved snapshot.",
+                    count=str(restored),
+                ),
                 discord.Color.green(),
             ),
             ephemeral=True,
@@ -990,7 +1204,10 @@ class HistoryCog(commands.GroupCog, group_name="history", group_description="Vie
         self.bot = bot
         self._history_lock = asyncio.Lock()
 
-    @app_commands.command(name="user", description="Show warning + note history for a member.")
+    @app_commands.command(
+        name="user",
+        description="Show warning + note history for a member.",
+)
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.checks.has_permissions(moderate_members=True)
     async def history_user(self, interaction: discord.Interaction, user: discord.Member) -> None:
@@ -1028,7 +1245,10 @@ class NoteCog(commands.GroupCog, group_name="note", group_description="Manage in
         self.bot = bot
         self._history_lock = asyncio.Lock()
 
-    @app_commands.command(name="add", description="Add a staff note for a user.")
+    @app_commands.command(
+        name="add",
+        description="Add a staff note for a user.",
+)
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.checks.has_permissions(moderate_members=True)
     async def note_add(self, interaction: discord.Interaction, user: discord.Member, text: str) -> None:
@@ -1039,7 +1259,11 @@ class NoteCog(commands.GroupCog, group_name="note", group_description="Manage in
         note_text = text.strip()
         if not note_text:
             await interaction.response.send_message(
-                embed=_embed("Invalid Note", "Note text cannot be empty.", discord.Color.red()),
+                embed=_embed(
+                    _staff_text_sync(interaction.user.id, "invalid_note_title", default="Invalid Note"),
+                    _staff_text_sync(interaction.user.id, "invalid_note_body", default="Note text cannot be empty."),
+                    discord.Color.red(),
+                ),
                 ephemeral=True,
             )
             return
@@ -1059,12 +1283,19 @@ class NoteCog(commands.GroupCog, group_name="note", group_description="Manage in
             )
             _save_history_data(data)
         await interaction.response.send_message(
-            embed=_embed("Note Added", f"Saved note for {user.mention}.", discord.Color.green()),
+            embed=_embed(
+                _staff_text_sync(interaction.user.id, "note_added_title", default="Note Added"),
+                _staff_text_sync(interaction.user.id, "note_added_body", default="Saved note for {user}.", user=user.mention),
+                discord.Color.green(),
+            ),
             ephemeral=True,
         )
         print(f"[staff_utils] note_add guild={interaction.guild_id} target={user.id} by={interaction.user.id}")
 
-    @app_commands.command(name="view", description="View staff notes for a user.")
+    @app_commands.command(
+        name="view",
+        description="View staff notes for a user.",
+)
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.checks.has_permissions(moderate_members=True)
     async def note_view(self, interaction: discord.Interaction, user: discord.Member) -> None:

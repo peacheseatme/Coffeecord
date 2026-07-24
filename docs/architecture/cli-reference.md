@@ -16,13 +16,11 @@ The bot is controlled via `bot.sh` or the `c-cord` symlink.
 | `status -v` / `status --verbose` | Status + last 10 log lines |
 | `logs` | Follow log (tail -f) |
 | `logs -n N` | Last N lines, no follow |
-| `console` | Live console — tail bot log (commands, errors, etc.) |
-| `console -n N` | Last N lines, no follow |
-| `console clear` | Clear the bot log file |
-| `update` | Latest **GitHub release** tag → fetch/checkout → pip install → restart |
-| `update <version>` | Same, pinned to that release (e.g. `1.0.3` or `v1.0.3`) |
+| `console` | Interactive host REPL — run slash/owner commands against the live bot |
+| `update` | Latest **GitHub Release** → git checkout if possible, else zipball overlay → pip → restart |
+| `update <version>` | Same, pinned to that release tag (e.g. `1.0.3` or `v1.0.3`) |
 | `update --branch` | `git pull` on current branch (for development on `main`) → pip → restart |
-| `update -f` | Continue even if resolve/fetch/checkout/pull fails |
+| `update -f` | Continue even if resolve/git/archive/pull fails |
 | `module refresh` | Scan Modules/, add new files to registry |
 | `module refresh_registry` | Alias for module refresh |
 | `module refresh --dry-run` | Preview additions without writing |
@@ -48,13 +46,17 @@ Paths are relative to the project root unless absolute. The config is loaded aut
 
 ### `c-cord update` (releases)
 
-Default update uses the [GitHub Releases API](https://docs.github.com/en/rest/releases/releases) on the repo inferred from `git remote get-url origin` (HTTPS or `git@github.com:...`), unless `github_repo` is set in `c-cord.json`. Requires a **git clone** (not a plain zip). The working tree must be clean unless you pass `-f`.
+Default update uses the [GitHub Releases API](https://docs.github.com/en/rest/releases/releases) on the repo inferred from `git remote get-url origin` (HTTPS or `git@github.com:...`), unless `github_repo` is set in `c-cord.json`. Publishing a Release on a tag (e.g. `1.0.4` / `v1.0.4`) is enough — custom release assets are optional.
 
-After a release checkout the repo is in a **detached HEAD** state at the release tag — expected for production installs. To follow `main` again, use `c-cord update --branch` or `git checkout main && git pull`.
+**Fallback order:** resolve the release tag → if this is a git clone with a clean tree, `git fetch` + `git checkout` that tag → otherwise (or if git fails) download GitHub’s auto **zipball** for the tag and overlay it onto the install root. Overlay never replaces `Storage/`, `.venv/`, `Src/.env`, `Src/ticket.env`, or the local `data/` tree. Draft/prerelease tags are not treated as “latest” (`/releases/latest` already excludes them).
+
+Works without a `.git` directory when `github_repo` (or `GITHUB_REPO`) identifies `owner/repo`. For git checkouts, the working tree must be clean unless you pass `-f`. After a successful git release checkout the repo is in a **detached HEAD** at the tag — expected for production. To follow `main` again, use `c-cord update --branch` or `git checkout main && git pull`.
+
+Optional uploaded asset: if you attach a file named exactly `coffeecord-release.zip`, the resolver reports it as `asset_url`; the updater still prefers the automatic zipball unless you change tooling later.
 
 Unauthenticated API calls are rate-limited (about 60/hour per IP). For private repositories or heavier use, set environment variable `GITHUB_TOKEN` (fine-grained or classic PAT with `Contents: Read`) when running `c-cord update`.
 
-If the latest release cannot be resolved (e.g. no published releases), the helper falls back to the newest **local** semver-looking tag after you run `git fetch --tags`; that may include tags that were never published as GitHub “releases.”
+If the latest release cannot be resolved (e.g. no published releases) on a git clone, the helper falls back to the newest **local** semver-looking tag after you run `git fetch --tags`; that may include tags that were never published as GitHub “releases.”
 
 ## ngrok (Ko-fi webhooks)
 
@@ -75,6 +77,36 @@ Add `kofi_webhook_host` (your ngrok host, e.g. `postmyxedematous-meadow-unswagge
 - **Logs**: `Storage/Logs/bot.log`
 - **PID**: `Storage/Temp/bot.pid`
 - **Venv**: `.venv/`
+
+## Host console REPL
+
+`c-cord console` opens an interactive shell on the host machine. Commands run against the **already-running** bot process (same Discord session) via a local Unix socket at `Storage/Temp/console.sock`.
+
+| REPL input | Description |
+|--------------|-------------|
+| `help` | List slash commands |
+| `commands` | Every slash command with full usage syntax |
+| `help ban` | Describe one command (parameters, types) |
+| `servers` | Guild ids for `server:<id>` |
+| `server info server:<id>` | Export roles, members, invites, channels, perms to `Storage/Temp/server-info-…/` |
+| `ban server:138477 user:stan425 reason:spam time:1h` | One-line command (no pickers) |
+| `synccommands` / `.dev banuser …` | Owner prefix commands |
+| `ping` | Bot ready state, guild count, latency |
+| `exit` / `quit` | Leave the REPL |
+
+Arg syntax: `key:value` (also `key=value`, `:user@name`, quoted values). Examples:
+
+```text
+ban server:138477 user:stan425 reason:spam time:1h
+colorrole clear server:138477
+server info server:1384771470860746753
+```
+
+Missing required args print a usage line instead of interactive pickers. Run `commands` for every command’s syntax; `servers` for guild ids.
+
+**Security:** Authentication uses `HOST_CONSOLE_TOKEN` in `Src/ticket.env` (auto-generated on first start). The socket is filesystem-local only — not exposed to the network. Commands execute as the configured owner (`COFFEECORD_OWNER_ID`).
+
+**Limitations:** Commands that open Discord UI (Views/Modals), such as `/colorrole setup` or `/setup`, must be run in Discord. Use `c-cord logs` for log tailing (not `console`).
 
 ## Ko-fi setup
 

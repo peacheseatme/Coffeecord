@@ -22,7 +22,7 @@ def _state_path() -> Path:
     return bot_config.get_module_state_path()
 
 # These files live in Modules/ but are not loadable cogs.
-_DISCOVERY_EXCLUDE: frozenset[str] = frozenset({"module_registry", "kofi_webhook"})
+_DISCOVERY_EXCLUDE: frozenset[str] = frozenset({"module_registry", "kofi_webhook", "backup_crypto"})
 
 _REGISTRY_LOCK = asyncio.Lock()
 _STATE_LOCK = asyncio.Lock()
@@ -35,6 +35,15 @@ REGISTRY_DEFAULT: dict[str, list[dict[str, Any]]] = {
             "path": "Modules/automod.py",
             "display_name": "Automod",
             "description": "Spam, caps, link, mention, keyword filters, and escalation.",
+            "default_enabled": True,
+            "category": "moderation",
+        },
+        {
+            "id": "inactive_members",
+            "extension": "Modules.inactive_members",
+            "path": "Modules/inactive_members.py",
+            "display_name": "Inactive Members",
+            "description": "Track activity and remove inactive members by configurable rules.",
             "default_enabled": True,
             "category": "moderation",
         },
@@ -71,6 +80,15 @@ REGISTRY_DEFAULT: dict[str, list[dict[str, Any]]] = {
             "path": "Modules/reactionrole.py",
             "display_name": "Reaction Roles",
             "description": "Reaction/button based self-role assignment.",
+            "default_enabled": True,
+            "category": "configuration",
+        },
+        {
+            "id": "color_roles",
+            "extension": "Modules.color_roles",
+            "path": "Modules/color_roles.py",
+            "display_name": "Color Roles",
+            "description": "Exclusive self-assign color roles via buttons or emoji reactions.",
             "default_enabled": True,
             "category": "configuration",
         },
@@ -120,6 +138,15 @@ REGISTRY_DEFAULT: dict[str, list[dict[str, Any]]] = {
             "category": "configuration",
         },
         {
+            "id": "language",
+            "extension": "Modules.language",
+            "path": "Modules/language.py",
+            "display_name": "Language",
+            "description": "Choose your language for Coffeecord replies (English, Spanish, Portuguese, Russian).",
+            "default_enabled": True,
+            "category": "configuration",
+        },
+        {
             "id": "leveling",
             "extension": "Modules.leveling",
             "path": "Modules/leveling.py",
@@ -136,6 +163,15 @@ REGISTRY_DEFAULT: dict[str, list[dict[str, Any]]] = {
             "description": "Ko-fi linking/claims, supporter state, and webhook helpers.",
             "default_enabled": True,
             "category": "integrations",
+        },
+        {
+            "id": "host_console",
+            "extension": "Modules.host_console",
+            "path": "Modules/host_console.py",
+            "display_name": "Host Console",
+            "description": "Local Unix-socket REPL for running commands from c-cord console.",
+            "default_enabled": True,
+            "category": "utilities",
         },
         {
             "id": "verification",
@@ -217,6 +253,15 @@ REGISTRY_DEFAULT: dict[str, list[dict[str, Any]]] = {
             "description": "Support information, perks, and support links command.",
             "default_enabled": True,
             "category": "integrations",
+        },
+        {
+            "id": "server_backup",
+            "extension": "Modules.server_backup",
+            "path": "Modules/server_backup.py",
+            "display_name": "Server Backup",
+            "description": "Encrypted Discord structure + Coffeecord config backups with host slots.",
+            "default_enabled": True,
+            "category": "configuration",
         },
     ]
 }

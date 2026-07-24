@@ -1,23 +1,32 @@
 #!/usr/bin/env python3
 """
-Resolve a GitHub release tag for c-cord update.
+Resolve a GitHub release tag (and archive URLs) for c-cord update.
 
 Usage:
   ccord_release_resolve.py <repo_root> [version]
+  ccord_release_resolve.py <repo_root> [version] --json
 
   version: optional; if omitted, use latest published release from the API.
   GITHUB_REPO=owner/repo  optional override (from c-cord.json).
   GITHUB_TOKEN            optional; raises API rate limits and helps private repos.
 
+  Default stdout: tag name only (one line).
+  --json stdout: stable schema with tag + archive URLs (see SCHEMA_VERSION).
+
+  Prefer GitHub zipball/tarball (auto-created for release tags). Optional uploaded
+  asset named exactly "coffeecord-release.zip" is reported as asset_url when present.
+
   With an explicit version, GitHub Releases API is tried first, then
   git ls-remote on origin (so downgrades to older tags work even when the tag
-  was never a GitHub "release" asset).
+  was never a GitHub "release" asset). Archive URLs are still constructed for
+  any resolved tag.
 
 On API failure for "latest", falls back to highest local semver-like tag (run
 git fetch --tags first from the caller).
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
@@ -27,9 +36,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 GITHUB_API = "https://api.github.com"
 ACCEPT_HEADER = "application/vnd.github+json"
+SCHEMA_VERSION = 1
+OPTIONAL_ASSET_NAME = "coffeecord-release.zip"
 
 
 def _parse_github_remote(url: str) -> tuple[str, str] | None:
@@ -46,7 +58,7 @@ def _parse_github_remote(url: str) -> tuple[str, str] | None:
     return m.group(1), m.group(2)
 
 
-def _repo_from_git_root(root: Path) -> tuple[str, str]:
+def _repo_from_root(root: Path) -> tuple[str, str]:
     env_repo = os.environ.get("GITHUB_REPO", "").strip()
     if env_repo:
         parts = env_repo.replace(" ", "").split("/")
@@ -62,7 +74,8 @@ def _repo_from_git_root(root: Path) -> tuple[str, str]:
     )
     if r.returncode != 0:
         print(
-            "Could not read git remote origin. Set GITHUB_REPO=owner/repo in c-cord.json.",
+            "Could not read git remote origin. Set github_repo (owner/repo) in "
+            "Storage/Config/c-cord.json or GITHUB_REPO in the environment.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -70,7 +83,7 @@ def _repo_from_git_root(root: Path) -> tuple[str, str]:
     if not parsed:
         print(
             f"Origin URL is not a github.com remote: {r.stdout.strip()!r}. "
-            "Set GITHUB_REPO=owner/repo in Storage/Config/c-cord.json.",
+            "Set github_repo=owner/repo in Storage/Config/c-cord.json.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -120,6 +133,52 @@ def _tag_candidates(user_version: str) -> list[str]:
     return unique
 
 
+def _archive_urls(owner: str, repo: str, tag: str) -> tuple[str, str]:
+    quoted = urllib.parse.quote(tag, safe="")
+    zipball = f"{GITHUB_API}/repos/{owner}/{repo}/zipball/{quoted}"
+    tarball = f"{GITHUB_API}/repos/{owner}/{repo}/tarball/{quoted}"
+    return zipball, tarball
+
+
+def _asset_url_from_release(data: dict[str, Any]) -> str | None:
+    assets = data.get("assets")
+    if not isinstance(assets, list):
+        return None
+    want = OPTIONAL_ASSET_NAME.lower()
+    for asset in assets:
+        if not isinstance(asset, dict):
+            continue
+        name = str(asset.get("name") or "").strip()
+        url = str(asset.get("browser_download_url") or "").strip()
+        if name.lower() == want and url:
+            return url
+    return None
+
+
+def _payload(
+    *,
+    tag: str,
+    owner: str,
+    repo: str,
+    source: str,
+    zipball_url: str | None = None,
+    tarball_url: str | None = None,
+    asset_url: str | None = None,
+) -> dict[str, Any]:
+    z_default, t_default = _archive_urls(owner, repo, tag)
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "tag": tag,
+        "owner": owner,
+        "repo": repo,
+        "source": source,
+        "zipball_url": zipball_url or z_default,
+        "tarball_url": tarball_url or t_default,
+        "asset_url": asset_url,
+        "preferred_archive_url": (zipball_url or z_default),
+    }
+
+
 def _resolve_tag_on_origin(root: Path, user_version: str) -> str | None:
     """Return a tag name that exists on origin, or None (supports downgrade / tag-only releases)."""
     for tag in _tag_candidates(user_version):
@@ -136,19 +195,34 @@ def _resolve_tag_on_origin(root: Path, user_version: str) -> str | None:
     return None
 
 
-def _resolve_specific_release(root: Path, owner: str, repo: str, user_version: str) -> str:
+def _release_payload_from_api(owner: str, repo: str, data: dict[str, Any], source: str) -> dict[str, Any]:
+    tag = str(data["tag_name"])
+    zipball = str(data.get("zipball_url") or "") or None
+    tarball = str(data.get("tarball_url") or "") or None
+    return _payload(
+        tag=tag,
+        owner=owner,
+        repo=repo,
+        source=source,
+        zipball_url=zipball,
+        tarball_url=tarball,
+        asset_url=_asset_url_from_release(data),
+    )
+
+
+def _resolve_specific_release(root: Path, owner: str, repo: str, user_version: str) -> dict[str, Any]:
     for tag in _tag_candidates(user_version):
         path = f"/repos/{owner}/{repo}/releases/tags/{urllib.parse.quote(tag, safe='')}"
         status, data, _ = _api_request(path)
         if status == 200 and isinstance(data, dict) and data.get("tag_name"):
-            return str(data["tag_name"])
+            return _release_payload_from_api(owner, repo, data, "release")
     origin_tag = _resolve_tag_on_origin(root, user_version)
     if origin_tag:
         print(
             f"Note: {origin_tag!r} resolved from origin tags (not a GitHub Release page).",
             file=sys.stderr,
         )
-        return origin_tag
+        return _payload(tag=origin_tag, owner=owner, repo=repo, source="origin_tag")
     print(
         f"No GitHub release or origin tag found for {user_version!r} (tried tag variants).",
         file=sys.stderr,
@@ -156,10 +230,10 @@ def _resolve_specific_release(root: Path, owner: str, repo: str, user_version: s
     sys.exit(1)
 
 
-def _resolve_latest_api(owner: str, repo: str) -> str | None:
+def _resolve_latest_api(owner: str, repo: str) -> dict[str, Any] | None:
     status, data, _ = _api_request(f"/repos/{owner}/{repo}/releases/latest")
     if status == 200 and isinstance(data, dict) and data.get("tag_name"):
-        return str(data["tag_name"])
+        return _release_payload_from_api(owner, repo, data, "release")
     if isinstance(data, dict) and data.get("message"):
         print(f"GitHub API: {data.get('message')}", file=sys.stderr)
     elif status > 0:
@@ -194,35 +268,50 @@ def _local_latest_semver_tag(root: Path) -> str | None:
     return max(tags, key=lambda t: _semver_tuple(t) or ())
 
 
-def main() -> int:
-    if len(sys.argv) < 2:
-        print("Usage: ccord_release_resolve.py <repo_root> [version]", file=sys.stderr)
-        return 1
-    root = Path(sys.argv[1]).resolve()
-    user_version = sys.argv[2].strip() if len(sys.argv) > 2 else ""
-
-    if not root.is_dir():
-        print(f"Not a directory: {root}", file=sys.stderr)
-        return 1
-
-    owner, repo = _repo_from_git_root(root)
+def resolve(root: Path, user_version: str = "") -> dict[str, Any]:
+    owner, repo = _repo_from_root(root)
 
     if user_version:
-        tag = _resolve_specific_release(root, owner, repo, user_version)
-        print(tag)
-        return 0
+        return _resolve_specific_release(root, owner, repo, user_version)
 
-    tag = _resolve_latest_api(owner, repo)
-    if tag:
-        print(tag)
-        return 0
+    payload = _resolve_latest_api(owner, repo)
+    if payload:
+        return payload
 
     print("Falling back to latest local semver tag (git fetch --tags recommended).", file=sys.stderr)
     local = _local_latest_semver_tag(root)
     if not local:
         print("No local semver tag found and GitHub latest release could not be resolved.", file=sys.stderr)
+        sys.exit(1)
+    return _payload(tag=local, owner=owner, repo=repo, source="local_tag")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Resolve GitHub release tag for c-cord update.")
+    parser.add_argument("repo_root", type=Path, help="Install / clone root")
+    parser.add_argument("version", nargs="?", default="", help="Optional pinned version / tag")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON with tag + archive URLs (schema_version=%s)" % SCHEMA_VERSION,
+    )
+    args = parser.parse_args(argv)
+
+    root = args.repo_root.resolve()
+    if not root.is_dir():
+        print(f"Not a directory: {root}", file=sys.stderr)
         return 1
-    print(local)
+
+    try:
+        payload = resolve(root, args.version.strip() if args.version else "")
+    except SystemExit as e:
+        code = e.code
+        return int(code) if isinstance(code, int) else 1
+
+    if args.json:
+        print(json.dumps(payload, separators=(",", ":")))
+    else:
+        print(payload["tag"])
     return 0
 
 

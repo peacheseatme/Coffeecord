@@ -161,5 +161,140 @@
     "default_mode": "button",
     "default_logging": false,
     "messages": {}
+  },
+  "1406814562484752475": {
+    "enabled": true,
+    "default_mode": "button",
+    "default_logging": true,
+    "messages": {
+      "1528928476948730027": {
+        "channel_id": 1528926835491213393,
+        "mode": "button",
+        "content": "Click This Button",
+        "embed": {
+          "title": "Idk",
+          "description": "figure it out",
+          "color": 5793266
+        },
+        "mappings": [
+          {
+            "id": "map_789eccd6",
+            "role_id": 1528926790322753777,
+            "label": "Toggle Role",
+            "emoji": null
+          }
+        ],
+        "max_roles": 0,
+        "required_role_ids": [],
+        "remove_others": false,
+        "logging": true
+      },
+      "1528928478706143484": {
+        "channel_id": 1528926846715035749,
+        "mode": "button",
+        "content": "Get your roles to be pinged for stuff",
+        "embed": {
+          "title": "Roles",
+          "description": "",
+          "color": 5793266
+        },
+        "mappings": [
+          {
+            "id": "map_5b681321",
+            "role_id": 1528926762640216134,
+            "label": "Toggle Role",
+            "emoji": null
+          }
+        ],
+        "max_roles": 0,
+        "required_role_ids": [],
+        "remove_others": false,
+        "logging": true
+      },
+      "1528928480660689048": {
+        "channel_id": 1528926846715035749,
+        "mode": "button",
+        "content": "Choose if you want to be pinged for bot updates of announcements.",
+        "embed": {
+          "title": "Get some roles",
+          "description": "RR",
+          "color": 5793266
+        },
+        "mappings": [
+          {
+            "id": "map_ba240d4f",
+            "role_id": 1528926762640216134,
+            "label": "Updates",
+            "emoji": null
+          },
+          {
+            "id": "map_8d413e78",
+            "role_id": 1528926769045049407,
+            "label": "Announcements",
+            "emoji": null
+          }
+        ],
+        "max_roles": 0,
+        "required_role_ids": [],
+        "remove_others": false,
+        "logging": true
+      },
+      "1528928482690732213": {
+        "channel_id": 1528926846715035749,
+        "mode": "button",
+        "content": "Choose if you want to be pinged or announcements or bot updates",
+        "embed": {
+          "title": "E",
+          "description": "CHEESEPUFFS",
+          "color": 5793266
+        },
+        "mappings": [
+          {
+            "id": "map_934e7ae2",
+            "role_id": 1528926762640216134,
+            "label": "Updates",
+            "emoji": null
+          },
+          {
+            "id": "map_8eeaba6c",
+            "role_id": 1528926769045049407,
+            "label": "Announcements",
+            "emoji": null
+          }
+        ],
+        "max_roles": 0,
+        "required_role_ids": [],
+        "remove_others": false,
+        "logging": true
+      },
+      "1528928484821438525": {
+        "channel_id": 1528926846715035749,
+        "mode": "button",
+        "content": "Get roles for updates and announcements.",
+        "embed": {
+          "title": "REACTION ROLES",
+          "description": "hehe",
+          "color": 5793266
+        },
+        "mappings": [
+          {
+            "id": "map_d85e3318",
+            "role_id": 1528926762640216134,
+            "label": "Updates",
+            "emoji": null
+          },
+          {
+            "id": "map_ae64b0ff",
+            "role_id": 1528926769045049407,
+            "label": "Announcements",
+            "emoji": null
+          }
+        ],
+        "max_roles": 0,
+        "required_role_ids": [],
+        "remove_others": false,
+        "logging": true
+      }
+    }
   }
 }

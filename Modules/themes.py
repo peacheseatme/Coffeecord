@@ -13,6 +13,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from Modules import json_cache
+from Modules.i18n import DEFAULT_LOCALE, get_user_language_sync, lookup_string, t_sync, translate_for_locale
 
 
 # Paths
@@ -32,10 +33,15 @@ HEX_COLOR_PATTERN = re.compile(r"^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$")
 
 _theme_cache: dict[tuple[int, str], dict[str, Any]] = {}
 DEFAULT_COLOR = discord.Color.orange()
+THEMES_I18N_PREFIX = "themes."
 
 __module_display_name__ = "Themes"
 __module_description__ = "Customize moderation DM messages with preset or custom themes."
 __module_category__ = "configuration"
+
+
+def _themes_text_sync(user_id: int | None, key: str, *, default: str, **params: str) -> str:
+    return t_sync(user_id, f"{THEMES_I18N_PREFIX}{key}", default=default, **params)
 
 
 def _load_json(path: Path, default: dict | None = None) -> dict:
@@ -228,12 +234,79 @@ def render_moderation_embed(
     reason: str = "",
     duration: str = "",
     rule: str = "",
+    recipient_user_id: int | None = None,
 ) -> discord.Embed:
     action = action.lower()
+    locale = get_user_language_sync(recipient_user_id) if recipient_user_id else DEFAULT_LOCALE
     actions = theme.get("actions", {})
     act = actions.get(action) or actions.get("ban", {})
     default = _builtin_default_theme()
     fallback = default["actions"].get(action, default["actions"]["ban"])
+
+    if locale != DEFAULT_LOCALE:
+        title = translate_for_locale(
+            locale,
+            f"moderation.{action}.dm_title",
+            default=translate_for_locale(
+                locale,
+                "moderation.dm.notice_title",
+                default=fallback.get("title", "Moderation Notice"),
+                action=action.title(),
+            ),
+        )
+        desc = translate_for_locale(
+            locale,
+            f"moderation.{action}.dm_description",
+            default=fallback.get("description", "An action was taken."),
+            guild_name=guild_name,
+            user=user_mention,
+            reason=reason or translate_for_locale(locale, "logging.embed.no_reason", default="No reason provided"),
+            duration=duration,
+            rule=rule,
+        )
+        color = _parse_color(act.get("color") or fallback.get("color"))
+        embed = discord.Embed(
+            title=_substitute(title, guild_name=guild_name, user=user_mention, reason=reason, duration=duration, rule=rule)[:256],
+            description=_substitute(desc, guild_name=guild_name, user=user_mention, reason=reason, duration=duration, rule=rule)[:4096],
+            color=color,
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(
+            name=translate_for_locale(locale, "moderation.dm.field_server", default="Server"),
+            value=guild_name or translate_for_locale(locale, "common.unknown", default="Unknown"),
+            inline=False,
+        )
+        if duration:
+            embed.add_field(
+                name=translate_for_locale(locale, "moderation.dm.field_duration", default="Duration"),
+                value=duration,
+                inline=True,
+            )
+        if rule:
+            embed.add_field(name=translate_for_locale(locale, "logging.embed.rule", default="Rule"), value=rule, inline=True)
+        no_reason = translate_for_locale(locale, "logging.embed.no_reason", default="No reason provided")
+        embed.add_field(
+            name=translate_for_locale(locale, "moderation.dm.field_reason", default="Reason"),
+            value=(reason or no_reason)[:1024],
+            inline=False,
+        )
+        if act.get("footer"):
+            embed.set_footer(
+                text=_substitute(
+                    act["footer"],
+                    guild_name=guild_name,
+                    user=user_mention,
+                    reason=reason,
+                    duration=duration,
+                    rule=rule,
+                )[:2048]
+            )
+        if act.get("thumbnail_url") and str(act["thumbnail_url"]).startswith("https://"):
+            embed.set_thumbnail(url=act["thumbnail_url"][:512])
+        if act.get("image_url") and str(act["image_url"]).startswith("https://"):
+            embed.set_image(url=act["image_url"][:512])
+        return embed
+
     title = _substitute(
         act.get("title") or fallback.get("title", "Moderation Notice"),
         guild_name=guild_name,
@@ -298,6 +371,7 @@ async def send_themed_moderation_dm(
         reason=reason or "No reason provided",
         duration=duration or "",
         rule=rule or "",
+        recipient_user_id=member.id,
     )
     try:
         await member.send(embed=embed)
@@ -320,24 +394,55 @@ def get_command_response_for_interaction(
 ) -> str:
     """Return custom response for a slash command. Uses interaction to infer guild and command name."""
     guild_id = interaction.guild.id if interaction.guild else 0
+    user_id = interaction.user.id
     command = _command_name_from_interaction(interaction)
-    return get_command_response(guild_id, command, key, default, **params)
+    return get_command_response(guild_id, command, key, default, user_id=user_id, **params)
 
 
-def get_command_response(guild_id: int, command: str, key: str, default: str, **params: str) -> str:
+def get_command_response(
+    guild_id: int,
+    command: str,
+    key: str,
+    default: str,
+    *,
+    user_id: int | None = None,
+    **params: str,
+) -> str:
     """Return custom response for a command key, or default. Supports {placeholder} substitution."""
+    locale = get_user_language_sync(user_id) if user_id else DEFAULT_LOCALE
+
+    def _from_catalog() -> str | None:
+        # Probe likely namespaces quietly; missing keys here are expected.
+        for catalog_key in (
+            f"fun.{command}.{key}",
+            f"responses.{command}.{key}",
+            f"moderation.{command}.{key}",
+        ):
+            catalog_val = lookup_string(locale, catalog_key, default="")
+            if catalog_val:
+                return _substitute(catalog_val, **params)
+        return None
+
+    # Non-English: user language wins over theme/command-response flavor overrides.
+    if locale != DEFAULT_LOCALE:
+        localized = _from_catalog()
+        if localized is not None:
+            return localized
+        return _substitute(default, **params)
+
     config = _load_json(COMMAND_RESPONSES_PATH, {"guilds": {}})
     guilds = config.get("guilds", {})
     overrides = guilds.get(str(guild_id), {})
-    if not isinstance(overrides, dict):
-        return _substitute(default, **params)
-    cmd_overrides = overrides.get(command, {})
-    if not isinstance(cmd_overrides, dict):
-        return _substitute(default, **params)
-    template = cmd_overrides.get(key)
-    if not isinstance(template, str):
-        return _substitute(default, **params)
-    return _substitute(template, **params)
+    if isinstance(overrides, dict):
+        cmd_overrides = overrides.get(command, {})
+        if isinstance(cmd_overrides, dict):
+            template = cmd_overrides.get(key)
+            if isinstance(template, str):
+                return _substitute(template, **params)
+    localized = _from_catalog()
+    if localized is not None:
+        return localized
+    return _substitute(default, **params)
 
 
 def validate_command_responses_json(data: dict | None) -> tuple[bool, str]:
@@ -432,19 +537,26 @@ def list_available_themes(guild_id: int) -> list[str]:
 
 async def _guild_only(interaction: discord.Interaction) -> bool:
     if interaction.guild is None:
-        await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+        await interaction.response.send_message(t_sync(interaction.user.id, "common.guild_only"), ephemeral=True)
         return False
     return True
 
 
-theme_group = app_commands.Group(name="theme", description="Moderation message themes")
+theme_group = app_commands.Group(
+    name="theme",
+    description="Moderation message themes",
+)
 
 
-@theme_group.command(name="list", description="List available themes (moderation DMs + command responses)")
+@theme_group.command(
+    name="list",
+    description="List available themes (moderation DMs + command responses)",
+)
 async def theme_list(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
         return
     guild_id = interaction.guild.id
+    user_id = interaction.user.id
     config = _load_json(THEMES_CONFIG_PATH, {"guilds": {}})
     current_mod = config.get("guilds", {}).get(str(guild_id), "default")
     presets = list_preset_themes()
@@ -466,12 +578,16 @@ async def theme_list(interaction: discord.Interaction) -> None:
             scope = ""
         lines.append(f"• **{name}**{badge}{custom_badge}{scope}")
     embed = discord.Embed(
-        title="Available Themes",
-        description="\n".join(lines) if lines else "No themes found. Default theme will be used.",
+        title=_themes_text_sync(user_id, "list_title", default="Available Themes"),
+        description="\n".join(lines)
+        if lines
+        else _themes_text_sync(user_id, "list_empty", default="No themes found. Default theme will be used."),
         color=discord.Color.blurple(),
         timestamp=discord.utils.utcnow(),
     )
-    embed.set_footer(text="Use /theme set <name> to apply (moderation DMs + command responses)")
+    embed.set_footer(
+        text=_themes_text_sync(user_id, "list_footer", default="Use /theme set <name> to apply (moderation DMs + command responses)")
+    )
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
@@ -489,20 +605,35 @@ def _theme_has_responses(name: str) -> bool:
     return load_response_theme(name) is not None
 
 
-@theme_group.command(name="set", description="Set the server theme (moderation DMs + command responses)")
+@theme_group.command(
+    name="set",
+    description="Set the server theme (moderation DMs + command responses)",
+)
 @app_commands.describe(name="Theme name to apply")
 async def theme_set(interaction: discord.Interaction, name: str) -> None:
     if not await _guild_only(interaction):
         return
     guild_id = interaction.guild.id
+    user_id = interaction.user.id
     safe = _sanitize_theme_name(name)
     if not safe:
-        await interaction.response.send_message("Invalid theme name. Use only letters, numbers, hyphens, and underscores.", ephemeral=True)
+        await interaction.response.send_message(
+            _themes_text_sync(user_id, "invalid_theme_name", default="Invalid theme name. Use only letters, numbers, hyphens, and underscores."),
+            ephemeral=True,
+        )
         return
     has_mod = _theme_has_moderation(safe)
     has_resp = _theme_has_responses(safe)
     if not has_mod and not has_resp:
-        await interaction.response.send_message(f"Theme `{safe}` not found. Use /theme list to see available themes.", ephemeral=True)
+        await interaction.response.send_message(
+            _themes_text_sync(
+                user_id,
+                "theme_not_found_list_hint",
+                default="Theme `{theme}` not found. Use /theme list to see available themes.",
+                theme=safe,
+            ),
+            ephemeral=True,
+        )
         return
 
     parts = []
@@ -518,25 +649,35 @@ async def theme_set(interaction: discord.Interaction, name: str) -> None:
     else:
         clear_guild_command_responses(guild_id)
 
-    msg = f"Theme set to **{safe}**."
+    msg = _themes_text_sync(user_id, "set_success", default="Theme set to **{theme}**.", theme=safe)
     if parts:
-        msg += f" Applied: {', '.join(parts)}."
+        msg += _themes_text_sync(user_id, "set_applied_parts", default=" Applied: {parts}.", parts=", ".join(parts))
     await interaction.response.send_message(msg, ephemeral=True)
 
 
-@theme_group.command(name="preview", description="Preview a theme's moderation messages")
+@theme_group.command(
+    name="preview",
+    description="Preview a theme's moderation messages",
+)
 @app_commands.describe(name="Theme name to preview")
 async def theme_preview(interaction: discord.Interaction, name: str) -> None:
     if not await _guild_only(interaction):
         return
     guild_id = interaction.guild.id
+    user_id = interaction.user.id
     safe = _sanitize_theme_name(name)
     if not safe:
-        await interaction.response.send_message("Invalid theme name.", ephemeral=True)
+        await interaction.response.send_message(
+            _themes_text_sync(user_id, "invalid_theme_name_short", default="Invalid theme name."),
+            ephemeral=True,
+        )
         return
     theme = load_theme(guild_id, safe)
     if not theme:
-        await interaction.response.send_message(f"Theme `{safe}` not found.", ephemeral=True)
+        await interaction.response.send_message(
+            _themes_text_sync(user_id, "theme_not_found", default="Theme `{theme}` not found.", theme=safe),
+            ephemeral=True,
+        )
         return
     guild_name = interaction.guild.name
     user = interaction.user.mention
@@ -555,62 +696,99 @@ async def theme_preview(interaction: discord.Interaction, name: str) -> None:
     await interaction.response.send_message(embeds=embeds, ephemeral=True)
 
 
-@theme_group.command(name="info", description="Show current theme and settings")
+@theme_group.command(
+    name="info",
+    description="Show current theme and settings",
+)
 async def theme_info(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
         return
     guild_id = interaction.guild.id
+    user_id = interaction.user.id
     config = _load_json(THEMES_CONFIG_PATH, {"guilds": {}})
     mod_theme = config.get("guilds", {}).get(str(guild_id), "default")
     theme = get_active_theme(guild_id)
-    desc = theme.get("description", "No description.")
+    desc = theme.get("description", _themes_text_sync(user_id, "no_description", default="No description."))
     is_custom = mod_theme in list_custom_themes(guild_id)
     overrides = get_guild_command_responses(guild_id)
-    resp_status = f"{len(overrides)} command(s)" if overrides else "None (default messages)"
+    resp_status = (
+        _themes_text_sync(user_id, "command_count", default="{count} command(s)", count=str(len(overrides)))
+        if overrides
+        else _themes_text_sync(user_id, "none_default_messages", default="None (default messages)")
+    )
     embed = discord.Embed(
-        title="Theme Info",
+        title=_themes_text_sync(user_id, "info_title", default="Theme Info"),
         color=discord.Color.blurple(),
         timestamp=discord.utils.utcnow(),
     )
-    embed.add_field(name="Moderation DMs", value=mod_theme, inline=True)
-    embed.add_field(name="Command Responses", value=resp_status, inline=True)
-    embed.add_field(name="Type", value="Custom" if is_custom else "Preset", inline=True)
-    embed.add_field(name="Description", value=desc[:1024], inline=False)
+    embed.add_field(name=_themes_text_sync(user_id, "field_moderation_dms", default="Moderation DMs"), value=mod_theme, inline=True)
+    embed.add_field(name=_themes_text_sync(user_id, "field_command_responses", default="Command Responses"), value=resp_status, inline=True)
+    embed.add_field(
+        name=_themes_text_sync(user_id, "field_type", default="Type"),
+        value=_themes_text_sync(user_id, "type_custom", default="Custom") if is_custom else _themes_text_sync(user_id, "type_preset", default="Preset"),
+        inline=True,
+    )
+    embed.add_field(name=_themes_text_sync(user_id, "field_description", default="Description"), value=desc[:1024], inline=False)
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-@theme_group.command(name="upload", description="Upload a custom theme (supporters only)")
+@theme_group.command(
+    name="upload",
+    description="Upload a custom theme (supporters only)",
+)
 @app_commands.describe(file="JSON theme file (max 50KB)")
 async def theme_upload(interaction: discord.Interaction, file: discord.Attachment) -> None:
     if not await _guild_only(interaction):
         return
     if not _supporter_active(interaction.user.id):
         await interaction.response.send_message(
-            "Custom themes require Ko-fi supporter status. Use /kofi link to get perks.",
+            _themes_text_sync(
+                interaction.user.id,
+                "supporter_required_custom_themes",
+                default="Custom themes require Ko-fi supporter status. Use /kofi link to get perks.",
+            ),
             ephemeral=True,
         )
         return
     guild_id = interaction.guild.id
+    user_id = interaction.user.id
     if file.size > MAX_THEME_FILE_BYTES:
         await interaction.response.send_message(
-            f"Theme file exceeds 50KB limit ({file.size} bytes).",
+            _themes_text_sync(
+                guild_id,
+                "theme_file_too_large",
+                default="Theme file exceeds 50KB limit ({bytes} bytes).",
+                bytes=str(file.size),
+            ),
             ephemeral=True,
         )
         return
     if not file.filename.lower().endswith(".json"):
-        await interaction.response.send_message("Theme file must be a .json file.", ephemeral=True)
+        await interaction.response.send_message(
+            _themes_text_sync(user_id, "theme_file_must_be_json", default="Theme file must be a .json file."),
+            ephemeral=True,
+        )
         return
     theme_name = _sanitize_theme_name(Path(file.filename).stem)
     if not theme_name:
         await interaction.response.send_message(
-            "Invalid theme name. Filename (without .json) must use only letters, numbers, hyphens, and underscores.",
+            _themes_text_sync(
+                guild_id,
+                "invalid_theme_filename",
+                default="Invalid theme name. Filename (without .json) must use only letters, numbers, hyphens, and underscores.",
+            ),
             ephemeral=True,
         )
         return
     custom_count = len(list_custom_themes(guild_id))
     if custom_count >= MAX_CUSTOM_THEMES_PER_GUILD and theme_name not in list_custom_themes(guild_id):
         await interaction.response.send_message(
-            f"Maximum {MAX_CUSTOM_THEMES_PER_GUILD} custom themes per server. Delete one with /theme delete first.",
+            _themes_text_sync(
+                guild_id,
+                "max_custom_themes_reached",
+                default="Maximum {max_count} custom themes per server. Delete one with /theme delete first.",
+                max_count=str(MAX_CUSTOM_THEMES_PER_GUILD),
+            ),
             ephemeral=True,
         )
         return
@@ -639,35 +817,62 @@ async def theme_upload(interaction: discord.Interaction, file: discord.Attachmen
         return
     json_cache.invalidate(out_path)
     _invalidate_guild_cache(guild_id)
-    await interaction.followup.send(f"Custom theme **{theme_name}** uploaded. Use /theme set {theme_name} to apply.", ephemeral=True)
+    await interaction.followup.send(
+        _themes_text_sync(
+            guild_id,
+            "custom_theme_uploaded",
+            default="Custom theme **{theme}** uploaded. Use /theme set {theme} to apply.",
+            theme=theme_name,
+        ),
+        ephemeral=True,
+    )
 
 
-@theme_group.command(name="delete", description="Delete a custom theme (supporters only)")
+@theme_group.command(
+    name="delete",
+    description="Delete a custom theme (supporters only)",
+)
 @app_commands.describe(name="Custom theme name to delete")
 async def theme_delete(interaction: discord.Interaction, name: str) -> None:
     if not await _guild_only(interaction):
         return
     if not _supporter_active(interaction.user.id):
         await interaction.response.send_message(
-            "Custom themes require Ko-fi supporter status. Use /kofi link to get perks.",
+            _themes_text_sync(
+                interaction.user.id,
+                "supporter_required_custom_themes",
+                default="Custom themes require Ko-fi supporter status. Use /kofi link to get perks.",
+            ),
             ephemeral=True,
         )
         return
     guild_id = interaction.guild.id
+    user_id = interaction.user.id
     safe = _sanitize_theme_name(name)
     if not safe:
-        await interaction.response.send_message("Invalid theme name.", ephemeral=True)
+        await interaction.response.send_message(
+            _themes_text_sync(user_id, "invalid_theme_name_short", default="Invalid theme name."),
+            ephemeral=True,
+        )
         return
     custom_themes = list_custom_themes(guild_id)
     if safe not in custom_themes:
         await interaction.response.send_message(
-            f"`{safe}` is not a custom theme. You can only delete custom themes (uploaded by /theme upload).",
+            _themes_text_sync(
+                guild_id,
+                "delete_not_custom_theme",
+                default="`{theme}` is not a custom theme. You can only delete custom themes (uploaded by /theme upload).",
+                theme=safe,
+            ),
             ephemeral=True,
         )
         return
     custom_path = THEME_STORAGE_DIR / str(guild_id) / f"{safe}.json"
     if not custom_path.exists():
-        await interaction.response.send_message(f"Theme `{safe}` not found.", ephemeral=True)
+        await interaction.response.send_message(
+            _themes_text_sync(user_id, "theme_not_found", default="Theme `{theme}` not found.", theme=safe),
+            ephemeral=True,
+        )
         return
     try:
         custom_path.unlink()
@@ -681,48 +886,75 @@ async def theme_delete(interaction: discord.Interaction, name: str) -> None:
         guilds[str(guild_id)] = "default"
         _save_json(THEMES_CONFIG_PATH, config)
     _invalidate_guild_cache(guild_id)
-    await interaction.response.send_message(f"Custom theme **{safe}** deleted. Server theme reset to default.", ephemeral=True)
+    await interaction.response.send_message(
+        _themes_text_sync(
+            guild_id,
+            "custom_theme_deleted",
+            default="Custom theme **{theme}** deleted. Server theme reset to default.",
+            theme=safe,
+        ),
+        ephemeral=True,
+    )
 
 
 # ---------- Command response overrides (nested group) ----------
-responses_group = app_commands.Group(name="responses", description="Customize command response messages")
+responses_group = app_commands.Group(
+    name="responses",
+    description="Customize command response messages",
+)
 
 
-@responses_group.command(name="presets", description="List preset response themes (use /theme set to apply)")
+@responses_group.command(
+    name="presets",
+    description="List preset response themes (use /theme set to apply)",
+)
 async def responses_presets(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
         return
     themes = list_response_themes()
     if not themes:
-        await interaction.response.send_message("No preset response themes found.", ephemeral=True)
+        await interaction.response.send_message(
+            _themes_text_sync(interaction.user.id, "responses_presets_empty", default="No preset response themes found."),
+            ephemeral=True,
+        )
         return
     lines = []
     for name in themes:
         data = load_response_theme(name)
         if data:
-            desc = data.get("description", "No description.")
+            desc = data.get("description", _themes_text_sync(interaction.user.id, "no_description", default="No description."))
             lines.append(f"• **{name}** — {desc}")
         else:
             lines.append(f"• **{name}**")
     embed = discord.Embed(
-        title="Preset Response Themes",
+        title=_themes_text_sync(interaction.user.id, "responses_presets_title", default="Preset Response Themes"),
         description="\n".join(lines),
         color=discord.Color.blurple(),
         timestamp=discord.utils.utcnow(),
     )
-    embed.set_footer(text="Use /theme set <name> to apply (moderation DMs + command responses)")
+    embed.set_footer(
+        text=_themes_text_sync(interaction.user.id, "list_footer", default="Use /theme set <name> to apply (moderation DMs + command responses)")
+    )
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-@responses_group.command(name="list", description="List configured command response overrides")
+@responses_group.command(
+    name="list",
+    description="List configured command response overrides",
+)
 async def responses_list(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
         return
     guild_id = interaction.guild.id
+    user_id = interaction.user.id
     overrides = get_guild_command_responses(guild_id)
     if not overrides:
         await interaction.response.send_message(
-            "No command response overrides. Use /theme responses upload to add custom responses.",
+            _themes_text_sync(
+                guild_id,
+                "responses_list_empty",
+                default="No command response overrides. Use /theme responses upload to add custom responses.",
+            ),
             ephemeral=True,
         )
         return
@@ -732,35 +964,48 @@ async def responses_list(interaction: discord.Interaction) -> None:
             preview = (v[:50] + "…") if len(v) > 50 else v
             lines.append(f"• **{cmd}.{k}**: `{preview}`")
     embed = discord.Embed(
-        title="Command Response Overrides",
-        description="\n".join(lines) if lines else "None",
+        title=_themes_text_sync(user_id, "responses_list_title", default="Command Response Overrides"),
+        description="\n".join(lines) if lines else t_sync(user_id, "common.none", default="None"),
         color=discord.Color.blurple(),
         timestamp=discord.utils.utcnow(),
     )
-    embed.set_footer(text="Supporters can upload JSON via /theme responses upload")
+    embed.set_footer(
+        text=_themes_text_sync(user_id, "responses_list_footer", default="Supporters can upload JSON via /theme responses upload")
+    )
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-@responses_group.command(name="upload", description="Upload command response overrides JSON (supporters only)")
+@responses_group.command(
+    name="upload",
+    description="Upload command response overrides JSON (supporters only)",
+)
 @app_commands.describe(file="JSON file with overrides (max 100KB)")
 async def responses_upload(interaction: discord.Interaction, file: discord.Attachment) -> None:
     if not await _guild_only(interaction):
         return
     if not _supporter_active(interaction.user.id):
         await interaction.response.send_message(
-            "Command response overrides require Ko-fi supporter status. Use /kofi link to get perks.",
+            _themes_text_sync(
+                interaction.user.id,
+                "supporter_required_response_overrides",
+                default="Command response overrides require Ko-fi supporter status. Use /kofi link to get perks.",
+            ),
             ephemeral=True,
         )
         return
     guild_id = interaction.guild.id
+    user_id = interaction.user.id
     if file.size > MAX_RESPONSES_FILE_BYTES:
         await interaction.response.send_message(
-            f"File exceeds 100KB limit ({file.size} bytes).",
+            _themes_text_sync(user_id, "responses_file_too_large", default="File exceeds 100KB limit ({bytes} bytes).", bytes=str(file.size)),
             ephemeral=True,
         )
         return
     if not file.filename.lower().endswith(".json"):
-        await interaction.response.send_message("File must be a .json file.", ephemeral=True)
+        await interaction.response.send_message(
+            _themes_text_sync(user_id, "responses_file_must_be_json", default="File must be a .json file."),
+            ephemeral=True,
+        )
         return
     await interaction.response.defer(ephemeral=True)
     try:
@@ -780,7 +1025,12 @@ async def responses_upload(interaction: discord.Interaction, file: discord.Attac
     set_guild_command_responses(guild_id, overrides)
     count = sum(len(v) for v in overrides.values() if isinstance(v, dict))
     await interaction.followup.send(
-        f"✅ Uploaded {count} command response override(s). See docs for available keys.",
+        _themes_text_sync(
+            guild_id,
+            "responses_upload_success",
+            default="✅ Uploaded {count} command response override(s). See docs for available keys.",
+            count=str(count),
+        ),
         ephemeral=True,
     )
 
@@ -803,23 +1053,34 @@ def _collect_slash_commands(tree: discord.app_commands.CommandTree) -> list[str]
     return sorted(set(names))
 
 
-@responses_group.command(name="discover", description="List all slash commands you can override")
+@responses_group.command(
+    name="discover",
+    description="List all slash commands you can override",
+)
 async def responses_discover(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
         return
     tree = interaction.client.tree
     names = _collect_slash_commands(tree)
     if not names:
-        await interaction.response.send_message("No slash commands found.", ephemeral=True)
+        await interaction.response.send_message(
+            _themes_text_sync(interaction.user.id, "responses_discover_empty", default="No slash commands found."),
+            ephemeral=True,
+        )
         return
     # Split into chunks of 20 for embed
     chunk = names[:30]
     desc = "Use these as command keys in your JSON. Use keys like `success`, `success_permanent`, `error`.\n\n"
     desc += "`" + "`, `".join(chunk) + "`"
     if len(names) > 30:
-        desc += f"\n\n...and {len(names) - 30} more. Run `/theme responses keys` for common keys."
+        desc += _themes_text_sync(
+            interaction.user.id,
+            "responses_discover_more",
+            default="\n\n...and {count} more. Run `/theme responses keys` for common keys.",
+            count=str(len(names) - 30),
+        )
     embed = discord.Embed(
-        title="Slash Commands (Overrideable)",
+        title=_themes_text_sync(interaction.user.id, "responses_discover_title", default="Slash Commands (Overrideable)"),
         description=desc,
         color=discord.Color.blurple(),
         timestamp=discord.utils.utcnow(),
@@ -827,7 +1088,10 @@ async def responses_discover(interaction: discord.Interaction) -> None:
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-@responses_group.command(name="keys", description="List common response keys and override format")
+@responses_group.command(
+    name="keys",
+    description="List common response keys and override format",
+)
 async def responses_keys(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
         return
@@ -842,7 +1106,7 @@ async def responses_keys(interaction: discord.Interaction) -> None:
         "Prefix commands (`.synccommands`, etc.) cannot be overridden."
     )
     embed = discord.Embed(
-        title="Command Response Keys",
+        title=_themes_text_sync(interaction.user.id, "responses_keys_title", default="Command Response Keys"),
         description=known,
         color=discord.Color.blurple(),
         timestamp=discord.utils.utcnow(),
@@ -850,19 +1114,30 @@ async def responses_keys(interaction: discord.Interaction) -> None:
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-@responses_group.command(name="clear", description="Clear all command response overrides (supporters only)")
+@responses_group.command(
+    name="clear",
+    description="Clear all command response overrides (supporters only)",
+)
 async def responses_clear(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
         return
     if not _supporter_active(interaction.user.id):
         await interaction.response.send_message(
-            "Clearing overrides requires Ko-fi supporter status.",
+            _themes_text_sync(
+                interaction.user.id,
+                "supporter_required_clear_overrides",
+                default="Clearing overrides requires Ko-fi supporter status.",
+            ),
             ephemeral=True,
         )
         return
     guild_id = interaction.guild.id
+    user_id = interaction.user.id
     clear_guild_command_responses(guild_id)
-    await interaction.response.send_message("Command response overrides cleared.", ephemeral=True)
+    await interaction.response.send_message(
+        _themes_text_sync(user_id, "responses_cleared", default="Command response overrides cleared."),
+        ephemeral=True,
+    )
 
 
 # Add responses subgroup to theme group

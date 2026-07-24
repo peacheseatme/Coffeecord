@@ -13,9 +13,11 @@ from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFont, ImageSequence
 
 from . import anti_abuse
+from Modules.i18n import t, t_sync
 from .json_cache import get as _json_get, set_ as _json_set
 from .module_registry import is_module_enabled
 from .themes import get_command_response_for_interaction
+from .log_actor import log_actor_from_interaction
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 XP_FILE = BASE_DIR / "Storage" / "Data" / "xp.json"
@@ -104,6 +106,9 @@ def _render_levelcard_sync(
     status_color: tuple[int, int, int, int],
     cached_path: Path,
     render_gif: bool,
+    level_label: str,
+    rank_label: str,
+    xp_label: str,
 ) -> Path:
     """Run PIL level card rendering in thread pool to avoid blocking event loop."""
     if bg_is_gif:
@@ -154,6 +159,9 @@ def _render_levelcard_sync(
 
     output_frames = []
     for frame in frames:
+        plate = Image.new("RGBA", frame.size, LEVELCARD_CANVAS_BG)
+        plate.alpha_composite(frame)
+        frame = plate
         draw = ImageDraw.Draw(frame)
         draw.rounded_rectangle((content_left, bar_top, content_right, bar_bottom), radius=bar_radius, fill=track_rgb)
         fill_width = int((content_right - content_left) * progress)
@@ -170,10 +178,10 @@ def _render_levelcard_sync(
             draw.ellipse((dot_center_x - 13, dot_center_y - 13, dot_center_x + 13, dot_center_y + 13), fill=(32, 34, 37, 255))
             draw.ellipse((dot_center_x - 10, dot_center_y - 10, dot_center_x + 10, dot_center_y + 10), fill=status_color)
 
-        level_text = f"Level {level}"
-        rank_text = f"Rank #{rank}"
+        level_text = f"{level_label} {level}"
+        rank_text = f"{rank_label} #{rank}"
         xp_display = max(0, min(xp, xp_for_next_level))
-        xp_text = f"XP: {xp_display:,} / {xp_for_next_level:,}"
+        xp_text = f"{xp_label}: {xp_display:,} / {xp_for_next_level:,}"
 
         draw.text((content_left, top_y), display_name, font=name_font, fill=name_color, stroke_width=2, stroke_fill=stroke_color)
         level_bbox = draw.textbbox((0, 0), level_text, font=level_font)
@@ -185,7 +193,7 @@ def _render_levelcard_sync(
         output_frames.append(frame)
 
     if render_gif:
-        output_frames[0].save(str(cached_path), save_all=True, append_images=output_frames[1:], duration=duration, loop=0, disposal=2)
+        output_frames[0].save(str(cached_path), save_all=True, append_images=output_frames[1:], duration=duration, loop=0, disposal=1)
     else:
         output_frames[0].save(str(cached_path))
     return cached_path
@@ -193,6 +201,17 @@ def _render_levelcard_sync(
 
 LEVELCARD_CACHE_TTL_SECONDS = 10 * 60
 LEVELCARD_CACHE_RETENTION_SECONDS = 30 * 60
+LEVELCARD_CANVAS_BG = (30, 30, 30, 255)
+LEVELCARD_IMAGE_EXTENSIONS = (".gif", ".png", ".jpg", ".jpeg", ".webp", ".bmp")
+LEVELCARD_IMAGE_MAGIC = (b"GIF87a", b"GIF89a", b"\x89PNG", b"\xff\xd8\xff")
+LEVELCARD_STATUS_COLORS = {
+    "online": (67, 181, 129, 255),
+    "idle": (250, 166, 26, 255),
+    "dnd": (240, 71, 71, 255),
+    "do_not_disturb": (240, 71, 71, 255),
+    "offline": (116, 127, 141, 255),
+    "invisible": (116, 127, 141, 255),
+}
 DEFAULT_LEVELCARD_BG_URL = "https://media1.tenor.com/m/CPKRTsSr14kAAAAd/rick-astley.gif"
 DEFAULT_LEVELCARD_STYLE: dict[str, str] = {
     "name_text": "#50FF78",
@@ -272,6 +291,50 @@ def _hex_to_rgba(hex_color: str, alpha: int = 255) -> tuple[int, int, int, int]:
     normalized = _normalize_hex_color(hex_color) or "#FFFFFF"
     rgb = normalized.lstrip("#")
     return int(rgb[0:2], 16), int(rgb[2:4], 16), int(rgb[4:6], 16), alpha
+
+
+def _looks_like_image_bytes(header: bytes) -> bool:
+    if any(header.startswith(magic) for magic in LEVELCARD_IMAGE_MAGIC):
+        return True
+    return len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WEBP"
+
+
+def _url_has_image_extension(url: str) -> bool:
+    path = url.split("?", 1)[0].lower()
+    return any(path.endswith(ext) for ext in LEVELCARD_IMAGE_EXTENSIONS)
+
+
+async def _validate_levelcard_image_url(session: aiohttp.ClientSession, url: str) -> bool:
+    """Validate a remote image URL (Tenor and similar CDNs often 404 on HEAD)."""
+    headers = {"Range": "bytes=0-1023"}
+    try:
+        async with session.get(url, allow_redirects=True, headers=headers) as resp:
+            if resp.status not in (200, 206):
+                return False
+            content_type = str(resp.headers.get("Content-Type", "")).split(";", 1)[0].strip().lower()
+            if content_type.startswith("image/"):
+                return True
+            body = await resp.content.read(16)
+            if _looks_like_image_bytes(body):
+                return True
+            return _url_has_image_extension(url) and bool(body)
+    except Exception:
+        return False
+
+
+def _member_status_key(member: discord.abc.User) -> str:
+    raw = getattr(member, "raw_status", None)
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip().lower()
+    status = getattr(member, "status", None)
+    if isinstance(status, discord.Status):
+        return status.value
+    if status is not None:
+        text = str(status).lower()
+        if text.startswith("status."):
+            return text.split(".", 1)[-1]
+        return text
+    return "offline"
 
 
 def _get_levelcard_config(user_id: str) -> tuple[str, dict[str, str]]:
@@ -385,7 +448,14 @@ async def _check_level_up(bot: commands.Bot, guild_id: str, user_id: str, channe
     if isinstance(channel, discord.TextChannel):
         guild = channel.guild
         try:
-            await channel.send(f"🎉 <@{user_id}> has leveled up to **Level {user_data['level']}**!")
+            await channel.send(
+                await t(
+                    guild.id,
+                    "leveling.level_up_announcement",
+                    user=f"<@{user_id}>",
+                    level=str(user_data["level"]),
+                )
+            )
         except discord.HTTPException:
             pass
         await _dispatch_module_event(
@@ -426,7 +496,12 @@ async def _check_level_up(bot: commands.Bot, guild_id: str, user_id: str, channe
                 except discord.HTTPException:
                     pass
 
-    message_tpl = str(reward.get("message", "🎉 {user} reached level {level} and earned {role}!"))
+    message_tpl = str(
+        reward.get(
+            "message",
+            await t(guild.id, "leveling.default_reward_message"),
+        )
+    )
     content = (
         message_tpl.replace("{user}", member.mention)
         .replace("{role}", role.mention)
@@ -563,9 +638,18 @@ class LevelingCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    xp_group = app_commands.Group(name="xp", description="XP and leveling configuration commands")
-    levelreward_group = app_commands.Group(name="levelreward", description="Level reward role commands")
-    levelcard_group = app_commands.Group(name="levelcard", description="Level card customization commands")
+    xp_group = app_commands.Group(
+        name="xp",
+        description="XP and leveling configuration commands",
+)
+    levelreward_group = app_commands.Group(
+        name="levelreward",
+        description="Level reward role commands",
+)
+    levelcard_group = app_commands.Group(
+        name="levelcard",
+        description="Level card customization commands",
+)
 
     @levelcard_group.command(name="customize", description="Customize your level card background and colors.")
     @app_commands.describe(
@@ -593,11 +677,11 @@ class LevelingCog(commands.Cog):
         stroke: Optional[str] = None,
     ) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         if not await is_module_enabled(interaction.guild.id, "leveling"):
             await interaction.response.send_message(
-                "This module is currently disabled. An admin can enable it with /modules.",
+                await t(interaction.user.id, "common.module_disabled"),
                 ephemeral=True,
             )
             return
@@ -609,19 +693,21 @@ class LevelingCog(commands.Cog):
             if session is None:
                 session = aiohttp.ClientSession()
             try:
-                async with session.head(url, allow_redirects=True) as resp:
-                    if resp.status != 200 or not str(resp.headers.get("Content-Type", "")).startswith("image/"):
-                        await interaction.response.send_message("❌ Invalid image URL.", ephemeral=True)
-                        return
-            except Exception:
-                await interaction.response.send_message("❌ Invalid image URL.", ephemeral=True)
-                return
+                if not await _validate_levelcard_image_url(session, url):
+                    await interaction.response.send_message(
+                        await t(interaction.user.id, "leveling.levelcard.invalid_image_url"),
+                        ephemeral=True,
+                    )
+                    return
             finally:
                 if close_session:
                     await session.close()
 
             if url.lower().endswith(".gif") and not _supporter_active(interaction.user.id):
-                await interaction.response.send_message("🚫 Only supporters can use GIF backgrounds.", ephemeral=True)
+                await interaction.response.send_message(
+                    await t(interaction.user.id, "leveling.levelcard.supporter_gif_only"),
+                    ephemeral=True,
+                )
                 return
             updates["background_url"] = url
 
@@ -641,7 +727,11 @@ class LevelingCog(commands.Cog):
             parsed = _normalize_hex_color(raw_value)
             if parsed is None:
                 await interaction.response.send_message(
-                    f"❌ Invalid color for `{key}`. Use hex like `#50FF78`.",
+                    await t(
+                        interaction.guild.id,
+                        "leveling.levelcard.invalid_color",
+                        key=key,
+                    ),
                     ephemeral=True,
                 )
                 return
@@ -649,7 +739,7 @@ class LevelingCog(commands.Cog):
 
         if not updates:
             await interaction.response.send_message(
-                "ℹ️ No changes provided. Set at least one color or a URL.",
+                await t(interaction.user.id, "leveling.levelcard.no_changes"),
                 ephemeral=True,
             )
             return
@@ -660,7 +750,7 @@ class LevelingCog(commands.Cog):
             interaction.guild,
             "leveling",
             "levelcard_customize",
-            actor=interaction.user,
+            actor=log_actor_from_interaction(interaction),
             details="; ".join(f"{k}={v}" for k, v in updates.items()),
             channel_id=interaction.channel.id if interaction.channel else None,
         )
@@ -668,7 +758,7 @@ class LevelingCog(commands.Cog):
         msg = get_command_response_for_interaction(
             interaction,
             "success",
-            "✅ Level card updated: {preview}",
+            await t(interaction.user.id, "leveling.levelcard.updated_response"),
             preview=preview,
         )
         await interaction.response.send_message(msg, ephemeral=True)
@@ -694,11 +784,11 @@ class LevelingCog(commands.Cog):
         url: Optional[str] = None,
     ) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         if not await is_module_enabled(interaction.guild.id, "leveling"):
             await interaction.response.send_message(
-                "This module is currently disabled. An admin can enable it with /modules.",
+                await t(interaction.user.id, "common.module_disabled"),
                 ephemeral=True,
             )
             return
@@ -706,7 +796,10 @@ class LevelingCog(commands.Cog):
         preset_key = preset.value
         colors = LEVELCARD_PRESETS.get(preset_key)
         if colors is None:
-            await interaction.response.send_message("❌ Unknown preset selected.", ephemeral=True)
+            await interaction.response.send_message(
+                await t(interaction.user.id, "leveling.levelcard.unknown_preset"),
+                ephemeral=True,
+            )
             return
 
         updates: dict[str, str] = dict(colors)
@@ -716,19 +809,21 @@ class LevelingCog(commands.Cog):
             if session is None:
                 session = aiohttp.ClientSession()
             try:
-                async with session.head(url, allow_redirects=True) as resp:
-                    if resp.status != 200 or not str(resp.headers.get("Content-Type", "")).startswith("image/"):
-                        await interaction.response.send_message("❌ Invalid image URL.", ephemeral=True)
-                        return
-            except Exception:
-                await interaction.response.send_message("❌ Invalid image URL.", ephemeral=True)
-                return
+                if not await _validate_levelcard_image_url(session, url):
+                    await interaction.response.send_message(
+                        await t(interaction.user.id, "leveling.levelcard.invalid_image_url"),
+                        ephemeral=True,
+                    )
+                    return
             finally:
                 if close_session:
                     await session.close()
 
             if url.lower().endswith(".gif") and not _supporter_active(interaction.user.id):
-                await interaction.response.send_message("🚫 Only supporters can use GIF backgrounds.", ephemeral=True)
+                await interaction.response.send_message(
+                    await t(interaction.user.id, "leveling.levelcard.supporter_gif_only"),
+                    ephemeral=True,
+                )
                 return
             updates["background_url"] = url
 
@@ -738,24 +833,31 @@ class LevelingCog(commands.Cog):
             interaction.guild,
             "leveling",
             "levelcard_preset",
-            actor=interaction.user,
+            actor=log_actor_from_interaction(interaction),
             details=f"preset={preset_key}; background_set={url is not None}",
             channel_id=interaction.channel.id if interaction.channel else None,
         )
         await interaction.response.send_message(
-            f"✅ Applied `{preset.name}` preset to your level card.",
+            await t(
+                interaction.guild.id,
+                "leveling.levelcard.applied_preset",
+                preset=preset.name,
+            ),
             ephemeral=True,
         )
 
-    @app_commands.command(name="level", description="Show your or another user's level card.")
+    @app_commands.command(
+        name="level",
+        description="Show your or another user's level card.",
+)
     @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)
     async def level(self, interaction: discord.Interaction, user: Optional[discord.Member] = None) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         if not await is_module_enabled(interaction.guild.id, "leveling"):
             await interaction.response.send_message(
-                "This module is currently disabled. An admin can enable it with /modules.",
+                await t(interaction.user.id, "common.module_disabled"),
                 ephemeral=True,
             )
             return
@@ -782,18 +884,9 @@ class LevelingCog(commands.Cog):
             reverse=True,
         )
         rank = next((i + 1 for i, (uid, _) in enumerate(sorted_users) if uid == user_id), 0)
-        guild_member = interaction.guild.get_member(target.id)
-        status_source = guild_member or target
-        raw_status_value = getattr(status_source, "raw_status", None)
-        status_value = getattr(status_source, "status", None)
-        status_key = str(raw_status_value or status_value or "offline").lower()
-        status_color = {
-            "online": (67, 181, 129, 255),
-            "idle": (250, 166, 26, 255),
-            "dnd": (240, 71, 71, 255),
-            "offline": (116, 127, 141, 255),
-            "invisible": (116, 127, 141, 255),
-        }.get(status_key, (116, 127, 141, 255))
+        status_source = interaction.guild.get_member(target.id) or target
+        status_key = _member_status_key(status_source)
+        status_color = LEVELCARD_STATUS_COLORS.get(status_key, LEVELCARD_STATUS_COLORS["offline"])
 
         cache_payload = {
             "guild_id": guild_id,
@@ -835,11 +928,21 @@ class LevelingCog(commands.Cog):
             try:
                 async with session.get(bg_url) as resp:
                         if resp.status != 200:
-                            await interaction.followup.send("❌ Failed to download background.", ephemeral=True)
+                            await interaction.followup.send(
+                                await t(interaction.user.id, "leveling.levelcard.download_failed"),
+                                ephemeral=True,
+                            )
                             return
                         bg_bytes = await resp.read()
             except Exception as e:
-                await interaction.followup.send(f"❌ Error loading background: {e}", ephemeral=True)
+                await interaction.followup.send(
+                    await t(
+                        interaction.guild.id,
+                        "leveling.levelcard.load_error",
+                        error=str(e),
+                    ),
+                    ephemeral=True,
+                )
                 return
             finally:
                 if close_session:
@@ -852,6 +955,9 @@ class LevelingCog(commands.Cog):
                 pass
 
             try:
+                level_label = await t(interaction.user.id, "leveling.level_card_label_level")
+                rank_label = await t(interaction.user.id, "leveling.level_card_label_rank")
+                xp_label = await t(interaction.user.id, "leveling.level_card_label_xp")
                 await asyncio.to_thread(
                     _render_levelcard_sync,
                     bg_bytes,
@@ -867,21 +973,34 @@ class LevelingCog(commands.Cog):
                     status_color,
                     cached_path,
                     render_gif,
+                    level_label,
+                    rank_label,
+                    xp_label,
                 )
             except Exception as e:
-                await interaction.followup.send(f"❌ Could not render level card: {e}", ephemeral=True)
+                await interaction.followup.send(
+                    await t(
+                        interaction.guild.id,
+                        "leveling.levelcard.render_failed",
+                        error=str(e),
+                    ),
+                    ephemeral=True,
+                )
                 return
             await interaction.followup.send(file=discord.File(str(cached_path)))
 
-    @app_commands.command(name="xpset", description="Set a user's XP and level (Admin only)")
+    @app_commands.command(
+        name="xpset",
+        description="Set a user's XP and level (Admin only)",
+)
     @app_commands.describe(user="User", xp="XP value", level="Level value")
     async def xpset(self, interaction: discord.Interaction, user: discord.Member, xp: int, level: int) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         if not await is_module_enabled(interaction.guild.id, "leveling"):
             await interaction.response.send_message(
-                "This module is currently disabled. An admin can enable it with /modules.",
+                await t(interaction.user.id, "common.module_disabled"),
                 ephemeral=True,
             )
             return
@@ -909,14 +1028,14 @@ class LevelingCog(commands.Cog):
             interaction.guild,
             "leveling",
             "xp_set",
-            actor=interaction.user,
+            actor=log_actor_from_interaction(interaction),
             details=f"target={user.id}; xp={xp}; level={level}",
             channel_id=interaction.channel.id if interaction.channel else None,
         )
         msg = get_command_response_for_interaction(
             interaction,
             "success",
-            "✅ Set {user}'s XP to {xp} and Level to {level}.",
+            await t(interaction.user.id, "leveling.xpset.success"),
             user=user.display_name,
             xp=str(xp_clamped),
             level=str(level_norm),
@@ -943,11 +1062,11 @@ class LevelingCog(commands.Cog):
         xp_scale: float,
     ) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         if not await is_module_enabled(interaction.guild.id, "leveling"):
             await interaction.response.send_message(
-                "This module is currently disabled. An admin can enable it with /modules.",
+                await t(interaction.user.id, "common.module_disabled"),
                 ephemeral=True,
             )
             return
@@ -967,27 +1086,34 @@ class LevelingCog(commands.Cog):
             interaction.guild,
             "leveling",
             "xp_config_update",
-            actor=interaction.user,
+            actor=log_actor_from_interaction(interaction),
             details=(
                 f"message_xp={message_xp}; reaction_xp={reaction_xp}; vc_minute_xp={vc_minute_xp}; "
                 f"poll_vote_xp={poll_vote_xp}; base_xp={base_xp}; xp_scale={xp_scale}"
             ),
             channel_id=interaction.channel.id if interaction.channel else None,
         )
-        preview = "\n".join(
-            f"Level {lvl}: {int(sum(base_xp * (xp_scale ** (i - 1)) for i in range(1, lvl + 1)))} XP total"
-            for lvl in [1, 2, 3, 5, 10]
-        )
+        preview_lines: list[str] = []
+        for lvl in [1, 2, 3, 5, 10]:
+            preview_lines.append(
+                await t(
+                    interaction.guild.id,
+                    "leveling.xp.preview_line",
+                    level=str(lvl),
+                    total_xp=str(int(sum(base_xp * (xp_scale ** (i - 1)) for i in range(1, lvl + 1)))),
+                )
+            )
+        preview = "\n".join(preview_lines)
         embed = discord.Embed(
-            title="✅ XP Configuration Updated!",
+            title=await t(interaction.user.id, "leveling.xp.config_title"),
             description=(
-                f"**Message XP:** {message_xp}\n"
-                f"**Reaction XP:** {reaction_xp}\n"
-                f"**VC XP/min:** {vc_minute_xp}\n"
-                f"**Poll Vote XP:** {poll_vote_xp}\n"
-                f"**Base XP (Lvl 1):** {base_xp}\n"
-                f"**XP Scale:** {xp_scale}\n\n"
-                f"📊 **XP Preview:**\n{preview}"
+                f"{await t(interaction.user.id, 'leveling.xp.message_xp', value=str(message_xp))}\n"
+                f"{await t(interaction.user.id, 'leveling.xp.reaction_xp', value=str(reaction_xp))}\n"
+                f"{await t(interaction.user.id, 'leveling.xp.vc_minute_xp', value=str(vc_minute_xp))}\n"
+                f"{await t(interaction.user.id, 'leveling.xp.poll_vote_xp', value=str(poll_vote_xp))}\n"
+                f"{await t(interaction.user.id, 'leveling.xp.base_xp', value=str(base_xp))}\n"
+                f"{await t(interaction.user.id, 'leveling.xp.scale', value=str(xp_scale))}\n\n"
+                f"{await t(interaction.user.id, 'leveling.xp.preview_header')}\n{preview}"
             ),
             color=discord.Color.green(),
         )
@@ -1002,11 +1128,11 @@ class LevelingCog(commands.Cog):
         message: str = "🎉 Congrats {user}, you reached level {level} and earned {role}!",
     ) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         if not await is_module_enabled(interaction.guild.id, "leveling"):
             await interaction.response.send_message(
-                "This module is currently disabled. An admin can enable it with /modules.",
+                await t(interaction.user.id, "common.module_disabled"),
                 ephemeral=True,
             )
             return
@@ -1021,14 +1147,14 @@ class LevelingCog(commands.Cog):
             interaction.guild,
             "leveling",
             "levelreward_add",
-            actor=interaction.user,
+            actor=log_actor_from_interaction(interaction),
             details=f"level={level}; role_id={role.id}",
             channel_id=interaction.channel.id if interaction.channel else None,
         )
         msg = get_command_response_for_interaction(
             interaction,
             "success",
-            "✅ Added reward for level **{level}** -> {role}",
+            await t(interaction.user.id, "leveling.levelreward.added"),
             level=str(level),
             role=role.mention,
         )
@@ -1037,18 +1163,21 @@ class LevelingCog(commands.Cog):
     @levelreward_group.command(name="remove", description="Remove a level reward role.")
     async def levelreward_remove(self, interaction: discord.Interaction, level: int) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         if not await is_module_enabled(interaction.guild.id, "leveling"):
             await interaction.response.send_message(
-                "This module is currently disabled. An admin can enable it with /modules.",
+                await t(interaction.user.id, "common.module_disabled"),
                 ephemeral=True,
             )
             return
         guild_id = str(interaction.guild.id)
         data = _load_json(LEVEL_REWARDS_FILE, {})
         if guild_id not in data or str(level) not in data[guild_id].get("rewards", {}):
-            await interaction.response.send_message("❌ No reward found for that level.", ephemeral=True)
+            await interaction.response.send_message(
+                await t(interaction.user.id, "leveling.levelreward.not_found"),
+                ephemeral=True,
+            )
             return
         del data[guild_id]["rewards"][str(level)]
         _save_json(LEVEL_REWARDS_FILE, data)
@@ -1057,14 +1186,14 @@ class LevelingCog(commands.Cog):
             interaction.guild,
             "leveling",
             "levelreward_remove",
-            actor=interaction.user,
+            actor=log_actor_from_interaction(interaction),
             details=f"level={level}",
             channel_id=interaction.channel.id if interaction.channel else None,
         )
         msg = get_command_response_for_interaction(
             interaction,
             "success",
-            "🗑️ Removed reward for level **{level}**.",
+            await t(interaction.user.id, "leveling.levelreward.removed"),
             level=str(level),
         )
         await interaction.response.send_message(msg, ephemeral=True)
@@ -1072,11 +1201,11 @@ class LevelingCog(commands.Cog):
     @levelreward_group.command(name="list", description="List all level reward roles.")
     async def levelreward_list(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         if not await is_module_enabled(interaction.guild.id, "leveling"):
             await interaction.response.send_message(
-                "This module is currently disabled. An admin can enable it with /modules.",
+                await t(interaction.user.id, "common.module_disabled"),
                 ephemeral=True,
             )
             return
@@ -1084,25 +1213,39 @@ class LevelingCog(commands.Cog):
         data = _load_json(LEVEL_REWARDS_FILE, {})
         guild_data = data.get(guild_id, {}).get("rewards", {})
         if not guild_data:
-            await interaction.response.send_message("ℹ️ No rewards configured yet.", ephemeral=True)
+            await interaction.response.send_message(
+                await t(interaction.user.id, "leveling.levelreward.none_configured"),
+                ephemeral=True,
+            )
             return
         desc = ""
         for lvl, info in sorted(guild_data.items(), key=lambda x: int(x[0])):
             role = interaction.guild.get_role(int(info["role_id"]))
-            desc += f"**Level {lvl}** -> {role.mention if role else '❓ Missing Role'}\n"
+            missing_role_label = await t(interaction.user.id, "leveling.levelreward.missing_role")
+            desc += await t(
+                interaction.guild.id,
+                "leveling.levelreward.list_line",
+                level=str(lvl),
+                role=role.mention if role else missing_role_label,
+            )
+            desc += "\n"
         await interaction.response.send_message(
-            embed=discord.Embed(title="🎁 Level Rewards", description=desc, color=discord.Color.gold()),
+            embed=discord.Embed(
+                title=await t(interaction.user.id, "leveling.levelreward.list_title"),
+                description=desc,
+                color=discord.Color.gold(),
+            ),
             ephemeral=True,
         )
 
     @levelreward_group.command(name="mode", description="Choose whether to replace old reward roles.")
     async def levelreward_mode(self, interaction: discord.Interaction, replace_old_roles: bool) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         if not await is_module_enabled(interaction.guild.id, "leveling"):
             await interaction.response.send_message(
-                "This module is currently disabled. An admin can enable it with /modules.",
+                await t(interaction.user.id, "common.module_disabled"),
                 ephemeral=True,
             )
             return
@@ -1117,12 +1260,15 @@ class LevelingCog(commands.Cog):
             interaction.guild,
             "leveling",
             "levelreward_mode",
-            actor=interaction.user,
+            actor=log_actor_from_interaction(interaction),
             details=f"replace_old_roles={replace_old_roles}",
             channel_id=interaction.channel.id if interaction.channel else None,
         )
         await interaction.response.send_message(
-            "✅ Now removing old reward roles." if replace_old_roles else "⚙️ Now keeping old reward roles.",
+            await t(
+                interaction.guild.id,
+                "leveling.levelreward.mode_replace_on" if replace_old_roles else "leveling.levelreward.mode_replace_off",
+            ),
             ephemeral=True,
         )
 

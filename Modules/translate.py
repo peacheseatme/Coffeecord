@@ -14,7 +14,9 @@ from discord import app_commands
 from discord.ext import commands
 
 from . import anti_abuse
+from .i18n import t
 from .module_registry import is_module_enabled
+from .log_actor import log_actor_from_interaction
 
 try:
     from google.cloud import translate_v2 as google_translate  # type: ignore
@@ -416,11 +418,11 @@ class TranslateCog(
         show_only_to_me: bool = True,
     ) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         if not await is_module_enabled(interaction.guild.id, "translate"):
             await interaction.response.send_message(
-                "This module is currently disabled. An admin can enable it with /modules.",
+                await t(interaction.user.id, "common.module_disabled"),
                 ephemeral=True,
             )
             return
@@ -443,21 +445,25 @@ class TranslateCog(
                 translate_text = ""
         if not translate_text:
             await interaction.response.send_message(
-                "Please provide text or run this command from a message context where Discord resolves the replied message.",
+                await t(interaction.user.id, "translate.messages.provide_text"),
                 ephemeral=True,
             )
             return
 
         if len(translate_text) > MAX_TRANSLATE_LENGTH:
             await interaction.response.send_message(
-                f"Message too long. Max length is {MAX_TRANSLATE_LENGTH} characters.",
+                await t(
+                    interaction.guild.id,
+                    "translate.messages.too_long",
+                    max_length=str(MAX_TRANSLATE_LENGTH),
+                ),
                 ephemeral=True,
             )
             return
 
         if _contains_code_block(translate_text):
             await interaction.response.send_message(
-                "Code blocks are skipped for safety. Remove triple backticks to translate.",
+                await t(interaction.user.id, "translate.messages.code_block_skipped"),
                 ephemeral=True,
             )
             return
@@ -466,14 +472,19 @@ class TranslateCog(
         if not allowed:
             reset_ts = f"<t:{reset_at}:R>"
             await interaction.response.send_message(
-                f"You have reached the free translation limit ({FREE_LIMIT}/day). Try again {reset_ts} or become a supporter for unlimited translations.",
+                await t(
+                    interaction.guild.id,
+                    "translate.messages.free_limit_hit",
+                    free_limit=str(FREE_LIMIT),
+                    reset_ts=reset_ts,
+                ),
                 ephemeral=True,
             )
             return
 
         if not self.backend.available:
             await interaction.response.send_message(
-                "Translation backend is unavailable. Configure Google credentials and restart.",
+                await t(interaction.user.id, "translate.messages.backend_unavailable"),
                 ephemeral=True,
             )
             return
@@ -482,19 +493,45 @@ class TranslateCog(
             async with anti_abuse.heavy_task_slot():
                 result = await self._translate_with_details(translate_text, source_language, target_language)
         except Exception:
-            await interaction.response.send_message("Translation failed. Please try again later.", ephemeral=True)
+            await interaction.response.send_message(
+                await t(interaction.user.id, "translate.messages.failed"),
+                ephemeral=True,
+            )
             return
 
-        source_label = translate_from.name if translate_from is not None else f"Auto-detected ({result.detected_source_language})"
-        embed = discord.Embed(title="Translation", color=discord.Color.blurple())
-        embed.add_field(name="Translate From", value=source_label, inline=True)
-        embed.add_field(name="Translate To",   value=translate_to.name, inline=True)
-        embed.add_field(name="Result", value=result.translated_text[:4000], inline=False)
+        source_label = (
+            translate_from.name
+            if translate_from is not None
+            else await t(
+                interaction.guild.id,
+                "translate.embed.auto_detected",
+                language=result.detected_source_language,
+            )
+        )
+        embed = discord.Embed(
+            title=await t(interaction.user.id, "translate.embed.translation_title"),
+            color=discord.Color.blurple(),
+        )
+        embed.add_field(
+            name=await t(interaction.user.id, "translate.embed.translate_from"),
+            value=source_label,
+            inline=True,
+        )
+        embed.add_field(
+            name=await t(interaction.user.id, "translate.embed.translate_to"),
+            value=translate_to.name,
+            inline=True,
+        )
+        embed.add_field(
+            name=await t(interaction.user.id, "translate.embed.result"),
+            value=result.translated_text[:4000],
+            inline=False,
+        )
         await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
         self._dispatch_module_event(
             interaction.guild,
             "manual_translate",
-            actor=interaction.user,
+            actor=log_actor_from_interaction(interaction),
             details=(
                 f"source={result.detected_source_language if source_language == 'auto' else source_language}; "
                 f"target={target_language}; chars={len(translate_text)}; ephemeral={ephemeral}"
@@ -548,7 +585,7 @@ class TranslateCog(
     ) -> None:
         if interaction.guild is not None and not await is_module_enabled(interaction.guild.id, "translate"):
             await interaction.response.send_message(
-                "This module is currently disabled. An admin can enable it with /modules.",
+                await t(interaction.user.id, "common.module_disabled"),
                 ephemeral=True,
             )
             return
@@ -565,19 +602,26 @@ class TranslateCog(
         _save_json(USERS_FILE, self.user_settings)
 
         lang_display = preferred_language.name if preferred_language is not None else settings["language"]
-        live_status  = "Enabled" if settings["live_translate"] else "Disabled"
-        dm_status    = "On"      if settings["dm_delivery"]    else "Off"
-        priv_status  = "Private" if settings["ephemeral"]      else "Public"
-        embed = discord.Embed(title="Translation Settings", color=discord.Color.green())
-        embed.add_field(name="My Language",        value=lang_display,  inline=True)
-        embed.add_field(name="Live Translation",   value=live_status,   inline=True)
-        embed.add_field(name="Response Privacy",   value=priv_status,   inline=True)
-        embed.add_field(name="Send to DM",         value=dm_status,     inline=True)
+        guild_id = interaction.user.id
+        live_status = await t(interaction.user.id, "common.enabled" if settings["live_translate"] else "common.disabled")
+        dm_status = await t(interaction.user.id, "translate.settings.on" if settings["dm_delivery"] else "translate.settings.off")
+        priv_status = await t(
+            guild_id,
+            "translate.settings.private" if settings["ephemeral"] else "translate.settings.public",
+        )
+        embed = discord.Embed(
+            title=await t(interaction.user.id, "translate.settings.title"),
+            color=discord.Color.green(),
+        )
+        embed.add_field(name=await t(interaction.user.id, "translate.settings.my_language"), value=lang_display, inline=True)
+        embed.add_field(name=await t(interaction.user.id, "translate.settings.live_translation"), value=live_status, inline=True)
+        embed.add_field(name=await t(interaction.user.id, "translate.settings.response_privacy"), value=priv_status, inline=True)
+        embed.add_field(name=await t(interaction.user.id, "translate.settings.send_to_dm"), value=dm_status, inline=True)
         await interaction.response.send_message(embed=embed, ephemeral=True)
         self._dispatch_module_event(
             interaction.guild,
             "settings_update",
-            actor=interaction.user,
+            actor=log_actor_from_interaction(interaction),
             details=(
                 f"language={settings.get('language', 'en')}; "
                 f"live_translate={bool(settings.get('live_translate', False))}; "
@@ -591,12 +635,15 @@ class TranslateCog(
     async def translate_usage(self, interaction: discord.Interaction) -> None:
         if interaction.guild is not None and not await is_module_enabled(interaction.guild.id, "translate"):
             await interaction.response.send_message(
-                "This module is currently disabled. An admin can enable it with /modules.",
+                await t(interaction.user.id, "common.module_disabled"),
                 ephemeral=True,
             )
             return
         if self._is_supporter(interaction.user.id):
-            await interaction.response.send_message("Supporter: unlimited translations.", ephemeral=True)
+            await interaction.response.send_message(
+                await t(interaction.user.id, "translate.usage.supporter_unlimited"),
+                ephemeral=True,
+            )
             return
 
         now = int(time.time())
@@ -608,28 +655,37 @@ class TranslateCog(
             reset_at = now + WINDOW_SECONDS
 
         await interaction.response.send_message(
-            f"Free plan: `{count}/{FREE_LIMIT}` translations used today. Resets <t:{reset_at}:R>.",
+            await t(
+                interaction.user.id,
+                "translate.usage.free_plan",
+                count=str(count),
+                free_limit=str(FREE_LIMIT),
+                reset_at=str(reset_at),
+            ),
             ephemeral=True,
         )
 
     @app_commands.command(name="reset", description="Reset a user's translation usage (admin only).")
     async def translate_reset_user(self, interaction: discord.Interaction, user: discord.User) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         if not await is_module_enabled(interaction.guild.id, "translate"):
             await interaction.response.send_message(
-                "This module is currently disabled. An admin can enable it with /modules.",
+                await t(interaction.user.id, "common.module_disabled"),
                 ephemeral=True,
             )
             return
         self.usage_data.pop(str(user.id), None)
         _save_json(USAGE_FILE, self.usage_data)
-        await interaction.response.send_message(f"Reset translation usage for {user.mention}.", ephemeral=True)
+        await interaction.response.send_message(
+            await t(interaction.user.id, "translate.messages.reset_usage", user=user.mention),
+            ephemeral=True,
+        )
         self._dispatch_module_event(
             interaction.guild,
             "usage_reset",
-            actor=interaction.user,
+            actor=log_actor_from_interaction(interaction),
             details=f"target_user_id={user.id}",
             channel_id=interaction.channel.id if interaction.channel else None,
         )
@@ -711,6 +767,7 @@ class TranslateCog(
         if not settings.get("live_translate", False):
             return
 
+        guild_id = message.guild.id if message.guild else None
         language = _normalize_lang(settings.get("language"), "en")
         msg_key = (message.id, target_user.id, language)
         now = time.time()
@@ -726,8 +783,12 @@ class TranslateCog(
             if self._mark_limit_notice_sent(target_user.id):
                 try:
                     await target_user.send(
-                        f"You have reached the free translation limit ({FREE_LIMIT}/day). "
-                        f"Translations resume <t:{reset_at}:R>."
+                        await t(
+                            guild_id,
+                            "translate.messages.limit_notice_dm",
+                            free_limit=str(FREE_LIMIT),
+                            reset_at=str(reset_at),
+                        )
                     )
                 except discord.HTTPException:
                     pass
@@ -752,11 +813,18 @@ class TranslateCog(
             return
 
         embed = discord.Embed(
-            title="Live Translation",
+            title=await t(interaction.user.id, "translate.embed.live_translation_title"),
             description=translated_text[:4000],
             color=discord.Color.green(),
         )
-        embed.set_footer(text=f"Detected {result.detected_source_language} → {language}")
+        embed.set_footer(
+            text=await t(
+                guild_id,
+                "translate.embed.detected_footer",
+                source_language=result.detected_source_language,
+                target_language=language,
+            )
+        )
 
         if settings.get("dm_delivery", False):
             try:

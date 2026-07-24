@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 
 import discord
 from discord import app_commands
+from Modules.i18n import t_sync
 
 _main = sys.modules.get("__main__")
 if _main and hasattr(_main, "bot") and hasattr(_main, "tree"):
@@ -44,6 +45,11 @@ RULE_NAMES = [
 ]
 
 ACTION_NAMES = ["delete", "warn", "timeout", "kick", "ban", "log_only"]
+AUTOMOD_I18N_PREFIX = "automod."
+
+
+def _automod_text_sync(user_id: int | None, key: str, *, default: str, **params: str) -> str:
+    return t_sync(user_id, f"{AUTOMOD_I18N_PREFIX}{key}", default=default, **params)
 
 DEFAULT_TOKEN_PATTERN_STRINGS = [
     r"[MN][A-Za-z\d]{23}\.[\w-]{6}\.[\w-]{27}",
@@ -1283,7 +1289,11 @@ def _is_moderation_admin(interaction: discord.Interaction) -> bool:
 async def _require_admin(interaction: discord.Interaction) -> bool:
     if not _is_moderation_admin(interaction):
         await interaction.response.send_message(
-            "You need `Manage Server` to use automod admin commands.",
+            _automod_text_sync(
+                interaction.user.id,
+                "admin_required",
+                default="You need `Manage Server` to use automod admin commands.",
+            ),
             ephemeral=True,
         )
         return False
@@ -1302,71 +1312,130 @@ def _save_config():
     save_json(CONFIG_PATH, config)
 
 
-automod_group = app_commands.Group(name="automod", description="Automod management commands")
-automod_set_group = app_commands.Group(name="set", description="Set automod values", parent=automod_group)
-automod_toggle_group = app_commands.Group(name="toggle", description="Toggle automod settings", parent=automod_group)
-automod_whitelist_group = app_commands.Group(name="whitelist", description="Manage automod whitelist", parent=automod_group)
-automod_exempt_group = app_commands.Group(name="exempt", description="Exempt roles from automod enforcement", parent=automod_group)
-automod_badword_group = app_commands.Group(name="badword", description="Manage blocked words", parent=automod_group)
-automod_channel_group = app_commands.Group(name="channel", description="Manage channel overrides", parent=automod_group)
-automod_warn_group = app_commands.Group(name="warn", description="Manage automod warns", parent=automod_group)
-automod_escalation_group = app_commands.Group(name="escalation", description="Warn escalation settings", parent=automod_group)
+automod_group = app_commands.Group(
+    name="automod",
+    description="Automod management commands",
+)
+automod_set_group = app_commands.Group(
+    name="set",
+    description="Set automod values",
+    parent=automod_group,
+)
+automod_toggle_group = app_commands.Group(
+    name="toggle",
+    description="Toggle automod settings",
+    parent=automod_group,
+)
+automod_whitelist_group = app_commands.Group(
+    name="whitelist",
+    description="Manage automod whitelist",
+    parent=automod_group,
+)
+automod_exempt_group = app_commands.Group(
+    name="exempt",
+    description="Exempt roles from automod enforcement",
+    parent=automod_group,
+)
+automod_badword_group = app_commands.Group(
+    name="badword",
+    description="Manage blocked words",
+    parent=automod_group,
+)
+automod_channel_group = app_commands.Group(
+    name="channel",
+    description="Manage channel overrides",
+    parent=automod_group,
+)
+automod_warn_group = app_commands.Group(
+    name="warn",
+    description="Manage automod warns",
+    parent=automod_group,
+)
+automod_escalation_group = app_commands.Group(
+    name="escalation",
+    description="Warn escalation settings",
+    parent=automod_group,
+)
 
 
-@automod_group.command(name="overview", description="View automod status and enabled rules")
+@automod_group.command(
+    name="overview",
+    description="View automod status and enabled rules",
+)
 async def automod_overview(interaction: discord.Interaction):
     if not interaction.guild_id:
-        await interaction.response.send_message("Guild-only command.", ephemeral=True)
+        await interaction.response.send_message(t_sync(interaction.user.id, "common.guild_only"), ephemeral=True)
         return
     guild_cfg = get_guild_config(interaction.guild_id)
     enabled = "ON" if guild_cfg.get("enabled") else "OFF"
     log_channel = guild_cfg.get("log_channel_id")
 
-    embed = discord.Embed(title="Automod Overview")
-    embed.add_field(name="Status", value=enabled, inline=False)
+    embed = discord.Embed(title=_automod_text_sync(interaction.user.id, "overview_title", default="Automod Overview"))
+    embed.add_field(name=_automod_text_sync(interaction.user.id, "field_status", default="Status"), value=enabled, inline=False)
     embed.add_field(
-        name="Log Channel",
-        value=(f"<#{log_channel}>" if log_channel else "Not set"),
+        name=_automod_text_sync(interaction.user.id, "field_log_channel", default="Log Channel"),
+        value=(f"<#{log_channel}>" if log_channel else _automod_text_sync(interaction.user.id, "not_set", default="Not set")),
         inline=False,
     )
     embed.add_field(
-        name="Violation Warn Counting",
+        name=_automod_text_sync(interaction.user.id, "field_violation_warn_counting", default="Violation Warn Counting"),
         value=("ON" if guild_cfg.get("count_rule_violations_as_warns", False) else "OFF"),
         inline=False,
     )
-    embed.add_field(name="Rules", value="\n".join(_rules_status_lines(guild_cfg)), inline=False)
+    embed.add_field(name=_automod_text_sync(interaction.user.id, "field_rules", default="Rules"), value="\n".join(_rules_status_lines(guild_cfg)), inline=False)
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-@automod_group.command(name="on", description="Enable automod for this guild")
+@automod_group.command(
+    name="on",
+    description="Enable automod for this guild",
+)
 async def automod_on(interaction: discord.Interaction):
     if not interaction.guild_id or not await _require_admin(interaction):
         return
     update_guild_override(interaction.guild_id)["enabled"] = True
     _save_config()
-    await interaction.response.send_message("Automod enabled for this guild.", ephemeral=True)
+    await interaction.response.send_message(
+        _automod_text_sync(interaction.user.id, "enabled", default="Automod enabled for this guild."),
+        ephemeral=True,
+    )
 
 
-@automod_group.command(name="off", description="Disable automod for this guild")
+@automod_group.command(
+    name="off",
+    description="Disable automod for this guild",
+)
 async def automod_off(interaction: discord.Interaction):
     if not interaction.guild_id or not await _require_admin(interaction):
         return
     update_guild_override(interaction.guild_id)["enabled"] = False
     _save_config()
-    await interaction.response.send_message("Automod disabled for this guild.", ephemeral=True)
+    await interaction.response.send_message(
+        _automod_text_sync(interaction.user.id, "disabled", default="Automod disabled for this guild."),
+        ephemeral=True,
+    )
 
 
-@automod_group.command(name="status", description="Show automod status")
+@automod_group.command(
+    name="status",
+    description="Show automod status",
+)
 async def automod_status(interaction: discord.Interaction):
     if not interaction.guild_id:
-        await interaction.response.send_message("Guild-only command.", ephemeral=True)
+        await interaction.response.send_message(t_sync(interaction.user.id, "common.guild_only"), ephemeral=True)
         return
     guild_cfg = get_guild_config(interaction.guild_id)
     status = "enabled" if guild_cfg.get("enabled") else "disabled"
-    await interaction.response.send_message(f"Automod is {status}.", ephemeral=True)
+    await interaction.response.send_message(
+        _automod_text_sync(interaction.user.id, "status_result", default="Automod is {status}.", status=status),
+        ephemeral=True,
+    )
 
 
-@automod_group.command(name="reload", description="Reload automod config from disk")
+@automod_group.command(
+    name="reload",
+    description="Reload automod config from disk",
+)
 async def automod_reload(interaction: discord.Interaction):
     if not await _require_admin(interaction):
         return
@@ -1375,10 +1444,16 @@ async def automod_reload(interaction: discord.Interaction):
     warns = load_json(WARNS_PATH, {})
     strikes = load_json(STRIKES_PATH, {})
     _save_config()
-    await interaction.response.send_message("Automod config reloaded.", ephemeral=True)
+    await interaction.response.send_message(
+        _automod_text_sync(interaction.user.id, "reloaded", default="Automod config reloaded."),
+        ephemeral=True,
+    )
 
 
-@automod_set_group.command(name="log", description="Set automod log channel (or clear)")
+@automod_set_group.command(
+    name="log",
+    description="Set automod log channel (or clear)",
+)
 @app_commands.describe(channel="Text channel for automod logs")
 async def automod_set_log(interaction: discord.Interaction, channel: discord.TextChannel | None = None):
     if not interaction.guild_id or not await _require_admin(interaction):
@@ -1388,11 +1463,19 @@ async def automod_set_log(interaction: discord.Interaction, channel: discord.Tex
     _save_config()
     if channel:
         await interaction.response.send_message(
-            f"Automod log channel set to {channel.mention}.",
+            _automod_text_sync(
+                interaction.user.id,
+                "log_channel_set",
+                default="Automod log channel set to {channel}.",
+                channel=channel.mention,
+            ),
             ephemeral=True,
         )
     else:
-        await interaction.response.send_message("Automod log channel cleared.", ephemeral=True)
+        await interaction.response.send_message(
+            _automod_text_sync(interaction.user.id, "log_channel_cleared", default="Automod log channel cleared."),
+            ephemeral=True,
+        )
 
 
 EXEMPT_ACTION_CHOICES = [
@@ -1401,7 +1484,10 @@ EXEMPT_ACTION_CHOICES = [
 ]
 
 
-@automod_exempt_group.command(name="role", description="Add/remove role exemption from automod")
+@automod_exempt_group.command(
+    name="role",
+    description="Add/remove role exemption from automod",
+)
 @app_commands.choices(action=EXEMPT_ACTION_CHOICES)
 async def automod_exempt_role(
     interaction: discord.Interaction,
@@ -1419,22 +1505,37 @@ async def automod_exempt_role(
         protected_roles[:] = [rid for rid in protected_roles if rid != role.id]
     _save_config()
     await interaction.response.send_message(
-        f"Exempt roles updated ({action.value}: {role.mention}).",
+        _automod_text_sync(
+            interaction.user.id,
+            "exempt_roles_updated",
+            default="Exempt roles updated ({action}: {role}).",
+            action=action.value,
+            role=role.mention,
+        ),
         ephemeral=True,
     )
 
 
-@automod_exempt_group.command(name="list", description="List roles exempt from automod")
+@automod_exempt_group.command(
+    name="list",
+    description="List roles exempt from automod",
+)
 async def automod_exempt_list(interaction: discord.Interaction):
     if not interaction.guild_id or not await _require_admin(interaction):
         return
     guild_cfg = get_guild_config(interaction.guild_id)
     protected_roles = guild_cfg.get("protected_roles", [])
     if not protected_roles:
-        await interaction.response.send_message("No exempt roles configured.", ephemeral=True)
+        await interaction.response.send_message(
+            _automod_text_sync(interaction.user.id, "no_exempt_roles", default="No exempt roles configured."),
+            ephemeral=True,
+        )
         return
     mentions = " ".join(f"<@&{role_id}>" for role_id in protected_roles)
-    await interaction.response.send_message(f"Exempt roles: {mentions}", ephemeral=True)
+    await interaction.response.send_message(
+        _automod_text_sync(interaction.user.id, "exempt_roles_list", default="Exempt roles: {roles}", roles=mentions),
+        ephemeral=True,
+    )
 
 
 RULE_CHOICES = [
@@ -1582,7 +1683,14 @@ class AutomodPresetView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.invoker_id:
-            await interaction.response.send_message("Only the command invoker can use these preset buttons.", ephemeral=True)
+            await interaction.response.send_message(
+                _automod_text_sync(
+                    interaction.user.id,
+                    "preset_owner_only",
+                    default="Only the command invoker can use these preset buttons.",
+                ),
+                ephemeral=True,
+            )
             return False
         return True
 
@@ -1590,8 +1698,13 @@ class AutomodPresetView(discord.ui.View):
         _apply_automod_preset(self.guild_id, preset_key)
         await interaction.response.edit_message(
             content=(
-                f"✅ Applied automod preset: **{PRESET_LABELS[preset_key]}**\n"
-                f"{AUTOMOD_PRESET_APPLIED_FOOTER}"
+                _automod_text_sync(
+                    self.invoker_id,
+                    "preset_applied",
+                    default="✅ Applied automod preset: **{preset}**\n{footer}",
+                    preset=PRESET_LABELS[preset_key],
+                    footer=AUTOMOD_PRESET_APPLIED_FOOTER,
+                )
             ),
             view=self,
         )
@@ -1613,7 +1726,10 @@ class AutomodPresetView(discord.ui.View):
         await self._apply_and_confirm(interaction, PRESET_DICTATORSHIP)
 
 
-@automod_group.command(name="preset", description="Apply an automod preset directly or via buttons")
+@automod_group.command(
+    name="preset",
+    description="Apply an automod preset directly or via buttons",
+)
 @app_commands.choices(preset=AUTOMOD_PRESET_CHOICES)
 async def automod_preset(
     interaction: discord.Interaction,
@@ -1624,14 +1740,20 @@ async def automod_preset(
     if preset is not None:
         _apply_automod_preset(interaction.guild_id, preset.value)
         await interaction.response.send_message(
-            f"✅ Applied automod preset: **{PRESET_LABELS[preset.value]}**\n{AUTOMOD_PRESET_APPLIED_FOOTER}",
+            _automod_text_sync(
+                interaction.user.id,
+                "preset_applied",
+                default="✅ Applied automod preset: **{preset}**\n{footer}",
+                preset=PRESET_LABELS[preset.value],
+                footer=AUTOMOD_PRESET_APPLIED_FOOTER,
+            ),
             ephemeral=True,
         )
         return
 
     view = AutomodPresetView(interaction.guild_id, interaction.user.id)
     await interaction.response.send_message(
-        "Choose an automod preset:",
+        _automod_text_sync(interaction.user.id, "preset_choose_prompt", default="Choose an automod preset:"),
         view=view,
         ephemeral=True,
     )
@@ -1676,7 +1798,10 @@ def _parse_setting_value(caster, value: str):
     return raw
 
 
-@automod_toggle_group.command(name="rule", description="Enable/disable a specific automod rule")
+@automod_toggle_group.command(
+    name="rule",
+    description="Enable/disable a specific automod rule",
+)
 @app_commands.choices(rule=RULE_CHOICES)
 @app_commands.describe(rule="Rule to toggle", enabled="Whether this rule should be enabled")
 async def automod_toggle_rule(
@@ -1691,12 +1816,21 @@ async def automod_toggle_rule(
     override[rule.value]["enabled"] = enabled
     _save_config()
     await interaction.response.send_message(
-        f"Rule `{rule.value}` set to {'ON' if enabled else 'OFF'}.",
+        _automod_text_sync(
+            interaction.user.id,
+            "toggle_rule_success",
+            default="Rule `{rule}` set to {state}.",
+            rule=rule.value,
+            state="ON" if enabled else "OFF",
+        ),
         ephemeral=True,
     )
 
 
-@automod_set_group.command(name="action", description="Set the action for an automod rule")
+@automod_set_group.command(
+    name="action",
+    description="Set the action for an automod rule",
+)
 @app_commands.choices(rule=RULE_CHOICES, action=ACTION_CHOICES)
 async def automod_set_action(
     interaction: discord.Interaction,
@@ -1710,12 +1844,21 @@ async def automod_set_action(
     override[rule.value]["action"] = action.value
     _save_config()
     await interaction.response.send_message(
-        f"Rule `{rule.value}` action set to `{action.value}`.",
+        _automod_text_sync(
+            interaction.user.id,
+            "set_action_success",
+            default="Rule `{rule}` action set to `{action}`.",
+            rule=rule.value,
+            action=action.value,
+        ),
         ephemeral=True,
     )
 
 
-@automod_set_group.command(name="value", description="Set numeric config values for a rule")
+@automod_set_group.command(
+    name="value",
+    description="Set numeric config values for a rule",
+)
 @app_commands.choices(rule=RULE_CHOICES)
 @app_commands.describe(
     rule="Rule to update",
@@ -1735,7 +1878,13 @@ async def automod_set_value(
     if caster is None:
         allowed = ", ".join(specs.keys()) if specs else "no editable numeric settings"
         await interaction.response.send_message(
-            f"Invalid setting for `{rule.value}`. Allowed: {allowed}.",
+            _automod_text_sync(
+                interaction.user.id,
+                "set_value_invalid_setting",
+                default="Invalid setting for `{rule}`. Allowed: {allowed}.",
+                rule=rule.value,
+                allowed=allowed,
+            ),
             ephemeral=True,
         )
         return
@@ -1744,7 +1893,13 @@ async def automod_set_value(
         parsed = _parse_setting_value(caster, value)
     except ValueError:
         await interaction.response.send_message(
-            f"Invalid value `{value}` for `{setting}`.",
+            _automod_text_sync(
+                interaction.user.id,
+                "set_value_invalid_value",
+                default="Invalid value `{value}` for `{setting}`.",
+                value=value,
+                setting=setting,
+            ),
             ephemeral=True,
         )
         return
@@ -1754,12 +1909,22 @@ async def automod_set_value(
     override[rule.value][setting] = parsed
     _save_config()
     await interaction.response.send_message(
-        f"Updated `{rule.value}.{setting}` to `{parsed}`.",
+        _automod_text_sync(
+            interaction.user.id,
+            "set_value_success",
+            default="Updated `{rule}.{setting}` to `{value}`.",
+            rule=rule.value,
+            setting=setting,
+            value=str(parsed),
+        ),
         ephemeral=True,
     )
 
 
-@automod_set_group.command(name="deletemessage", description="Set delete_message behavior for a rule")
+@automod_set_group.command(
+    name="deletemessage",
+    description="Set delete_message behavior for a rule",
+)
 @app_commands.choices(rule=RULE_CHOICES)
 async def automod_set_delete_message(
     interaction: discord.Interaction,
@@ -1773,7 +1938,13 @@ async def automod_set_delete_message(
     override[rule.value]["delete_message"] = enabled
     _save_config()
     await interaction.response.send_message(
-        f"`{rule.value}.delete_message` set to `{enabled}`.",
+        _automod_text_sync(
+            interaction.user.id,
+            "set_deletemessage_success",
+            default="`{rule}.delete_message` set to `{enabled}`.",
+            rule=rule.value,
+            enabled=str(enabled),
+        ),
         ephemeral=True,
     )
 
@@ -1790,7 +1961,12 @@ async def automod_set_violation_warns(interaction: discord.Interaction, enabled:
     override["count_rule_violations_as_warns"] = enabled
     _save_config()
     await interaction.response.send_message(
-        f"`count_rule_violations_as_warns` set to `{enabled}`.",
+        _automod_text_sync(
+            interaction.user.id,
+            "set_violationwarns_success",
+            default="`count_rule_violations_as_warns` set to `{enabled}`.",
+            enabled=str(enabled),
+        ),
         ephemeral=True,
     )
 
@@ -1801,7 +1977,10 @@ WHITELIST_ACTION_CHOICES = [
 ]
 
 
-@automod_whitelist_group.command(name="channel", description="Add/remove a channel from automod whitelist")
+@automod_whitelist_group.command(
+    name="channel",
+    description="Add/remove a channel from automod whitelist",
+)
 @app_commands.choices(action=WHITELIST_ACTION_CHOICES)
 async def automod_whitelist_channel(
     interaction: discord.Interaction,
@@ -1820,12 +1999,21 @@ async def automod_whitelist_channel(
         channels[:] = [cid for cid in channels if cid != channel.id]
     _save_config()
     await interaction.response.send_message(
-        f"Whitelist channels updated ({action.value}: {channel.mention}).",
+        _automod_text_sync(
+            interaction.user.id,
+            "whitelist_channels_updated",
+            default="Whitelist channels updated ({action}: {channel}).",
+            action=action.value,
+            channel=channel.mention,
+        ),
         ephemeral=True,
     )
 
 
-@automod_whitelist_group.command(name="role", description="Add/remove a role from automod whitelist")
+@automod_whitelist_group.command(
+    name="role",
+    description="Add/remove a role from automod whitelist",
+)
 @app_commands.choices(action=WHITELIST_ACTION_CHOICES)
 async def automod_whitelist_role(
     interaction: discord.Interaction,
@@ -1844,18 +2032,30 @@ async def automod_whitelist_role(
         roles[:] = [rid for rid in roles if rid != role.id]
     _save_config()
     await interaction.response.send_message(
-        f"Whitelist roles updated ({action.value}: {role.mention}).",
+        _automod_text_sync(
+            interaction.user.id,
+            "whitelist_roles_updated",
+            default="Whitelist roles updated ({action}: {role}).",
+            action=action.value,
+            role=role.mention,
+        ),
         ephemeral=True,
     )
 
 
-@automod_badword_group.command(name="add", description="Add a blocked word to bad_words")
+@automod_badword_group.command(
+    name="add",
+    description="Add a blocked word to bad_words",
+)
 async def automod_badword_add(interaction: discord.Interaction, word: str):
     if not interaction.guild_id or not await _require_admin(interaction):
         return
     normalized = word.strip().lower()
     if not normalized:
-        await interaction.response.send_message("Word cannot be empty.", ephemeral=True)
+        await interaction.response.send_message(
+            _automod_text_sync(interaction.user.id, "badword_empty", default="Word cannot be empty."),
+            ephemeral=True,
+        )
         return
 
     override = update_guild_override(interaction.guild_id)
@@ -1863,7 +2063,12 @@ async def automod_badword_add(interaction: discord.Interaction, word: str):
     words = bad_words.setdefault("words", [])
     if normalized in words:
         await interaction.response.send_message(
-            f"`{normalized}` is already in bad words.",
+            _automod_text_sync(
+                interaction.user.id,
+                "badword_already_exists",
+                default="`{word}` is already in bad words.",
+                word=normalized,
+            ),
             ephemeral=True,
         )
         return
@@ -1871,12 +2076,20 @@ async def automod_badword_add(interaction: discord.Interaction, word: str):
     bad_words["enabled"] = True
     _save_config()
     await interaction.response.send_message(
-        f"Added `{normalized}` to bad words list.",
+        _automod_text_sync(
+            interaction.user.id,
+            "badword_added",
+            default="Added `{word}` to bad words list.",
+            word=normalized,
+        ),
         ephemeral=True,
     )
 
 
-@automod_badword_group.command(name="remove", description="Remove a blocked word from bad_words")
+@automod_badword_group.command(
+    name="remove",
+    description="Remove a blocked word from bad_words",
+)
 async def automod_badword_remove(interaction: discord.Interaction, word: str):
     if not interaction.guild_id or not await _require_admin(interaction):
         return
@@ -1887,35 +2100,60 @@ async def automod_badword_remove(interaction: discord.Interaction, word: str):
     new_words = [w for w in words if w != normalized]
     if len(new_words) == len(words):
         await interaction.response.send_message(
-            f"`{normalized}` was not in bad words list.",
+            _automod_text_sync(
+                interaction.user.id,
+                "badword_not_found",
+                default="`{word}` was not in bad words list.",
+                word=normalized,
+            ),
             ephemeral=True,
         )
         return
     bad_words["words"] = new_words
     _save_config()
     await interaction.response.send_message(
-        f"Removed `{normalized}` from bad words list.",
+        _automod_text_sync(
+            interaction.user.id,
+            "badword_removed",
+            default="Removed `{word}` from bad words list.",
+            word=normalized,
+        ),
         ephemeral=True,
     )
 
 
-@automod_badword_group.command(name="list", description="List blocked words")
+@automod_badword_group.command(
+    name="list",
+    description="List blocked words",
+)
 async def automod_badword_list(interaction: discord.Interaction):
     if not interaction.guild_id or not await _require_admin(interaction):
         return
     guild_cfg = get_guild_config(interaction.guild_id)
     words = guild_cfg.get("bad_words", {}).get("words", [])
     if not words:
-        await interaction.response.send_message("No blocked words configured.", ephemeral=True)
+        await interaction.response.send_message(
+            _automod_text_sync(interaction.user.id, "badword_list_empty", default="No blocked words configured."),
+            ephemeral=True,
+        )
         return
     preview = ", ".join(words[:100])
     await interaction.response.send_message(
-        f"Blocked words ({len(words)}): {preview}",
+        _automod_text_sync(
+            interaction.user.id,
+            "badword_list",
+            default="Blocked words ({count}): {words}",
+            count=str(len(words)),
+            words=preview,
+        ),
         ephemeral=True,
     )
 
 
-@automod_channel_group.command(name="overrideset", description="Set a channel-specific rule value")
+@automod_channel_group.command(
+    name="overrideset",
+    description="Set a channel-specific rule value",
+)
 @app_commands.choices(rule=RULE_CHOICES)
 @app_commands.describe(
     channel="Channel to override",
@@ -1942,7 +2180,12 @@ async def automod_channel_override_set(
     if setting in bool_keys:
         if raw.lower() not in {"true", "false"}:
             await interaction.response.send_message(
-                f"`{setting}` expects `true` or `false`.",
+                _automod_text_sync(
+                    interaction.user.id,
+                    "override_bool_expected",
+                    default="`{setting}` expects `true` or `false`.",
+                    setting=setting,
+                ),
                 ephemeral=True,
             )
             return
@@ -1950,7 +2193,12 @@ async def automod_channel_override_set(
     elif setting in action_keys:
         if raw.lower() not in ACTION_NAMES:
             await interaction.response.send_message(
-                f"`action` must be one of: {', '.join(ACTION_NAMES)}.",
+                _automod_text_sync(
+                    interaction.user.id,
+                    "override_action_expected",
+                    default="`action` must be one of: {actions}.",
+                    actions=", ".join(ACTION_NAMES),
+                ),
                 ephemeral=True,
             )
             return
@@ -1960,13 +2208,24 @@ async def automod_channel_override_set(
             parsed = _parse_setting_value(numeric_specs[setting], raw)
         except ValueError:
             await interaction.response.send_message(
-                f"`{setting}` expects a numeric value.",
+                _automod_text_sync(
+                    interaction.user.id,
+                    "override_numeric_expected",
+                    default="`{setting}` expects a numeric value.",
+                    setting=setting,
+                ),
                 ephemeral=True,
             )
             return
     else:
         await interaction.response.send_message(
-            f"Unsupported setting `{setting}` for `{rule.value}`.",
+            _automod_text_sync(
+                interaction.user.id,
+                "override_setting_unsupported",
+                default="Unsupported setting `{setting}` for `{rule}`.",
+                setting=setting,
+                rule=rule.value,
+            ),
             ephemeral=True,
         )
         return
@@ -1976,12 +2235,23 @@ async def automod_channel_override_set(
     channel_override[rule.value][setting] = parsed
     _save_config()
     await interaction.response.send_message(
-        f"Set override for {channel.mention}: `{rule.value}.{setting} = {parsed}`",
+        _automod_text_sync(
+            interaction.user.id,
+            "override_set_success",
+            default="Set override for {channel}: `{rule}.{setting} = {value}`",
+            channel=channel.mention,
+            rule=rule.value,
+            setting=setting,
+            value=str(parsed),
+        ),
         ephemeral=True,
     )
 
 
-@automod_channel_group.command(name="overrideclear", description="Clear channel-specific rule override")
+@automod_channel_group.command(
+    name="overrideclear",
+    description="Clear channel-specific rule override",
+)
 @app_commands.choices(rule=RULE_CHOICES)
 async def automod_channel_override_clear(
     interaction: discord.Interaction,
@@ -1995,7 +2265,11 @@ async def automod_channel_override_clear(
     channel_map = channel_overrides.get(str(channel.id), {})
     if not isinstance(channel_map, dict) or rule.value not in channel_map:
         await interaction.response.send_message(
-            "No override exists for that channel/rule.",
+            _automod_text_sync(
+                interaction.user.id,
+                "override_not_found",
+                default="No override exists for that channel/rule.",
+            ),
             ephemeral=True,
         )
         return
@@ -2004,12 +2278,21 @@ async def automod_channel_override_clear(
         channel_overrides.pop(str(channel.id), None)
     _save_config()
     await interaction.response.send_message(
-        f"Cleared override for {channel.mention} on `{rule.value}`.",
+        _automod_text_sync(
+            interaction.user.id,
+            "override_cleared",
+            default="Cleared override for {channel} on `{rule}`.",
+            channel=channel.mention,
+            rule=rule.value,
+        ),
         ephemeral=True,
     )
 
 
-@automod_warn_group.command(name="list", description="Show automod warns for a member")
+@automod_warn_group.command(
+    name="list",
+    description="Show automod warns for a member",
+)
 async def automod_warns(interaction: discord.Interaction, member: discord.Member):
     if not interaction.guild_id or not await _require_admin(interaction):
         return
@@ -2019,7 +2302,12 @@ async def automod_warns(interaction: discord.Interaction, member: discord.Member
     latest = user_warns[-5:]
     if not latest:
         await interaction.response.send_message(
-            f"{member.mention} has no automod warns.",
+            _automod_text_sync(
+                interaction.user.id,
+                "warn_list_empty",
+                default="{member} has no automod warns.",
+                member=member.mention,
+            ),
             ephemeral=True,
         )
         return
@@ -2030,17 +2318,30 @@ async def automod_warns(interaction: discord.Interaction, member: discord.Member
         reason = str(entry.get("reason", "No reason"))
         lines.append(f"{idx}. <t:{timestamp}:f> by {issuer} - {reason}")
     await interaction.response.send_message(
-        f"{member.mention} has **{count}** warn(s).\nRecent:\n" + "\n".join(lines),
+        _automod_text_sync(
+            interaction.user.id,
+            "warn_list_result",
+            default="{member} has **{count}** warn(s).\nRecent:\n{lines}",
+            member=member.mention,
+            count=str(count),
+            lines="\n".join(lines),
+        ),
         ephemeral=True,
     )
 
 
-@automod_warn_group.command(name="add", description="Manually add a warn (uses automod warns storage)")
+@automod_warn_group.command(
+    name="add",
+    description="Manually add a warn (uses automod warns storage)",
+)
 async def automod_warn_add(interaction: discord.Interaction, member: discord.Member, reason: str):
     if not interaction.guild_id or not await _require_admin(interaction):
         return
     if member.bot:
-        await interaction.response.send_message("Cannot warn a bot.", ephemeral=True)
+        await interaction.response.send_message(
+            _automod_text_sync(interaction.user.id, "warn_add_bot_blocked", default="Cannot warn a bot."),
+            ephemeral=True,
+        )
         return
     warn_count = add_warn(
         interaction.guild_id,
@@ -2075,11 +2376,19 @@ async def automod_warn_add(interaction: discord.Interaction, member: discord.Mem
         count=str(warn_count),
     )
     if threshold_action:
-        response += f"\nThreshold action: `{threshold_action}`"
+        response += _automod_text_sync(
+            interaction.user.id,
+            "warn_threshold_action",
+            default="\nThreshold action: `{action}`",
+            action=threshold_action,
+        )
     await interaction.response.send_message(response, ephemeral=True)
 
 
-@automod_warn_group.command(name="remove", description="Remove one warn by index (or latest)")
+@automod_warn_group.command(
+    name="remove",
+    description="Remove one warn by index (or latest)",
+)
 async def automod_warn_remove(interaction: discord.Interaction, member: discord.Member, index: int | None = None):
     if not interaction.guild_id or not await _require_admin(interaction):
         return
@@ -2088,13 +2397,21 @@ async def automod_warn_remove(interaction: discord.Interaction, member: discord.
     guild_warns = warns.setdefault(guild_id, {})
     user_warns = guild_warns.get(user_id, [])
     if not user_warns:
-        await interaction.response.send_message(f"{member.mention} has no warns.", ephemeral=True)
+        await interaction.response.send_message(
+            _automod_text_sync(interaction.user.id, "warn_remove_empty", default="{member} has no warns.", member=member.mention),
+            ephemeral=True,
+        )
         return
 
     remove_at = len(user_warns) - 1 if index is None else index - 1
     if remove_at < 0 or remove_at >= len(user_warns):
         await interaction.response.send_message(
-            f"Invalid index. Use a value from 1 to {len(user_warns)}.",
+            _automod_text_sync(
+                interaction.user.id,
+                "warn_remove_invalid_index",
+                default="Invalid index. Use a value from 1 to {max_index}.",
+                max_index=str(len(user_warns)),
+            ),
             ephemeral=True,
         )
         return
@@ -2108,12 +2425,22 @@ async def automod_warn_remove(interaction: discord.Interaction, member: discord.
 
     reason = str(removed.get("reason", "No reason"))
     await interaction.response.send_message(
-        f"Removed warn #{remove_at + 1} for {member.mention}: {reason}",
+        _automod_text_sync(
+            interaction.user.id,
+            "warn_removed",
+            default="Removed warn #{index} for {member}: {reason}",
+            index=str(remove_at + 1),
+            member=member.mention,
+            reason=reason,
+        ),
         ephemeral=True,
     )
 
 
-@automod_warn_group.command(name="clear", description="Clear all warns for a user")
+@automod_warn_group.command(
+    name="clear",
+    description="Clear all warns for a user",
+)
 async def automod_warn_clear(interaction: discord.Interaction, member: discord.Member):
     if not interaction.guild_id or not await _require_admin(interaction):
         return
@@ -2124,7 +2451,13 @@ async def automod_warn_clear(interaction: discord.Interaction, member: discord.M
     guild_warns.pop(user_id, None)
     save_json(WARNS_PATH, warns)
     await interaction.response.send_message(
-        f"Cleared **{removed}** warn(s) for {member.mention}.",
+        _automod_text_sync(
+            interaction.user.id,
+            "warn_cleared",
+            default="Cleared **{count}** warn(s) for {member}.",
+            count=str(removed),
+            member=member.mention,
+        ),
         ephemeral=True,
     )
 
@@ -2166,7 +2499,12 @@ async def automod_escalation_warn(
 
     if errors:
         await interaction.response.send_message(
-            "Invalid escalation configuration:\n- " + "\n- ".join(errors),
+            _automod_text_sync(
+                interaction.user.id,
+                "escalation_invalid",
+                default="Invalid escalation configuration:\n- {errors}",
+                errors="\n- ".join(errors),
+            ),
             ephemeral=True,
         )
         return
@@ -2177,7 +2515,11 @@ async def automod_escalation_warn(
 
     if not parsed_thresholds:
         await interaction.response.send_message(
-            "Warn escalation cleared for warn 1-5 (all set to none/off).",
+            _automod_text_sync(
+                interaction.user.id,
+                "escalation_cleared",
+                default="Warn escalation cleared for warn 1-5 (all set to none/off).",
+            ),
             ephemeral=True,
         )
         return
@@ -2196,7 +2538,12 @@ async def automod_escalation_warn(
             lines.append(f"{idx}: {action}")
 
     await interaction.response.send_message(
-        "Warn escalation updated:\n" + "\n".join(lines),
+        _automod_text_sync(
+            interaction.user.id,
+            "escalation_updated",
+            default="Warn escalation updated:\n{lines}",
+            lines="\n".join(lines),
+        ),
         ephemeral=True,
     )
 

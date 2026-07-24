@@ -9,6 +9,14 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from Modules.i18n import t, t_sync
+from Modules.log_actor import (
+    LogActor,
+    format_log_actor,
+    log_actor_from_context,
+    log_actor_from_interaction,
+)
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = BASE_DIR / "Storage" / "Config" / "logging.json"
 
@@ -84,6 +92,33 @@ EVENT_MODULE_MAP = {
 
 LOGGER = logging.getLogger("coffeecord.logging")
 _CONFIG_LOCK = asyncio.Lock()
+AUDIT_LOG_MAX_AGE_SECONDS = 12.0
+AUDIT_LOG_FETCH_DELAY_SECONDS = 0.6
+LOGGING_EMBED_KEY_PREFIX = "logging.embed."
+LOGGING_EVENT_KEY_PREFIX = "logging.events."
+
+
+def _audit_entry_matches(entry: discord.AuditLogEntry, target_id: int) -> bool:
+    target = entry.target
+    tid = getattr(target, "id", None)
+    if tid != target_id:
+        return False
+    age = (discord.utils.utcnow() - entry.created_at).total_seconds()
+    return age <= AUDIT_LOG_MAX_AGE_SECONDS
+
+
+def _embed_action_by(
+    embed: discord.Embed,
+    actor: LogActor,
+    guild_id: int | None = None,
+    *,
+    inline: bool = True,
+) -> None:
+    embed.add_field(
+        name=t_sync(None, f"{LOGGING_EMBED_KEY_PREFIX}action_by", default="Action by"),
+        value=format_log_actor(actor),
+        inline=inline,
+    )
 
 
 def _guild_default() -> dict[str, Any]:
@@ -167,6 +202,14 @@ class LoggingCog(
         self.bot = bot
         self._config: dict[str, dict[str, Any]] = {}
 
+    @staticmethod
+    def _embed_label(user_id: int | None, key: str, default: str) -> str:
+        return t_sync(user_id, f"{LOGGING_EMBED_KEY_PREFIX}{key}", default=default)
+
+    @staticmethod
+    def _event_title(guild_id: int | None, key: str, default: str) -> str:
+        return t_sync(None, f"{LOGGING_EVENT_KEY_PREFIX}{key}", default=default)
+
     async def cog_load(self) -> None:
         await self.reload_config()
 
@@ -227,6 +270,27 @@ class LoggingCog(
 
         return channel
 
+    async def _fetch_audit_actor(
+        self,
+        guild: discord.Guild,
+        action: discord.AuditLogAction,
+        *,
+        target_id: int,
+        wait: bool = True,
+    ) -> discord.User | None:
+        if wait:
+            await asyncio.sleep(AUDIT_LOG_FETCH_DELAY_SECONDS)
+        try:
+            async for entry in guild.audit_logs(action=action, limit=8):
+                if not _audit_entry_matches(entry, target_id):
+                    continue
+                user = entry.user
+                if user is not None:
+                    return user
+        except (discord.Forbidden, discord.HTTPException):
+            return None
+        return None
+
     async def _send_event_embed(
         self,
         guild: discord.Guild,
@@ -262,10 +326,15 @@ class LoggingCog(
             return discord.Color.red()
         return discord.Color.blurple()
 
-    def _build_status_embed(self, guild: discord.Guild, cfg: dict[str, Any]) -> discord.Embed:
+    def _build_status_embed(self, guild: discord.Guild, cfg: dict[str, Any], *, user_id: int | None = None) -> discord.Embed:
         enabled = bool(cfg.get("enabled", False))
         channel_id = cfg.get("log_channel_id")
-        channel_text = f"<#{channel_id}>" if isinstance(channel_id, int) else "Not set"
+        uid = user_id
+        channel_text = (
+            f"<#{channel_id}>"
+            if isinstance(channel_id, int)
+            else t_sync(uid, "common.not_configured", default="Not configured.")
+        )
         lines = []
         events = cfg.get("events", {})
         for name in EVENT_DEFAULTS.keys():
@@ -277,41 +346,57 @@ class LoggingCog(
             marker = "☑" if bool(modules.get(name, False)) else "☐"
             module_lines.append(f"{marker} `{name}`")
         embed = discord.Embed(
-            title="Logging Status",
+            title=t_sync(uid, "logging.status.title", default="Logging Status"),
             color=discord.Color.green() if enabled else discord.Color.red(),
             timestamp=discord.utils.utcnow(),
         )
-        embed.add_field(name="Enabled", value="Yes" if enabled else "No", inline=True)
-        embed.add_field(name="Log Channel", value=channel_text, inline=True)
-        embed.add_field(name="Events", value="\n".join(lines), inline=False)
-        embed.add_field(name="Modules", value="\n".join(module_lines), inline=False)
+        embed.add_field(
+            name=self._embed_label(uid, "enabled", "Enabled"),
+            value=t_sync(uid, "common.yes", default="Yes") if enabled else t_sync(uid, "common.no", default="No"),
+            inline=True,
+        )
+        embed.add_field(name=self._embed_label(uid, "log_channel", "Log Channel"), value=channel_text, inline=True)
+        embed.add_field(name=self._embed_label(uid, "events", "Events"), value="\n".join(lines), inline=False)
+        embed.add_field(name=self._embed_label(uid, "modules", "Modules"), value="\n".join(module_lines), inline=False)
         embed.set_footer(text="Coffeecord Logging")
         return embed
 
-    @app_commands.command(name="status", description="Show logging status for this server.")
+    @app_commands.command(
+        name="status",
+        description="Show logging status for this server.",
+)
     async def logging_status(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         cfg = await self.load_logging_config(interaction.guild.id)
-        await interaction.response.send_message(embed=self._build_status_embed(interaction.guild, cfg), ephemeral=True)
+        await interaction.response.send_message(embed=self._build_status_embed(interaction.guild, cfg, user_id=interaction.user.id), ephemeral=True)
 
-    @app_commands.command(name="setup", description="Set logging channel and enable logging.")
+    @app_commands.command(
+        name="setup",
+        description="Set logging channel and enable logging.",
+)
     @app_commands.describe(channel="Channel where logs should be sent")
     async def logging_setup(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         cfg = await self.load_logging_config(interaction.guild.id)
         cfg["enabled"] = True
         cfg["log_channel_id"] = channel.id
         await self.save_logging_config(interaction.guild.id, cfg)
         await interaction.response.send_message(
-            f"Logging enabled. Events will be sent to {channel.mention}.",
+            await t(interaction.user.id,
+                "logging.setup_success",
+                channel=channel.mention,
+            ),
             ephemeral=True,
         )
 
-    @app_commands.command(name="toggle", description="Enable or disable a specific logging event.")
+    @app_commands.command(
+        name="toggle",
+        description="Enable or disable a specific logging event.",
+)
     @app_commands.describe(event="Event to toggle")
     @app_commands.choices(
         event=[
@@ -343,16 +428,26 @@ class LoggingCog(
     )
     async def logging_toggle(self, interaction: discord.Interaction, event: app_commands.Choice[str]) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         cfg = await self.load_logging_config(interaction.guild.id)
         current = bool(cfg.get("events", {}).get(event.value, EVENT_DEFAULTS[event.value]))
         cfg["events"][event.value] = not current
         await self.save_logging_config(interaction.guild.id, cfg)
-        state = "enabled" if cfg["events"][event.value] else "disabled"
-        await interaction.response.send_message(f"`{event.value}` is now **{state}**.", ephemeral=True)
+        state_key = "modules_cmd.state_enabled" if cfg["events"][event.value] else "modules_cmd.state_disabled"
+        await interaction.response.send_message(
+            await t(interaction.user.id,
+                "logging.toggle_event",
+                event=event.value,
+                state=await t(interaction.user.id, state_key),
+            ),
+            ephemeral=True,
+        )
 
-    @app_commands.command(name="module", description="Enable or disable a logging module.")
+    @app_commands.command(
+        name="module",
+        description="Enable or disable a logging module.",
+)
     @app_commands.describe(module="Module to toggle", enabled="Whether this module should log")
     @app_commands.choices(
         module=[
@@ -380,25 +475,36 @@ class LoggingCog(
         enabled: bool,
     ) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         cfg = await self.load_logging_config(interaction.guild.id)
         cfg["modules"][module.value] = enabled
         await self.save_logging_config(interaction.guild.id, cfg)
+        state_key = "modules_cmd.state_enabled" if enabled else "modules_cmd.state_disabled"
         await interaction.response.send_message(
-            f"Module `{module.value}` is now **{'enabled' if enabled else 'disabled'}**.",
+            await t(interaction.user.id,
+                "logging.module_set",
+                module=module.value,
+                state=await t(interaction.user.id, state_key),
+            ),
             ephemeral=True,
         )
 
-    @app_commands.command(name="disable", description="Disable logging for this server.")
+    @app_commands.command(
+        name="disable",
+        description="Disable logging for this server.",
+)
     async def logging_disable(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         cfg = await self.load_logging_config(interaction.guild.id)
         cfg["enabled"] = False
         await self.save_logging_config(interaction.guild.id, cfg)
-        await interaction.response.send_message("Logging disabled for this server.", ephemeral=True)
+        await interaction.response.send_message(
+            await t(interaction.user.id, "logging.disabled"),
+            ephemeral=True,
+        )
 
     # ----- Event listeners -----
     @commands.Cog.listener()
@@ -416,16 +522,25 @@ class LoggingCog(
         elif interaction.data and isinstance(interaction.data, dict):
             command_name = str(interaction.data.get("name", "unknown"))
 
-        channel_value = interaction.channel.mention if interaction.channel else "Unknown"
+        guild_id = interaction.guild.id
+        channel_value = (
+            interaction.channel.mention
+            if interaction.channel
+            else self._embed_label(None, "unknown_channel", "Unknown")
+        )
         embed = discord.Embed(
-            title="Command Used",
+            title=self._event_title(guild_id, "command_use", "Command Used"),
             color=discord.Color.blurple(),
             timestamp=discord.utils.utcnow(),
         )
-        embed.add_field(name="Type", value="Slash", inline=True)
-        embed.add_field(name="Command", value=f"`/{command_name}`", inline=True)
-        embed.add_field(name="User", value=interaction.user.mention, inline=True)
-        embed.add_field(name="Channel", value=channel_value, inline=True)
+        embed.add_field(
+            name=self._embed_label(None, "type", "Type"),
+            value=self._embed_label(None, "slash", "Slash"),
+            inline=True,
+        )
+        embed.add_field(name=self._embed_label(None, "command", "Command"), value=f"`/{command_name}`", inline=True)
+        _embed_action_by(embed, log_actor_from_interaction(interaction), guild_id)
+        embed.add_field(name=self._embed_label(None, "channel", "Channel"), value=channel_value, inline=True)
         await self._send_event_embed(interaction.guild, "command_use", embed, module_name="commands")
 
     @commands.Cog.listener()
@@ -438,30 +553,62 @@ class LoggingCog(
             return
 
         command_name = ctx.command.qualified_name
+        guild_id = ctx.guild.id
         embed = discord.Embed(
-            title="Command Used",
+            title=self._event_title(guild_id, "command_use", "Command Used"),
             color=discord.Color.blurple(),
             timestamp=discord.utils.utcnow(),
         )
-        embed.add_field(name="Type", value="Prefix", inline=True)
-        embed.add_field(name="Command", value=f"`{ctx.clean_prefix}{command_name}`", inline=True)
-        embed.add_field(name="User", value=ctx.author.mention, inline=True)
-        embed.add_field(name="Channel", value=ctx.channel.mention, inline=True)
+        embed.add_field(
+            name=self._embed_label(None, "type", "Type"),
+            value=self._embed_label(None, "prefix", "Prefix"),
+            inline=True,
+        )
+        embed.add_field(
+            name=self._embed_label(None, "command", "Command"),
+            value=f"`{ctx.clean_prefix}{command_name}`",
+            inline=True,
+        )
+        _embed_action_by(embed, log_actor_from_context(ctx), guild_id)
+        embed.add_field(name=self._embed_label(None, "channel", "Channel"), value=ctx.channel.mention, inline=True)
         await self._send_event_embed(ctx.guild, "command_use", embed, module_name="commands")
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message) -> None:
         if message.guild is None or message.author.bot:
             return
+        actor: LogActor = message.author
+        if message.guild.me and self.bot.user:
+            audit_user = await self._fetch_audit_actor(
+                message.guild,
+                discord.AuditLogAction.message_delete,
+                target_id=message.author.id,
+            )
+            if audit_user is not None and audit_user.id != message.author.id:
+                actor = audit_user
+        guild_id = message.guild.id
         embed = discord.Embed(
-            title="Message Deleted",
+            title=self._event_title(guild_id, "message_delete", "Message Deleted"),
             color=self._event_color("message_delete"),
             timestamp=discord.utils.utcnow(),
         )
-        embed.add_field(name="Author", value=message.author.mention, inline=True)
-        embed.add_field(name="Channel", value=message.channel.mention if isinstance(message.channel, discord.abc.GuildChannel) else "Unknown", inline=True)
+        embed.add_field(name=self._embed_label(None, "author", "Author"), value=message.author.mention, inline=True)
+        embed.add_field(
+            name=self._embed_label(None, "channel", "Channel"),
+            value=(
+                message.channel.mention
+                if isinstance(message.channel, discord.abc.GuildChannel)
+                else self._embed_label(None, "unknown_channel", "Unknown")
+            ),
+            inline=True,
+        )
+        _embed_action_by(embed, actor, guild_id)
         content = (message.content or "").strip()
-        embed.add_field(name="Content", value=content[:1024] if content else "No text content", inline=False)
+        embed.add_field(
+            name=self._embed_label(None, "content", "Content"),
+            value=content[:1024] if content else self._embed_label(None, "no_text", "No text content"),
+            inline=False,
+        )
         await self._send_event_embed(message.guild, "message_delete", embed, module_name="messages")
 
     @commands.Cog.listener()
@@ -470,123 +617,229 @@ class LoggingCog(
             return
         if before.content == after.content:
             return
+        guild_id = before.guild.id
         embed = discord.Embed(
-            title="Message Edited",
+            title=self._event_title(guild_id, "message_edit", "Message Edited"),
             color=self._event_color("message_edit"),
             timestamp=discord.utils.utcnow(),
         )
-        embed.add_field(name="Author", value=before.author.mention, inline=True)
-        embed.add_field(name="Channel", value=before.channel.mention if isinstance(before.channel, discord.abc.GuildChannel) else "Unknown", inline=True)
-        embed.add_field(name="Before", value=(before.content or "No text")[:1024], inline=False)
-        embed.add_field(name="After", value=(after.content or "No text")[:1024], inline=False)
+        embed.add_field(name=self._embed_label(None, "author", "Author"), value=before.author.mention, inline=True)
+        embed.add_field(
+            name=self._embed_label(None, "channel", "Channel"),
+            value=(
+                before.channel.mention
+                if isinstance(before.channel, discord.abc.GuildChannel)
+                else self._embed_label(None, "unknown_channel", "Unknown")
+            ),
+            inline=True,
+        )
+        _embed_action_by(embed, before.author, guild_id)
+        embed.add_field(
+            name=self._embed_label(None, "before", "Before"),
+            value=(before.content or self._embed_label(None, "no_text_short", "No text"))[:1024],
+            inline=False,
+        )
+        embed.add_field(
+            name=self._embed_label(None, "after", "After"),
+            value=(after.content or self._embed_label(None, "no_text_short", "No text"))[:1024],
+            inline=False,
+        )
         await self._send_event_embed(before.guild, "message_edit", embed, module_name="messages")
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
+        guild_id = member.guild.id
         embed = discord.Embed(
-            title="Member Joined",
+            title=self._event_title(guild_id, "member_join", "Member Joined"),
             color=self._event_color("member_join"),
             timestamp=discord.utils.utcnow(),
         )
-        embed.add_field(name="Member", value=f"{member.mention} (`{member.id}`)", inline=False)
-        embed.add_field(name="Account Created", value=discord.utils.format_dt(member.created_at, style="R"), inline=False)
+        embed.add_field(name=self._embed_label(None, "member", "Member"), value=f"{member.mention} (`{member.id}`)", inline=False)
+        embed.add_field(
+            name=self._embed_label(None, "account_created", "Account Created"),
+            value=discord.utils.format_dt(member.created_at, style="R"),
+            inline=False,
+        )
         await self._send_event_embed(member.guild, "member_join", embed, module_name="members")
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member) -> None:
+        guild_id = member.guild.id
         embed = discord.Embed(
-            title="Member Left",
+            title=self._event_title(guild_id, "member_leave", "Member Left"),
             color=self._event_color("member_leave"),
             timestamp=discord.utils.utcnow(),
         )
-        embed.add_field(name="Member", value=f"{member} (`{member.id}`)", inline=False)
+        embed.add_field(name=self._embed_label(None, "member", "Member"), value=f"{member} (`{member.id}`)", inline=False)
         await self._send_event_embed(member.guild, "member_leave", embed, module_name="members")
 
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member) -> None:
+        guild_id = after.guild.id
         before_to = before.timed_out_until
         after_to = after.timed_out_until
         if before_to != after_to:
             is_timeout_added = after_to is not None and (before_to is None or after_to > before_to)
-            title = "Timeout Added" if is_timeout_added else "Timeout Removed"
+            title = self._event_title(
+                guild_id,
+                "timeout_added" if is_timeout_added else "timeout_removed",
+                "Timeout Added" if is_timeout_added else "Timeout Removed",
+            )
             embed = discord.Embed(
                 title=title,
                 color=self._event_color("timeout"),
                 timestamp=discord.utils.utcnow(),
             )
-            embed.add_field(name="Member", value=f"{after.mention} (`{after.id}`)", inline=False)
+            embed.add_field(name=self._embed_label(None, "member", "Member"), value=f"{after.mention} (`{after.id}`)", inline=False)
             if after_to is not None:
-                embed.add_field(name="Until", value=discord.utils.format_dt(after_to, style="F"), inline=False)
+                embed.add_field(
+                    name=self._embed_label(None, "until", "Until"),
+                    value=discord.utils.format_dt(after_to, style="F"),
+                    inline=False,
+                )
+            audit_user = await self._fetch_audit_actor(
+                after.guild,
+                discord.AuditLogAction.member_update,
+                target_id=after.id,
+            )
+            _embed_action_by(embed, audit_user, guild_id)
             await self._send_event_embed(after.guild, "timeout", embed, module_name="moderation")
 
         if before.nick != after.nick:
             embed = discord.Embed(
-                title="Nickname Changed",
+                title=self._event_title(guild_id, "nickname_change", "Nickname Changed"),
                 color=discord.Color.blurple(),
                 timestamp=discord.utils.utcnow(),
             )
-            embed.add_field(name="Member", value=f"{after.mention} (`{after.id}`)", inline=False)
-            embed.add_field(name="Before", value=before.nick or before.name, inline=True)
-            embed.add_field(name="After", value=after.nick or after.name, inline=True)
+            embed.add_field(name=self._embed_label(None, "member", "Member"), value=f"{after.mention} (`{after.id}`)", inline=False)
+            embed.add_field(
+                name=self._embed_label(None, "before", "Before"),
+                value=before.nick or before.name,
+                inline=True,
+            )
+            embed.add_field(
+                name=self._embed_label(None, "after", "After"),
+                value=after.nick or after.name,
+                inline=True,
+            )
+            audit_user = await self._fetch_audit_actor(
+                after.guild,
+                discord.AuditLogAction.member_update,
+                target_id=after.id,
+            )
+            _embed_action_by(embed, audit_user, guild_id)
             await self._send_event_embed(after.guild, "nickname_change", embed, module_name="members")
 
         before_roles = {role.id for role in before.roles}
         after_roles = {role.id for role in after.roles}
         added_role_ids = after_roles - before_roles
         removed_role_ids = before_roles - after_roles
+        role_audit_user: discord.User | None = None
+        if added_role_ids or removed_role_ids:
+            role_audit_user = await self._fetch_audit_actor(
+                after.guild,
+                discord.AuditLogAction.member_role_update,
+                target_id=after.id,
+            )
 
         if added_role_ids:
             role_mentions = [f"<@&{role_id}>" for role_id in added_role_ids]
             embed = discord.Embed(
-                title="Roles Added",
+                title=self._event_title(guild_id, "role_assign", "Roles Added"),
                 color=discord.Color.green(),
                 timestamp=discord.utils.utcnow(),
             )
-            embed.add_field(name="Member", value=f"{after.mention} (`{after.id}`)", inline=False)
-            embed.add_field(name="Roles", value=", ".join(role_mentions)[:1024], inline=False)
+            embed.add_field(name=self._embed_label(None, "member", "Member"), value=f"{after.mention} (`{after.id}`)", inline=False)
+            embed.add_field(
+                name=self._embed_label(None, "roles", "Roles"),
+                value=", ".join(role_mentions)[:1024],
+                inline=False,
+            )
+            _embed_action_by(embed, role_audit_user, guild_id)
             await self._send_event_embed(after.guild, "role_assign", embed, module_name="moderation")
 
         if removed_role_ids:
             role_mentions = [f"<@&{role_id}>" for role_id in removed_role_ids]
             embed = discord.Embed(
-                title="Roles Removed",
+                title=self._event_title(guild_id, "role_remove", "Roles Removed"),
                 color=discord.Color.red(),
                 timestamp=discord.utils.utcnow(),
             )
-            embed.add_field(name="Member", value=f"{after.mention} (`{after.id}`)", inline=False)
-            embed.add_field(name="Roles", value=", ".join(role_mentions)[:1024], inline=False)
+            embed.add_field(name=self._embed_label(None, "member", "Member"), value=f"{after.mention} (`{after.id}`)", inline=False)
+            embed.add_field(
+                name=self._embed_label(None, "roles", "Roles"),
+                value=", ".join(role_mentions)[:1024],
+                inline=False,
+            )
+            _embed_action_by(embed, role_audit_user, guild_id)
             await self._send_event_embed(after.guild, "role_remove", embed, module_name="moderation")
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild: discord.Guild, user: discord.User) -> None:
+        audit_user = await self._fetch_audit_actor(
+            guild,
+            discord.AuditLogAction.ban,
+            target_id=user.id,
+        )
+        guild_id = guild.id
         embed = discord.Embed(
-            title="Member Banned",
+            title=self._event_title(guild_id, "ban", "Member Banned"),
             color=self._event_color("ban"),
             timestamp=discord.utils.utcnow(),
         )
-        embed.add_field(name="User", value=f"{user} (`{user.id}`)", inline=False)
+        embed.add_field(name=self._embed_label(None, "user", "User"), value=f"{user} (`{user.id}`)", inline=False)
+        _embed_action_by(embed, audit_user, guild_id)
         await self._send_event_embed(guild, "ban", embed, module_name="moderation")
 
     @commands.Cog.listener()
     async def on_member_unban(self, guild: discord.Guild, user: discord.User) -> None:
+        audit_user = await self._fetch_audit_actor(
+            guild,
+            discord.AuditLogAction.unban,
+            target_id=user.id,
+        )
+        guild_id = guild.id
         embed = discord.Embed(
-            title="Member Unbanned",
+            title=self._event_title(guild_id, "unban", "Member Unbanned"),
             color=self._event_color("unban"),
             timestamp=discord.utils.utcnow(),
         )
-        embed.add_field(name="User", value=f"{user} (`{user.id}`)", inline=False)
+        embed.add_field(name=self._embed_label(None, "user", "User"), value=f"{user} (`{user.id}`)", inline=False)
+        _embed_action_by(embed, audit_user, guild_id)
         await self._send_event_embed(guild, "unban", embed, module_name="moderation")
 
     @commands.Cog.listener()
     async def on_guild_role_create(self, role: discord.Role) -> None:
-        embed = discord.Embed(title="Role Created", color=discord.Color.green(), timestamp=discord.utils.utcnow())
-        embed.add_field(name="Role", value=f"{role.mention} (`{role.id}`)", inline=False)
+        audit_user = await self._fetch_audit_actor(
+            role.guild,
+            discord.AuditLogAction.role_create,
+            target_id=role.id,
+        )
+        guild_id = role.guild.id
+        embed = discord.Embed(
+            title=self._event_title(guild_id, "role_create", "Role Created"),
+            color=discord.Color.green(),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(name=self._embed_label(None, "role", "Role"), value=f"{role.mention} (`{role.id}`)", inline=False)
+        _embed_action_by(embed, audit_user, guild_id)
         await self._send_event_embed(role.guild, "role_create", embed, module_name="moderation")
 
     @commands.Cog.listener()
     async def on_guild_role_delete(self, role: discord.Role) -> None:
-        embed = discord.Embed(title="Role Deleted", color=discord.Color.red(), timestamp=discord.utils.utcnow())
-        embed.add_field(name="Role", value=f"{role.name} (`{role.id}`)", inline=False)
+        audit_user = await self._fetch_audit_actor(
+            role.guild,
+            discord.AuditLogAction.role_delete,
+            target_id=role.id,
+        )
+        guild_id = role.guild.id
+        embed = discord.Embed(
+            title=self._event_title(guild_id, "role_delete", "Role Deleted"),
+            color=discord.Color.red(),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(name=self._embed_label(None, "role", "Role"), value=f"{role.name} (`{role.id}`)", inline=False)
+        _embed_action_by(embed, audit_user, guild_id)
         await self._send_event_embed(role.guild, "role_delete", embed, module_name="moderation")
 
     @commands.Cog.listener()
@@ -600,21 +853,66 @@ class LoggingCog(
             changes.append("permissions updated")
         if not changes:
             return
-        embed = discord.Embed(title="Role Updated", color=discord.Color.blurple(), timestamp=discord.utils.utcnow())
-        embed.add_field(name="Role", value=f"{after.mention} (`{after.id}`)", inline=False)
-        embed.add_field(name="Changes", value="\n".join(changes)[:1024], inline=False)
+        audit_user = await self._fetch_audit_actor(
+            after.guild,
+            discord.AuditLogAction.role_update,
+            target_id=after.id,
+        )
+        guild_id = after.guild.id
+        embed = discord.Embed(
+            title=self._event_title(guild_id, "role_update", "Role Updated"),
+            color=discord.Color.blurple(),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(name=self._embed_label(None, "role", "Role"), value=f"{after.mention} (`{after.id}`)", inline=False)
+        embed.add_field(
+            name=self._embed_label(None, "changes", "Changes"),
+            value="\n".join(changes)[:1024],
+            inline=False,
+        )
+        _embed_action_by(embed, audit_user, guild_id)
         await self._send_event_embed(after.guild, "role_update", embed, module_name="moderation")
 
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel: discord.abc.GuildChannel) -> None:
-        embed = discord.Embed(title="Channel Created", color=discord.Color.green(), timestamp=discord.utils.utcnow())
-        embed.add_field(name="Channel", value=f"{getattr(channel, 'mention', channel.name)} (`{channel.id}`)", inline=False)
+        audit_user = await self._fetch_audit_actor(
+            channel.guild,
+            discord.AuditLogAction.channel_create,
+            target_id=channel.id,
+        )
+        guild_id = channel.guild.id
+        embed = discord.Embed(
+            title=self._event_title(guild_id, "channel_create", "Channel Created"),
+            color=discord.Color.green(),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(
+            name=self._embed_label(None, "channel", "Channel"),
+            value=f"{getattr(channel, 'mention', channel.name)} (`{channel.id}`)",
+            inline=False,
+        )
+        _embed_action_by(embed, audit_user, guild_id)
         await self._send_event_embed(channel.guild, "channel_create", embed, module_name="messages")
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel) -> None:
-        embed = discord.Embed(title="Channel Deleted", color=discord.Color.red(), timestamp=discord.utils.utcnow())
-        embed.add_field(name="Channel", value=f"{channel.name} (`{channel.id}`)", inline=False)
+        audit_user = await self._fetch_audit_actor(
+            channel.guild,
+            discord.AuditLogAction.channel_delete,
+            target_id=channel.id,
+        )
+        guild_id = channel.guild.id
+        embed = discord.Embed(
+            title=self._event_title(guild_id, "channel_delete", "Channel Deleted"),
+            color=discord.Color.red(),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(
+            name=self._embed_label(None, "channel", "Channel"),
+            value=f"{channel.name} (`{channel.id}`)",
+            inline=False,
+        )
+        _embed_action_by(embed, audit_user, guild_id)
         await self._send_event_embed(channel.guild, "channel_delete", embed, module_name="messages")
 
     @commands.Cog.listener()
@@ -628,9 +926,28 @@ class LoggingCog(
             changes.append("slowmode updated")
         if not changes:
             return
-        embed = discord.Embed(title="Channel Updated", color=discord.Color.blurple(), timestamp=discord.utils.utcnow())
-        embed.add_field(name="Channel", value=f"{getattr(after, 'mention', after.name)} (`{after.id}`)", inline=False)
-        embed.add_field(name="Changes", value="\n".join(changes)[:1024], inline=False)
+        audit_user = await self._fetch_audit_actor(
+            after.guild,
+            discord.AuditLogAction.channel_update,
+            target_id=after.id,
+        )
+        guild_id = after.guild.id
+        embed = discord.Embed(
+            title=self._event_title(guild_id, "channel_update", "Channel Updated"),
+            color=discord.Color.blurple(),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(
+            name=self._embed_label(None, "channel", "Channel"),
+            value=f"{getattr(after, 'mention', after.name)} (`{after.id}`)",
+            inline=False,
+        )
+        embed.add_field(
+            name=self._embed_label(None, "changes", "Changes"),
+            value="\n".join(changes)[:1024],
+            inline=False,
+        )
+        _embed_action_by(embed, audit_user, guild_id)
         await self._send_event_embed(after.guild, "channel_update", embed, module_name="messages")
 
     @commands.Cog.listener()
@@ -642,23 +959,44 @@ class LoggingCog(
     ) -> None:
         if member.bot:
             return
+        guild_id = member.guild.id
         if before.channel is None and after.channel is not None:
-            embed = discord.Embed(title="Voice Join", color=discord.Color.green(), timestamp=discord.utils.utcnow())
-            embed.add_field(name="Member", value=f"{member.mention} (`{member.id}`)", inline=False)
-            embed.add_field(name="Channel", value=after.channel.mention, inline=False)
+            embed = discord.Embed(
+                title=self._event_title(guild_id, "voice_join", "Voice Join"),
+                color=discord.Color.green(),
+                timestamp=discord.utils.utcnow(),
+            )
+            embed.add_field(name=self._embed_label(None, "member", "Member"), value=f"{member.mention} (`{member.id}`)", inline=False)
+            embed.add_field(name=self._embed_label(None, "channel", "Channel"), value=after.channel.mention, inline=False)
+            _embed_action_by(embed, member, guild_id)
             await self._send_event_embed(member.guild, "voice_join", embed, module_name="members")
             return
         if before.channel is not None and after.channel is None:
-            embed = discord.Embed(title="Voice Leave", color=discord.Color.red(), timestamp=discord.utils.utcnow())
-            embed.add_field(name="Member", value=f"{member.mention} (`{member.id}`)", inline=False)
-            embed.add_field(name="Channel", value=before.channel.mention, inline=False)
+            embed = discord.Embed(
+                title=self._event_title(guild_id, "voice_leave", "Voice Leave"),
+                color=discord.Color.red(),
+                timestamp=discord.utils.utcnow(),
+            )
+            embed.add_field(name=self._embed_label(None, "member", "Member"), value=f"{member.mention} (`{member.id}`)", inline=False)
+            embed.add_field(name=self._embed_label(None, "channel", "Channel"), value=before.channel.mention, inline=False)
+            _embed_action_by(embed, member, guild_id)
             await self._send_event_embed(member.guild, "voice_leave", embed, module_name="members")
             return
         if before.channel is not None and after.channel is not None and before.channel.id != after.channel.id:
-            embed = discord.Embed(title="Voice Move", color=discord.Color.blurple(), timestamp=discord.utils.utcnow())
-            embed.add_field(name="Member", value=f"{member.mention} (`{member.id}`)", inline=False)
-            embed.add_field(name="From", value=before.channel.mention, inline=True)
-            embed.add_field(name="To", value=after.channel.mention, inline=True)
+            embed = discord.Embed(
+                title=self._event_title(guild_id, "voice_move", "Voice Move"),
+                color=discord.Color.blurple(),
+                timestamp=discord.utils.utcnow(),
+            )
+            embed.add_field(name=self._embed_label(None, "member", "Member"), value=f"{member.mention} (`{member.id}`)", inline=False)
+            embed.add_field(name=self._embed_label(None, "from", "From"), value=before.channel.mention, inline=True)
+            embed.add_field(name=self._embed_label(None, "to", "To"), value=after.channel.mention, inline=True)
+            audit_user = await self._fetch_audit_actor(
+                member.guild,
+                discord.AuditLogAction.member_move,
+                target_id=member.id,
+            )
+            _embed_action_by(embed, audit_user or member, guild_id)
             await self._send_event_embed(member.guild, "voice_move", embed, module_name="members")
 
     @commands.Cog.listener("on_coffeecord_warn")
@@ -670,15 +1008,20 @@ class LoggingCog(
         reason: str,
         source: str = "manual",
     ) -> None:
+        guild_id = guild.id
         embed = discord.Embed(
-            title="Warn Issued",
+            title=self._event_title(guild_id, "warn", "Warn Issued"),
             color=self._event_color("warn"),
             timestamp=discord.utils.utcnow(),
         )
-        embed.add_field(name="Target", value=f"{target.mention} (`{target.id}`)", inline=False)
-        embed.add_field(name="Moderator", value=(moderator.mention if moderator else "Automod/System"), inline=False)
-        embed.add_field(name="Source", value=source, inline=True)
-        embed.add_field(name="Reason", value=(reason or "No reason provided")[:1024], inline=False)
+        embed.add_field(name=self._embed_label(None, "target", "Target"), value=f"{target.mention} (`{target.id}`)", inline=False)
+        _embed_action_by(embed, moderator, guild_id)
+        embed.add_field(name=self._embed_label(None, "source", "Source"), value=source, inline=True)
+        embed.add_field(
+            name=self._embed_label(None, "reason", "Reason"),
+            value=(reason or self._embed_label(None, "no_reason", "No reason provided"))[:1024],
+            inline=False,
+        )
         await self._send_event_embed(guild, "warn", embed, module_name="moderation")
 
     @commands.Cog.listener("on_coffeecord_automod_action")
@@ -692,17 +1035,31 @@ class LoggingCog(
         channel_id: int,
         message_id: int,
     ) -> None:
+        guild_id = guild.id
         embed = discord.Embed(
-            title="Automod Action",
+            title=self._event_title(guild_id, "automod", "Automod Action"),
             color=self._event_color("automod"),
             timestamp=discord.utils.utcnow(),
         )
-        embed.add_field(name="Target", value=f"{target.mention} (`{target.id}`)", inline=False)
-        embed.add_field(name="Rule", value=rule, inline=True)
-        embed.add_field(name="Action", value=action, inline=True)
-        embed.add_field(name="Channel", value=f"<#{channel_id}>", inline=True)
-        embed.add_field(name="Message", value=f"https://discord.com/channels/{guild.id}/{channel_id}/{message_id}", inline=False)
-        embed.add_field(name="Reason", value=(reason or "No reason provided")[:1024], inline=False)
+        embed.add_field(name=self._embed_label(None, "target", "Target"), value=f"{target.mention} (`{target.id}`)", inline=False)
+        embed.add_field(name=self._embed_label(None, "rule", "Rule"), value=rule, inline=True)
+        embed.add_field(name=self._embed_label(None, "action", "Action"), value=action, inline=True)
+        embed.add_field(
+            name=self._embed_label(None, "action_by", "Action by"),
+            value=self._embed_label(None, "automod", "Automod"),
+            inline=True,
+        )
+        embed.add_field(name=self._embed_label(None, "channel", "Channel"), value=f"<#{channel_id}>", inline=True)
+        embed.add_field(
+            name=self._embed_label(None, "message", "Message"),
+            value=f"https://discord.com/channels/{guild.id}/{channel_id}/{message_id}",
+            inline=False,
+        )
+        embed.add_field(
+            name=self._embed_label(None, "reason", "Reason"),
+            value=(reason or self._embed_label(None, "no_reason", "No reason provided"))[:1024],
+            inline=False,
+        )
         await self._send_event_embed(guild, "automod", embed, module_name="automod")
 
     @commands.Cog.listener("on_coffeecord_ticket_event")
@@ -714,16 +1071,17 @@ class LoggingCog(
         channel_id: int,
         details: str = "",
     ) -> None:
+        guild_id = guild.id
         embed = discord.Embed(
-            title="Ticket Event",
+            title=self._event_title(guild_id, "ticket_event", "Ticket Event"),
             color=discord.Color.blue(),
             timestamp=discord.utils.utcnow(),
         )
-        embed.add_field(name="Action", value=action, inline=True)
-        embed.add_field(name="Actor", value=f"{actor.mention} (`{actor.id}`)", inline=True)
-        embed.add_field(name="Channel", value=f"<#{channel_id}>", inline=True)
+        embed.add_field(name=self._embed_label(None, "action", "Action"), value=action, inline=True)
+        _embed_action_by(embed, actor, guild_id)
+        embed.add_field(name=self._embed_label(None, "channel", "Channel"), value=f"<#{channel_id}>", inline=True)
         if details:
-            embed.add_field(name="Details", value=details[:1024], inline=False)
+            embed.add_field(name=self._embed_label(None, "details", "Details"), value=details[:1024], inline=False)
         await self._send_event_embed(guild, "ticket_event", embed, module_name="tickets")
 
     @commands.Cog.listener("on_coffeecord_module_event")
@@ -732,24 +1090,28 @@ class LoggingCog(
         guild: discord.Guild,
         module_name: str,
         action: str,
-        actor: Optional[discord.abc.User] = None,
+        actor: LogActor = None,
         details: str = "",
         channel_id: Optional[int] = None,
     ) -> None:
         module_key = (module_name or "misc").strip().lower()
+        guild_id = guild.id
         embed = discord.Embed(
-            title="Module Event",
+            title=self._event_title(guild_id, "module_event", "Module Event"),
             color=discord.Color.blurple(),
             timestamp=discord.utils.utcnow(),
         )
-        embed.add_field(name="Module", value=module_key, inline=True)
-        embed.add_field(name="Action", value=action or "unknown", inline=True)
-        if actor is not None:
-            embed.add_field(name="Actor", value=f"{actor.mention} (`{actor.id}`)", inline=False)
+        embed.add_field(name=self._embed_label(None, "module", "Module"), value=module_key, inline=True)
+        embed.add_field(
+            name=self._embed_label(None, "action", "Action"),
+            value=action or t_sync(None, "common.unknown", default="unknown"),
+            inline=True,
+        )
+        _embed_action_by(embed, actor, guild_id, inline=False)
         if channel_id is not None:
-            embed.add_field(name="Channel", value=f"<#{channel_id}>", inline=True)
+            embed.add_field(name=self._embed_label(None, "channel", "Channel"), value=f"<#{channel_id}>", inline=True)
         if details:
-            embed.add_field(name="Details", value=details[:1024], inline=False)
+            embed.add_field(name=self._embed_label(None, "details", "Details"), value=details[:1024], inline=False)
         await self._send_event_embed(guild, "module_event", embed, module_name=module_key)
 
     @commands.Cog.listener()

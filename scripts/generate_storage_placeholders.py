@@ -57,7 +57,7 @@ CONFIG_PLACEHOLDERS: dict[str, object] = {
     },
     "backgrounds.json": {},
     "command_config.json": {"guild_id": 0, "command_config": {}},
-    "exit_surveys.json": {},
+    "user_languages.json": {},
     "level_rewards.json": {},
     "leveling.json": {},
     "leveling_announce.json": {},
@@ -70,19 +70,23 @@ CONFIG_PLACEHOLDERS: dict[str, object] = {
             {"id": "adaptive_slowmode", "extension": "Modules.adaptive_slowmode", "path": "Modules/adaptive_slowmode.py", "display_name": "Adaptive Slowmode", "description": "Adaptive slowmode configuration.", "default_enabled": True, "category": "moderation"},
             {"id": "applications", "extension": "Modules.applications", "path": "Modules/applications.py", "display_name": "Applications", "description": "Staff application questions and submissions.", "default_enabled": True, "category": "utilities"},
             {"id": "automod", "extension": "Modules.automod", "path": "Modules/automod.py", "display_name": "Automod", "description": "Spam, caps, link, mention, keyword filters.", "default_enabled": True, "category": "moderation"},
+            {"id": "inactive_members", "extension": "Modules.inactive_members", "path": "Modules/inactive_members.py", "display_name": "Inactive Members", "description": "Track activity and remove inactive members.", "default_enabled": True, "category": "moderation"},
             {"id": "autorole", "extension": "Modules.autorole", "path": "Modules/autorole.py", "display_name": "Auto Roles", "description": "Rule-based automatic role assignment.", "default_enabled": True, "category": "configuration"},
             {"id": "calls", "extension": "Modules.calls", "path": "Modules/calls.py", "display_name": "Calls", "description": "Private call channels.", "default_enabled": True, "category": "utilities"},
             {"id": "kofi", "extension": "Modules.kofi", "path": "Modules/kofi.py", "display_name": "Ko-fi Supporters", "description": "Ko-fi linking and supporter perks.", "default_enabled": True, "category": "integrations"},
             {"id": "leveling", "extension": "Modules.leveling", "path": "Modules/leveling.py", "display_name": "Leveling & XP", "description": "XP gain, level-up logic, level cards.", "default_enabled": True, "category": "engagement"},
             {"id": "logging", "extension": "Modules.logging", "path": "Modules/logging.py", "display_name": "Logging", "description": "Server event logging.", "default_enabled": True, "category": "configuration"},
             {"id": "modules_cmd", "extension": "Modules.modules_cmd", "path": "Modules/modules_cmd.py", "display_name": "Module Controls", "description": "Per-server module toggle.", "default_enabled": True, "category": "configuration"},
+            {"id": "language", "extension": "Modules.language", "path": "Modules/language.py", "display_name": "Language", "description": "Choose your language for Coffeecord replies (English, Spanish, Portuguese, Russian).", "default_enabled": True, "category": "configuration"},
             {"id": "muterole", "extension": "Modules.muterole", "path": "Modules/muterole.py", "display_name": "Mute Role", "description": "Mute role configuration.", "default_enabled": True, "category": "moderation"},
             {"id": "nickname", "extension": "Modules.nickname", "path": "Modules/nickname.py", "display_name": "Nickname", "description": "Nickname management.", "default_enabled": True, "category": "utilities"},
             {"id": "polls", "extension": "Modules.polls", "path": "Modules/polls.py", "display_name": "Polls", "description": "Poll creation and voting.", "default_enabled": True, "category": "engagement"},
             {"id": "quests", "extension": "Modules.quests", "path": "Modules/quests.py", "display_name": "Quests", "description": "Quest board, daily check-in, and XP rewards.", "default_enabled": True, "category": "engagement"},
             {"id": "reactionrole", "extension": "Modules.reactionrole", "path": "Modules/reactionrole.py", "display_name": "Reaction Roles", "description": "Reaction/button self-role assignment.", "default_enabled": True, "category": "configuration"},
+            {"id": "color_roles", "extension": "Modules.color_roles", "path": "Modules/color_roles.py", "display_name": "Color Roles", "description": "Exclusive color role panels with buttons or emoji.", "default_enabled": True, "category": "configuration"},
             {"id": "staff_utils", "extension": "Modules.staff_utils", "path": "Modules/staff_utils.py", "display_name": "Staff Utilities", "description": "Advanced purge, lockdown, notes, bulk roles.", "default_enabled": True, "category": "moderation"},
             {"id": "sticky_msg", "extension": "Modules.sticky_msg", "path": "Modules/sticky_msg.py", "display_name": "Sticky Messages", "description": "Named stickies re-posted at channel bottom.", "default_enabled": True, "category": "configuration"},
+            {"id": "server_backup", "extension": "Modules.server_backup", "path": "Modules/server_backup.py", "display_name": "Server Backup", "description": "Encrypted Discord structure + Coffeecord config backups with host slots.", "default_enabled": True, "category": "configuration"},
             {"id": "setup_wizard", "extension": "Modules.setup_wizard", "path": "Modules/setup_wizard.py", "display_name": "Setup Wizard", "description": "Interactive server setup.", "default_enabled": True, "category": "configuration"},
             {"id": "support", "extension": "Modules.support", "path": "Modules/support.py", "display_name": "Support Us", "description": "Support information and links.", "default_enabled": True, "category": "integrations"},
             {"id": "test_module", "extension": "Modules.test_module", "path": "Modules/test_module.py", "display_name": "Test Module", "description": "Test module for refresh_registry.", "default_enabled": True, "category": "utilities"},
@@ -95,6 +99,7 @@ CONFIG_PLACEHOLDERS: dict[str, object] = {
     "mute_roles.json": {},
     "quests.json": {},
     "reactionrole_config.json": {},
+    "color_roles.json": {},
     "slowmode.json": {},
     "sticky_messages.json": {},
     "translate_usage.json": {},
@@ -105,6 +110,7 @@ CONFIG_PLACEHOLDERS: dict[str, object] = {
     "themes_config.json": {"guilds": {}},
     "command_responses.json": {"guilds": {}},
     "adaptive_slowmode.json": {},
+    "inactive_members.json": {},
 }
 
 # Data files with placeholder data
@@ -119,6 +125,8 @@ DATA_PLACEHOLDERS: dict[str, object] = {
     "staff_applications.json": {},
     "staff_history.json": {"guilds": {}},
     "lockdown_state.json": {"guilds": {}},
+    "member_activity.json": {},
+    "inactivity_strikes.json": {},
 }
 
 

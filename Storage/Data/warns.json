@@ -131,5 +131,103 @@
       }
     ]
   },
-  "333949691962195969": {}
+  "333949691962195969": {},
+  "1406814562484752475": {
+    "1168282467162136656": [
+      {
+        "reason": "Use of blocked word: lol",
+        "timestamp": 1771458660,
+        "by": "Automod"
+      },
+      {
+        "reason": "Use of blocked word: lol",
+        "timestamp": 1771458664,
+        "by": "Automod"
+      },
+      {
+        "reason": "Use of blocked word: lol",
+        "timestamp": 1771458703,
+        "by": "Automod"
+      },
+      {
+        "reason": "Use of blocked word: lol",
+        "timestamp": 1771458722,
+        "by": "Automod"
+      },
+      {
+        "reason": "Blocked word detected: `e`",
+        "timestamp": 1771544333,
+        "by": "Automod"
+      },
+      {
+        "reason": "Blocked word detected: `e`",
+        "timestamp": 1771544342,
+        "by": "Automod"
+      },
+      {
+        "reason": "Blocked word detected: `e`",
+        "timestamp": 1771544343,
+        "by": "Automod"
+      },
+      {
+        "reason": "Blocked word detected: `e`",
+        "timestamp": 1771544343,
+        "by": "Automod"
+      },
+      {
+        "reason": "Blocked word detected: `e`",
+        "timestamp": 1771544343,
+        "by": "Automod"
+      },
+      {
+        "reason": "Blocked word detected: `e`",
+        "timestamp": 1771544344,
+        "by": "Automod"
+      },
+      {
+        "reason": "Blocked word detected: `e`",
+        "timestamp": 1771544348,
+        "by": "Automod"
+      },
+      {
+        "reason": "Blocked word detected: `e`",
+        "timestamp": 1771544348,
+        "by": "Automod"
+      }
+    ],
+    "1390501770437984377": [
+      {
+        "reason": "idk",
+        "timestamp": 1772489520,
+        "by": "Manual (Captain Viktor Vodkanov)"
+      },
+      {
+        "reason": "rude boi",
+        "timestamp": 1773601884,
+        "by": "Manual (Captain Viktor Vodkanov)"
+      },
+      {
+        "reason": "e",
+        "timestamp": 1773608904,
+        "by": "Manual (Captain Viktor Vodkanov)"
+      }
+    ],
+    "1212790116838412341": [
+      {
+        "reason": "Message spam (rule violation)",
+        "timestamp": 1779208902,
+        "by": "Automod"
+      },
+      {
+        "reason": "Message spam (rule violation)",
+        "timestamp": 1779208902,
+        "by": "Automod"
+      },
+      {
+        "reason": "Message spam (rule violation)",
+        "timestamp": 1779208905,
+        "by": "Automod"
+      }
+    ]
+  }
 }

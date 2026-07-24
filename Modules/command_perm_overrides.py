@@ -11,6 +11,7 @@ from discord import app_commands
 from discord.app_commands.errors import AppCommandError
 
 from Modules import json_cache
+from Modules.i18n import t_sync
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _STORAGE_DIR = os.path.join(_BASE_DIR, "Storage")
@@ -66,6 +67,11 @@ DEFAULT_SLASH_COMMAND_RULES: dict[str, dict[str, Any]] = {
     # --- Modules/quests.py ---
     "quests list": _everyone(),
     "quests checkin": _everyone(),
+    "quests admin create": _all("manage_guild"),
+    "quests admin list": _all("manage_guild"),
+    "quests admin delete": _all("manage_guild"),
+    "quests admin toggle": _all("manage_guild"),
+    "quests admin reset": _all("manage_guild"),
     # --- Modules/leveling.py ---
     "xpset": _all("manage_guild"),
     "xp config": _all("manage_guild"),
@@ -82,6 +88,9 @@ DEFAULT_SLASH_COMMAND_RULES: dict[str, dict[str, Any]] = {
     "modules enable": _all("manage_guild"),
     "modules disable": _all("manage_guild"),
     "modules info": _all("manage_guild"),
+    # --- Modules/language.py ---
+    "language status": _everyone(),
+    "language set": _everyone(),
     # --- Modules/setup_wizard.py (top-level app commands on cog) ---
     "setup": _all("manage_guild"),
     "setup_resume": _all("manage_guild"),
@@ -95,12 +104,28 @@ DEFAULT_SLASH_COMMAND_RULES: dict[str, dict[str, Any]] = {
     "sticky_msg create": _all("manage_guild"),
     "sticky_msg remove": _all("manage_guild"),
     "sticky_msg list": _all("manage_guild"),
+    # --- Modules/server_backup.py ---
+    "backup create": _all("manage_guild"),
+    "backup list": _all("manage_guild"),
+    "backup download": _all("manage_guild"),
+    "backup delete": _all("manage_guild"),
+    "backup restore": _all("manage_guild"),
     # --- Modules/reactionrole.py ---
     "reactionrole create": _all("manage_guild"),
     "reactionrole list": _all("manage_guild"),
     "reactionrole delete": _all("manage_guild"),
     "reactionrole config": _all("manage_guild"),
     "reactionrole edit": _all("manage_guild"),
+    # --- Modules/color_roles.py ---
+    "colorrole info": _all("manage_guild"),
+    "colorrole generate": _all("manage_guild"),
+    "colorrole setup": _all("manage_guild"),
+    "colorrole publish": _all("manage_guild"),
+    "colorrole list": _all("manage_guild"),
+    "colorrole delete": _all("manage_guild"),
+    "colorrole edit": _all("manage_guild"),
+    "colorrole sync": _all("manage_guild"),
+    "colorrole clear": _all("manage_guild"),
     # --- Modules/logging.py ---
     "logging status": _all("manage_guild"),
     "logging setup": _all("manage_guild"),
@@ -312,18 +337,31 @@ def _user_passes_rule(member: discord.Member, rule: dict[str, Any]) -> bool:
     return False
 
 
-def _fail_message_for_rule(rule: dict[str, Any]) -> str:
+def _fail_message_for_rule(rule: dict[str, Any], user_id: int | None = None) -> str:
     if rule.get("everyone"):
-        return "You cannot use this command."
+        return t_sync(user_id, "bot.command_perms.deny_everyone", default="You cannot use this command.")
     if "all" in rule:
         need = ", ".join(p.replace("_", " ") for p in rule["all"])
-        return f"You need all of these permissions: **{need}**."
-    if "any" in rule:
-        return (
-            "You need **Manage Roles**, **Moderate Members**, **Manage Server**, "
-            "or **Administrator** to use this command."
+        return t_sync(
+            user_id,
+            "bot.command_perms.deny_need_all",
+            default="You need all of these permissions: **{permissions}**.",
+            permissions=need,
         )
-    return "You do not have permission to use this command."
+    if "any" in rule:
+        return t_sync(
+            user_id,
+            "bot.command_perms.deny_mod_combo",
+            default=(
+                "You need **Manage Roles**, **Moderate Members**, **Manage Server**, "
+                "or **Administrator** to use this command."
+            ),
+        )
+    return t_sync(
+        user_id,
+        "bot.command_perms.deny_no_permission",
+        default="You do not have permission to use this command.",
+    )
 
 
 async def _deny(
@@ -384,11 +422,18 @@ async def tree_interaction_perm_check(interaction: discord.Interaction) -> bool:
     qn = getattr(cmd, "qualified_name", None) or cmd.name
     qn = str(qn).strip()
 
+    user_id = interaction.user.id if interaction.user else None
+
     if qn in _COMMAND_PERM_ADMIN_QN:
         if not _hard_manage_guild(interaction):
             return await _deny(
                 interaction,
-                "❌ You need **Manage Server** (or **Administrator**) to change command permissions.",
+                "❌ "
+                + t_sync(
+                    user_id,
+                    "bot.command_perms.deny_manage_guild",
+                    default="You need **Manage Server** (or **Administrator**) to change command permissions.",
+                ),
             )
         return True
 
@@ -399,12 +444,28 @@ async def tree_interaction_perm_check(interaction: discord.Interaction) -> bool:
     if interaction.guild is None:
         # Guild-only commands: let the command body respond; DM has no Member perms.
         if not rule_model.get("everyone"):
-            return await _deny(interaction, "❌ This command can only be used in a server.")
+            return await _deny(
+                interaction,
+                "❌ "
+                + t_sync(
+                    user_id,
+                    "bot.command_perms.deny_guild_only",
+                    default="This command can only be used in a server.",
+                ),
+            )
         return True
 
     member = _member_for_eval(interaction)
     if member is None:
-        return await _deny(interaction, "❌ Could not resolve your member permissions.")
+        return await _deny(
+            interaction,
+            "❌ "
+            + t_sync(
+                user_id,
+                "bot.command_perms.deny_member_resolve",
+                default="Could not resolve your member permissions.",
+            ),
+        )
 
     if _user_passes_rule(member, rule_model):
         return True
@@ -412,11 +473,18 @@ async def tree_interaction_perm_check(interaction: discord.Interaction) -> bool:
     if "any" in rule_model:
         return await _deny(
             interaction,
-            "❌ You need **Manage Roles**, **Moderate Members**, **Manage Server**, "
-            "or **Administrator** to use this command.",
+            "❌ "
+            + t_sync(
+                user_id,
+                "bot.command_perms.deny_mod_combo",
+                default=(
+                    "You need **Manage Roles**, **Moderate Members**, **Manage Server**, "
+                    "or **Administrator** to use this command."
+                ),
+            ),
         )
 
-    return await _deny(interaction, "❌ " + _fail_message_for_rule(rule_model))
+    return await _deny(interaction, "❌ " + _fail_message_for_rule(rule_model, user_id))
 
 
 def format_rule_human(rule: dict[str, Any]) -> str:

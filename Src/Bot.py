@@ -228,6 +228,16 @@ from Modules import checks as module_checks
 from Modules import command_perm_overrides
 from Modules import json_cache
 from Modules.themes import get_command_response, get_command_response_for_interaction
+from Modules.i18n import t, t_sync
+from Modules.help_search import (
+    HelpSearchResultsView,
+    build_all_commands_pages,
+    build_search_results_embed,
+    chunk_embeds_for_messages,
+    is_list_all_help_query,
+    list_all_help_commands,
+    search_help_commands_intent,
+)
 
 
 class CoffeecordCommandTree(app_commands.CommandTree):
@@ -237,6 +247,28 @@ class CoffeecordCommandTree(app_commands.CommandTree):
         if not await anti_abuse.should_allow_interaction(interaction):
             return False
         return await command_perm_overrides.tree_interaction_perm_check(interaction)
+
+
+async def _user_text(
+    interaction: discord.Interaction,
+    key: str,
+    /,
+    *,
+    default: str | None = None,
+    **params: str,
+) -> str:
+    return await t(interaction.user.id, key, default=default, **params)
+
+
+def _user_text_sync(
+    interaction: discord.Interaction,
+    key: str,
+    /,
+    *,
+    default: str | None = None,
+    **params: str,
+) -> str:
+    return t_sync(interaction.user.id, key, default=default, **params)
 
 
 def load_json(path: str, default: dict | list | None = None):
@@ -550,65 +582,65 @@ class Theme:
         )
 
 COMMAND_CATEGORIES = {
-    "General": [
+    "general": [
         "/help", "/command_perms docs", "/command_perms edit", "/support us", "/say", "/dm", "/poll", "/nickname",
         "/optout", "/optin"
     ],
-    "Ko-fi": [
+    "kofi": [
         "/kofi link", "/kofi status", "/kofi claim", "/kofi add", "/kofi remove"
     ],
-    "Logging": [
+    "logging": [
         "/logging status", "/logging setup", "/logging toggle", "/logging module", "/logging disable"
     ],
-    "Moderation": [
+    "moderation": [
         "/ban", "/unban", "/mute", "/unmute", "/hardmute",
         "/muterole create", "/muterole update",
         "/giverole", "/removerole", "/purge", "/specific_purge"
     ],
-    "Automod": [
+    "automod": [
         "/automod overview", "/automod on", "/automod off", "/automod status",
         "/automod set log", "/automod toggle rule", "/automod badword add"
     ],
-    "Fun": [
+    "fun": [
         "/8ball", "/bet", "/flipcoin", "/hug", "/kiss",
         "/lovecalc", "/truth", "/dare", "/uwuify", "/nuke", "/roast",
         "/ak47", "/petpet", "/dog", "/cat", "/abracadaberamotherafu"
     ],
-    "Timers / Reminders": [
+    "timers": [
         "/remindme", "/starttimer", "/checktimers", "/endtimer"
     ],
-    "Leveling": [
+    "leveling": [
         "/level", "/levelcard customize", "/levelcard preset", "/xpset", "/xp config",
         "/levelreward add", "/levelreward remove",
         "/levelreward list", "/levelreward mode"
     ],
-    "Calls": [
+    "calls": [
         "/call create", "/call join", "/call add", "/call remove", "/call end", "/call promote"
     ],
-    "Tickets": [
+    "tickets": [
         "/ticket setup", "/ticket add", "/ticket remove",
         "/ticket_export", "/ticket_import"
     ],
-    "Translation": [
+    "translation": [
         "/translate text", "/translate settings", "/translate usage", "/translate reset"
     ],
-    "Reaction Roles": [
+    "reaction_roles": [
         "/reactionrole create", "/reactionrole list", "/reactionrole delete",
         "/reactionrole config", "/reactionrole edit"
     ],
-    "Welcome & Leave": [
+    "welcome_leave": [
         "/welcome config", "/welcome test", "/leave config", "/leave test"
     ],
-    "Setup Wizard": [
+    "setup_wizard": [
         "/setup", "/setup_resume", "/setup_cancel"
     ],
-    "Themes": [
+    "themes": [
         "/theme list", "/theme set", "/theme preview", "/theme info",
         "/theme upload", "/theme delete",
         "/theme responses presets", "/theme responses list", "/theme responses upload",
         "/theme responses discover", "/theme responses keys", "/theme responses clear",
     ],
-    "Misc": [
+    "misc": [
         "/verifyconfig", "/autorole status", "/autorole toggle", "/autorole add",
         "/application", "/application setup", "/application toggle",
         "/modules status", "/modules toggle", "/modules enable", "/modules disable",
@@ -634,78 +666,245 @@ class HelpMenu(discord.ui.View):
         await interaction.response.edit_message(embed=self.pages[self.index], view=self)
 
 
-def build_help_pages():
-    pages = []
-    for category, cmds in COMMAND_CATEGORIES.items():
+
+async def build_help_pages_for_user(user_id: int) -> list[discord.Embed]:
+    pages: list[discord.Embed] = []
+    for slug, cmds in COMMAND_CATEGORIES.items():
+        label = await t(
+            user_id,
+            f"help.categories.{slug}",
+            default=slug.replace("_", " ").title(),
+        )
+        title = await t(
+            user_id,
+            "help.title_prefix",
+            default="📖 Help — {label}",
+            label=label,
+        )
         embed = discord.Embed(
-            title=f"📖 Help — {category}",
+            title=title,
             description="\n".join(f"`{cmd}`" for cmd in cmds),
-            color=discord.Color.blurple()
+            color=discord.Color.blurple(),
         )
         pages.append(embed)
     return pages
 
 
 @bot.tree.command(name="help", description="View bot commands or search for a specific one")
-@app_commands.describe(search="Search for a command name")
+@app_commands.describe(
+    search="What you want to do, or `all` for every command (e.g. ban someone, setup logging, all)",
+)
 async def help_cmd(interaction: discord.Interaction, search: str = None):
-    pages = build_help_pages()
-
+    uid = interaction.user.id
     if search:
-        search = search.lower()
-        found = [cmd for cmds in COMMAND_CATEGORIES.values() for cmd in cmds if search in cmd.lower()]
-        if not found:
-            await interaction.response.send_message(f"❌ No commands found for `{search}`")
+        query = search.strip()
+        if is_list_all_help_query(query):
+            hits = list_all_help_commands(tree)
+            pages = await build_all_commands_pages(hits, user_id=uid)
+            if not pages:
+                await interaction.response.send_message(
+                    await _user_text(interaction, "help.no_commands", default="No slash commands are registered yet."),
+                    ephemeral=True,
+                )
+                return
+            batches = chunk_embeds_for_messages(pages)
+            first = batches[0]
+            if len(first) == 1:
+                await interaction.response.send_message(embed=first[0], ephemeral=True)
+            else:
+                await interaction.response.send_message(embeds=first, ephemeral=True)
+            for batch in batches[1:]:
+                if len(batch) == 1:
+                    await interaction.followup.send(embed=batch[0], ephemeral=True)
+                else:
+                    await interaction.followup.send(embeds=batch, ephemeral=True)
             return
 
-        embed = discord.Embed(
-            title=f"🔍 Search Results for: {search}",
-            description="\n".join(f"`{cmd}`" for cmd in found),
-            color=discord.Color.green()
-        )
-        await interaction.response.send_message(embed=embed)
+        hits = search_help_commands_intent(tree, query)
+        if not hits:
+            await interaction.response.send_message(
+                await _user_text(
+                    interaction,
+                    "help.search_none",
+                    default="No commands found for `{query}`. Try different words, or use `all` to list every command.",
+                    query=query,
+                ),
+                ephemeral=True,
+            )
+            return
+        embed = await build_search_results_embed(query, hits, user_id=uid)
+        view = HelpSearchResultsView(hits, user_id=uid)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
         return
 
+    pages = await build_help_pages_for_user(uid)
+    if not pages:
+        await interaction.response.send_message(
+            await _user_text(interaction, "help.no_commands", default="No slash commands are registered yet."),
+            ephemeral=True,
+        )
+        return
     view = HelpMenu(pages, 0)
-    await interaction.response.send_message(embed=pages[0], view=view)
+    await interaction.response.send_message(embed=pages[0], view=view, ephemeral=True)
 
 
 @tree.command(name="about", description="Learn about Coffeecord")
 async def about_cmd(interaction: discord.Interaction):
+    uid = interaction.user.id
     embed = discord.Embed(
-        title="About Coffeecord",
-        color=discord.Color.from_str("#7B5EA7")
+        title=await _user_text(interaction, "about.title", default="About Coffeecord"),
+        color=discord.Color.from_str("#7B5EA7"),
     )
     if interaction.client.user:
         embed.set_thumbnail(url=interaction.client.user.display_avatar.url)
-    embed.add_field(name="Version", value=get_bot_version_display(), inline=False)
-    developer_value = f"<@{OWNER_ID}>" if OWNER_ID else "Not configured"
-    embed.add_field(name="Developer", value=developer_value, inline=False)
-    embed.add_field(name="Servers", value=f"{len(interaction.client.guilds)} servers", inline=False)
-    embed.add_field(name="Ping", value=f"{round(interaction.client.latency * 1000)} ms", inline=False)
+    embed.add_field(
+        name=await _user_text(interaction, "about.version", default="Version"),
+        value=get_bot_version_display(),
+        inline=False,
+    )
+    developer_value = (
+        f"<@{OWNER_ID}>"
+        if OWNER_ID
+        else await _user_text(interaction, "about.developer_not_configured", default="Not configured")
+    )
+    embed.add_field(
+        name=await _user_text(interaction, "about.developer", default="Developer"),
+        value=developer_value,
+        inline=False,
+    )
+    embed.add_field(
+        name=await _user_text(interaction, "about.servers", default="Servers"),
+        value=await _user_text(
+            interaction,
+            "about.servers_value",
+            default="{count} servers",
+            count=str(len(interaction.client.guilds)),
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name=await _user_text(interaction, "about.ping", default="Ping"),
+        value=await _user_text(
+            interaction,
+            "about.ping_value",
+            default="{ms} ms",
+            ms=str(round(interaction.client.latency * 1000)),
+        ),
+        inline=False,
+    )
     uptime_s = time.monotonic() - _BOT_START_MONO
     if uptime_s >= 60.0:
         uh = int(uptime_s // 3600)
         um = int((uptime_s % 3600) // 60)
-        embed.add_field(name="Uptime", value=f"{uh}h {um}m", inline=True)
+        embed.add_field(
+            name=await _user_text(interaction, "about.uptime", default="Uptime"),
+            value=await _user_text(
+                interaction,
+                "about.uptime_value",
+                default="{hours}h {minutes}m",
+                hours=str(uh),
+                minutes=str(um),
+            ),
+            inline=True,
+        )
     if _PSUTIL_PROCESS is not None:
         try:
             rss_mb = _PSUTIL_PROCESS.memory_info().rss / (1024 * 1024)
             cpu_pct = _PSUTIL_PROCESS.cpu_percent(interval=0.1)
-            embed.add_field(name="Memory", value=f"{rss_mb:.1f} MB", inline=True)
-            embed.add_field(name="CPU", value=f"{cpu_pct:.1f}%", inline=True)
+            embed.add_field(
+                name=await _user_text(interaction, "about.memory", default="Memory"),
+                value=await _user_text(
+                    interaction,
+                    "about.memory_value",
+                    default="{mb} MB",
+                    mb=f"{rss_mb:.1f}",
+                ),
+                inline=True,
+            )
+            embed.add_field(
+                name=await _user_text(interaction, "about.cpu", default="CPU"),
+                value=await _user_text(
+                    interaction,
+                    "about.cpu_value",
+                    default="{pct}%",
+                    pct=f"{cpu_pct:.1f}",
+                ),
+                inline=True,
+            )
         except Exception:
             pass
-    embed.set_footer(text="Coffeecord • Made with ☕ and discord.py ❤")
+    embed.set_footer(
+        text=await _user_text(
+            interaction,
+            "about.footer",
+            default="Coffeecord • Made with ☕ and discord.py ❤",
+        )
+    )
 
     view = discord.ui.View()
-    view.add_item(discord.ui.Button(label="GitHub", url=GITHUB_URL, emoji="🐙", style=discord.ButtonStyle.link, row=0))
-    view.add_item(discord.ui.Button(label="top.gg", url=TOPGG_URL, emoji="⬆️", style=discord.ButtonStyle.link, row=0))
-    view.add_item(discord.ui.Button(label="Invite Me", url=BOT_INVITE_URL, emoji="🤖", style=discord.ButtonStyle.link, row=1))
-    view.add_item(discord.ui.Button(label="Support Server", url=SUPPORT_SERVER, emoji="💬", style=discord.ButtonStyle.link, row=1))
-    view.add_item(discord.ui.Button(label="Ko-fi", url=DONATION_URL, emoji="☕", style=discord.ButtonStyle.link, row=1))
-    view.add_item(discord.ui.Button(label="Privacy Policy", url=PRIVACY_POLICY_URL, emoji="🔒", style=discord.ButtonStyle.link, row=2))
-    view.add_item(discord.ui.Button(label="Terms of Service", url=TERMS_URL, emoji="📜", style=discord.ButtonStyle.link, row=2))
+    view.add_item(
+        discord.ui.Button(
+            label=await _user_text(interaction, "about.button_github", default="GitHub"),
+            url=GITHUB_URL,
+            emoji="🐙",
+            style=discord.ButtonStyle.link,
+            row=0,
+        )
+    )
+    view.add_item(
+        discord.ui.Button(
+            label="top.gg",
+            url=TOPGG_URL,
+            emoji="⬆️",
+            style=discord.ButtonStyle.link,
+            row=0,
+        )
+    )
+    view.add_item(
+        discord.ui.Button(
+            label=await _user_text(interaction, "about.button_invite_me", default="Invite Me"),
+            url=BOT_INVITE_URL,
+            emoji="🤖",
+            style=discord.ButtonStyle.link,
+            row=1,
+        )
+    )
+    view.add_item(
+        discord.ui.Button(
+            label=await _user_text(interaction, "about.button_support_server", default="Support Server"),
+            url=SUPPORT_SERVER,
+            emoji="💬",
+            style=discord.ButtonStyle.link,
+            row=1,
+        )
+    )
+    view.add_item(
+        discord.ui.Button(
+            label=await _user_text(interaction, "about.button_kofi", default="Ko-fi"),
+            url=DONATION_URL,
+            emoji="☕",
+            style=discord.ButtonStyle.link,
+            row=1,
+        )
+    )
+    view.add_item(
+        discord.ui.Button(
+            label=await _user_text(interaction, "about.button_privacy_policy", default="Privacy Policy"),
+            url=PRIVACY_POLICY_URL,
+            emoji="🔒",
+            style=discord.ButtonStyle.link,
+            row=2,
+        )
+    )
+    view.add_item(
+        discord.ui.Button(
+            label=await _user_text(interaction, "about.button_terms_of_service", default="Terms of Service"),
+            url=TERMS_URL,
+            emoji="📜",
+            style=discord.ButtonStyle.link,
+            row=2,
+        )
+    )
 
     await interaction.response.send_message(embed=embed, view=view)
 
@@ -735,23 +934,27 @@ command_perms_group = app_commands.Group(
 @command_perms_group.command(name="docs", description="Open the permissions documentation.")
 async def command_perms_docs(interaction: discord.Interaction):
     embed = discord.Embed(
-        title="Command Permissions",
-        description=(
-            "Full reference: which slash commands use which **member** permissions, and what **bot** permissions "
-            "features need. Use `/command_perms edit` (Manage Server) to type any slash command name and set requirements."
+        title=await _user_text(interaction, "bot.command_perms.docs_title", default="Command Permissions"),
+        description=await _user_text(
+            interaction,
+            "bot.command_perms.docs_description",
+            default=(
+                "Full reference: which slash commands use which **member** permissions, and what **bot** "
+                "permissions features need. Use `/command_perms edit` (Manage Server) to type any slash command name and set requirements."
+            ),
         ),
         color=discord.Color.blurple(),
         url=PERMISSIONS_DOC_URL,
     )
     embed.add_field(
-        name="Quick links",
+        name=await _user_text(interaction, "bot.command_perms.docs_quick_links", default="Quick links"),
         value=f"[📋 Permissions doc]({PERMISSIONS_DOC_URL})",
         inline=False,
     )
-    embed.set_footer(text="Per-guild overrides apply after the next sync; defaults ship with the bot.")
+    embed.set_footer(text=await _user_text(interaction, "bot.command_perms.docs_footer", default="Per-guild overrides apply after the next sync; defaults ship with the bot."))
     view = discord.ui.View()
     view.add_item(
-        discord.ui.Button(label="Open permissions doc", url=PERMISSIONS_DOC_URL, emoji="📋", style=discord.ButtonStyle.link)
+        discord.ui.Button(label=await _user_text(interaction, "bot.command_perms.docs_button", default="Open permissions doc"), url=PERMISSIONS_DOC_URL, emoji="📋", style=discord.ButtonStyle.link)
     )
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
@@ -759,7 +962,7 @@ async def command_perms_docs(interaction: discord.Interaction):
 @command_perms_group.command(name="list", description="List slash commands with non-default permission rules in this server.")
 async def command_perms_list(interaction: discord.Interaction):
     if interaction.guild is None:
-        await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'common.guild_only', default='Use this in a server.')}", ephemeral=True)
         return
     ov = command_perm_overrides.get_guild_overrides(interaction.guild.id)
     lines: list[str] = []
@@ -771,13 +974,13 @@ async def command_perms_list(interaction: discord.Interaction):
         lines.append(f"**/{qn}** → {human}")
     if not lines:
         await interaction.response.send_message(
-            "No overrides in this server. Commands use bot defaults (see `/command_perms docs`).",
+            await _user_text(interaction, "bot.command_perms.list_empty", default="No overrides in this server. Commands use bot defaults (see `/command_perms docs`)."),
             ephemeral=True,
         )
         return
     desc = "\n".join(lines)[:4000]
     embed = discord.Embed(
-        title="Command permission overrides",
+        title=await _user_text(interaction, "bot.command_perms.list_title", default="Command permission overrides"),
         description=desc,
         color=discord.Color.blurple(),
     )
@@ -798,12 +1001,12 @@ async def command_perms_edit(
     custom_permissions: str | None = None,
 ):
     if interaction.guild is None:
-        await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'common.guild_only', default='Use this in a server.')}", ephemeral=True)
         return
     resolved = command_perm_overrides.resolve_slash_command_input(interaction.client.tree, command)
     if resolved is None:
         await interaction.response.send_message(
-            "❌ No matching slash command. Use the name Discord shows (e.g. `help`, `call create`, `modules toggle`).",
+            f"❌ {await _user_text(interaction, 'bot.command_perms.edit_no_match', default='No matching slash command. Use the name Discord shows (e.g. help, call create, modules toggle).')}",
             ephemeral=True,
         )
         return
@@ -811,7 +1014,7 @@ async def command_perms_edit(
     if mode.value == "custom":
         if not (custom_permissions or "").strip():
             await interaction.response.send_message(
-                "❌ For **Custom**, fill `custom_permissions` (comma-separated permission names).",
+                f"❌ {await _user_text(interaction, 'bot.command_perms.edit_custom_required', default='For Custom, fill custom_permissions (comma-separated permission names).')}",
                 ephemeral=True,
             )
             return
@@ -831,11 +1034,11 @@ async def command_perms_edit(
 
     if rule is None:
         if qn in command_perm_overrides.DEFAULT_SLASH_COMMAND_RULES:
-            msg = f"✅ Reset **`/{qn}`** to the bot default."
+            msg = f"✅ {await _user_text(interaction, 'bot.command_perms.edit_reset_default', default='Reset /{command} to the bot default.', command=qn)}"
         else:
-            msg = f"✅ Removed custom rules for **`/{qn}`** (no CoffeeCord member-permission gate)."
+            msg = f"✅ {await _user_text(interaction, 'bot.command_perms.edit_removed', default='Removed custom rules for /{command}.', command=qn)}"
     else:
-        msg = f"✅ **`/{qn}`** now requires: {command_perm_overrides.format_rule_human(rule)}"
+        msg = f"✅ {await _user_text(interaction, 'bot.command_perms.edit_set', default='/{command} now requires: {rule}', command=qn, rule=command_perm_overrides.format_rule_human(rule))}"
     await interaction.response.send_message(msg, ephemeral=True)
 
 
@@ -843,10 +1046,10 @@ tree.add_command(command_perms_group)
 
 
 class DonateView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, kofi_label: str):
         super().__init__(timeout=None)
         self.add_item(discord.ui.Button(
-            label="Support us via Ko-fi",
+            label=kofi_label,
             url=DONATION_URL,
             style=discord.ButtonStyle.link
         ))
@@ -857,25 +1060,32 @@ support_group = app_commands.Group(name="support", description="Support Coffeeco
 @support_group.command(name="us", description="Support Coffeecord and get access to exclusive features!")
 async def donate(interaction: discord.Interaction):
     embed = discord.Embed(
-        title="Support Coffeecord! 💙",
-        description=(
-            "Click the button below to support us via Ko-fi.\n\n"
-            "✅ Link your Discord account to Ko-fi and buy us a coffee or membership to support us!\n\n"
-            "**Perks:**\n"
-            "- `Supporter` role!\n"
-            "- Access to a private channel!\n"
-            "- Early access to new features!\n"
-            "- Play GIFs in your leveling card!\n"
-            "- Unlimited translations!\n\n"
-            "**How to activate your perks:**\n"
-            "1. Click **Support us via Ko-fi** below and complete your donation or membership.\n"
-            "2. Come back to Discord and run `/kofi link email:you@example.com` — use the same email you used on Ko-fi.\n"
-            "3. Your perks activate instantly. Run `/kofi status` to confirm.\n\n"
-            f"Need help? Join the support server: {PERMANENT_INVITE}"
+        title=await _user_text(interaction, "bot.support.title", default="Support Coffeecord! 💙"),
+        description=await _user_text(
+            interaction,
+            "bot.support.description",
+            default=(
+                "Click the button below to support us via Ko-fi.\n\n"
+                "✅ Link your Discord account to Ko-fi and buy us a coffee or membership to support us!\n\n"
+                "**Perks:**\n"
+                "- `Supporter` role!\n"
+                "- Access to a private channel!\n"
+                "- Early access to new features!\n"
+                "- Play GIFs in your leveling card!\n"
+                "- Unlimited translations!\n"
+                "- Up to 3 encrypted host server backup slots (`/backup`)!\n\n"
+                "**How to activate your perks:**\n"
+                "1. Click **Support us via Ko-fi** below and complete your donation or membership.\n"
+                "2. Come back to Discord and run `/kofi link email:you@example.com` — use the same email you used on Ko-fi.\n"
+                "3. Your perks activate instantly. Run `/kofi status` to confirm.\n\n"
+                "Need help? Join the support server: {invite}"
+            ),
+            invite=PERMANENT_INVITE,
         ),
         color=discord.Color.green()
     )
-    await interaction.response.send_message(embed=embed, view=DonateView(), ephemeral=True)
+    kofi_label = await _user_text(interaction, "bot.support.kofi_button", default="Support us via Ko-fi")
+    await interaction.response.send_message(embed=embed, view=DonateView(kofi_label), ephemeral=True)
 
 
 tree.add_command(support_group)
@@ -1058,7 +1268,7 @@ kofi_group = app_commands.Group(name="kofi", description="Manage Ko-fi supporter
 @app_commands.describe(email="Email used on Ko-fi")
 async def kofi_link(interaction: discord.Interaction, email: str):
     if not _is_valid_email(email):
-        await interaction.response.send_message("❌ Please provide a valid email address.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.kofi.invalid_email', default='Please provide a valid email address.')}", ephemeral=True)
         return
     normalized = _normalize_email(email)
     queue_position = _queue_pending_kofi_link(normalized, interaction.user.id)
@@ -1102,7 +1312,7 @@ async def kofi_link(interaction: discord.Interaction, email: str):
 @app_commands.describe(email="Email used on Ko-fi")
 async def kofi_claim(interaction: discord.Interaction, email: str):
     if not _is_valid_email(email):
-        await interaction.response.send_message("❌ Please provide a valid email address.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.kofi.invalid_email', default='Please provide a valid email address.')}", ephemeral=True)
         return
     normalized = _normalize_email(email)
     claimed = _claim_unlinked_for_user(interaction.user.id, normalized)
@@ -1143,18 +1353,18 @@ async def kofi_status(interaction: discord.Interaction):
     data = load_supporters_db()
     record = data.get("supporters", {}).get(str(interaction.user.id))
     if not record:
-        await interaction.response.send_message("You are not marked as a supporter yet.", ephemeral=True)
+        await interaction.response.send_message(await _user_text(interaction, "bot.kofi.not_supporter", default="You are not marked as a supporter yet."), ephemeral=True)
         return
     active = _record_is_active(record)
     if record.get("active") != active:
         record["active"] = active
         save_supporters_db(data)
 
-    embed = discord.Embed(title="Ko-fi Supporter Status", color=discord.Color.blurple())
+    embed = discord.Embed(title=await _user_text(interaction, "bot.kofi.status_title", default="Ko-fi Supporter Status"), color=discord.Color.blurple())
     embed.add_field(name="Active", value="Yes" if active else "No", inline=True)
-    embed.add_field(name="Tier", value=str(record.get("tier", "unknown")).title(), inline=True)
-    embed.add_field(name="Last Payment", value=str(record.get("last_payment", "Unknown")), inline=False)
-    embed.add_field(name="Total USD", value=f"{float(record.get('total_usd', 0.0) or 0.0):.2f}", inline=True)
+    embed.add_field(name=await _user_text(interaction, "bot.kofi.field_tier", default="Tier"), value=str(record.get("tier", "unknown")).title(), inline=True)
+    embed.add_field(name=await _user_text(interaction, "bot.kofi.field_last_payment", default="Last Payment"), value=str(record.get("last_payment", "Unknown")), inline=False)
+    embed.add_field(name=await _user_text(interaction, "bot.kofi.field_total_usd", default="Total USD"), value=f"{float(record.get('total_usd', 0.0) or 0.0):.2f}", inline=True)
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
@@ -1162,7 +1372,7 @@ async def kofi_status(interaction: discord.Interaction):
 @app_commands.describe(user="User to mark as supporter", email="Email used on Ko-fi")
 async def kofi_add(interaction: discord.Interaction, user: discord.Member, email: str):
     if not _is_valid_email(email):
-        await interaction.response.send_message("❌ Please provide a valid email address.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.kofi.invalid_email', default='Please provide a valid email address.')}", ephemeral=True)
         return
     data = load_supporters_db()
     now = _safe_iso_now()
@@ -1176,7 +1386,7 @@ async def kofi_add(interaction: discord.Interaction, user: discord.Member, email
         payment_ts=now,
     )
     save_supporters_db(data)
-    await interaction.response.send_message(f"✅ {user.mention} marked as an active supporter.", ephemeral=True)
+    await interaction.response.send_message(await _user_text(interaction, "bot.kofi.add_success", default="{user} marked as an active supporter.", user=user.mention), ephemeral=True)
     _dispatch_module_log_event(
         interaction.guild,
         "supporters",
@@ -1193,11 +1403,11 @@ async def kofi_remove(interaction: discord.Interaction, user: discord.Member):
     data = load_supporters_db()
     record = data.get("supporters", {}).get(str(user.id))
     if not record:
-        await interaction.response.send_message("❌ No supporter record exists for that user.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.kofi.remove_no_record', default='No supporter record exists for that user.')}", ephemeral=True)
         return
     record["active"] = False
     save_supporters_db(data)
-    await interaction.response.send_message(f"✅ Supporter status disabled for {user.mention}.", ephemeral=True)
+    await interaction.response.send_message(await _user_text(interaction, "bot.kofi.remove_success", default="Supporter status disabled for {user}.", user=user.mention), ephemeral=True)
     _dispatch_module_log_event(
         interaction.guild,
         "supporters",
@@ -1224,7 +1434,7 @@ async def kofi_prefix(ctx: commands.Context):
 @kofi_prefix.command(name="link")
 async def kofi_link_prefix(ctx: commands.Context, email: str):
     if not _is_valid_email(email):
-        await ctx.send("❌ Please provide a valid email address.")
+        await ctx.send(f"❌ {t_sync(ctx.author.id, 'bot.kofi.invalid_email', default='Please provide a valid email address.')}")
         return
     normalized = _normalize_email(email)
     queue_position = _queue_pending_kofi_link(normalized, ctx.author.id)
@@ -1263,24 +1473,24 @@ async def kofi_status_prefix(ctx: commands.Context):
     data = load_supporters_db()
     record = data.get("supporters", {}).get(str(ctx.author.id))
     if not record:
-        await ctx.send("You are not marked as a supporter yet.")
+        await ctx.send(t_sync(ctx.author.id, "bot.kofi.not_supporter", default="You are not marked as a supporter yet."))
         return
     active = _record_is_active(record)
     if record.get("active") != active:
         record["active"] = active
         save_supporters_db(data)
-    embed = discord.Embed(title="Ko-fi Supporter Status", color=discord.Color.blurple())
+    embed = discord.Embed(title=await _user_text(interaction, "bot.kofi.status_title", default="Ko-fi Supporter Status"), color=discord.Color.blurple())
     embed.add_field(name="Active", value="Yes" if active else "No", inline=True)
-    embed.add_field(name="Tier", value=str(record.get("tier", "unknown")).title(), inline=True)
-    embed.add_field(name="Last Payment", value=str(record.get("last_payment", "Unknown")), inline=False)
-    embed.add_field(name="Total USD", value=f"{float(record.get('total_usd', 0.0) or 0.0):.2f}", inline=True)
+    embed.add_field(name=await _user_text(interaction, "bot.kofi.field_tier", default="Tier"), value=str(record.get("tier", "unknown")).title(), inline=True)
+    embed.add_field(name=await _user_text(interaction, "bot.kofi.field_last_payment", default="Last Payment"), value=str(record.get("last_payment", "Unknown")), inline=False)
+    embed.add_field(name=await _user_text(interaction, "bot.kofi.field_total_usd", default="Total USD"), value=f"{float(record.get('total_usd', 0.0) or 0.0):.2f}", inline=True)
     await ctx.send(embed=embed)
 
 
 @kofi_prefix.command(name="claim")
 async def kofi_claim_prefix(ctx: commands.Context, email: str):
     if not _is_valid_email(email):
-        await ctx.send("❌ Please provide a valid email address.")
+        await ctx.send(f"❌ {t_sync(ctx.author.id, 'bot.kofi.invalid_email', default='Please provide a valid email address.')}")
         return
     normalized = _normalize_email(email)
     claimed = _claim_unlinked_for_user(ctx.author.id, normalized)
@@ -1314,7 +1524,7 @@ async def kofi_claim_prefix(ctx: commands.Context, email: str):
 @commands.has_permissions(administrator=True)
 async def kofi_add_prefix(ctx: commands.Context, user: discord.Member, email: str):
     if not _is_valid_email(email):
-        await ctx.send("❌ Please provide a valid email address.")
+        await ctx.send(f"❌ {t_sync(ctx.author.id, 'bot.kofi.invalid_email', default='Please provide a valid email address.')}")
         return
     data = load_supporters_db()
     now = _safe_iso_now()
@@ -1345,7 +1555,7 @@ async def kofi_remove_prefix(ctx: commands.Context, user: discord.Member):
     data = load_supporters_db()
     record = data.get("supporters", {}).get(str(user.id))
     if not record:
-        await ctx.send("❌ No supporter record exists for that user.")
+        await ctx.send(f"❌ {t_sync(ctx.author.id, 'bot.kofi.remove_no_record', default='No supporter record exists for that user.')}")
         return
     record["active"] = False
     save_supporters_db(data)
@@ -2074,9 +2284,9 @@ async def ban(
     duration: Optional[int] = None,  # in minutes
 ):
     if member == interaction.user:
-        return await interaction.response.send_message("❌ You cannot ban yourself.", ephemeral=True)
+        return await interaction.response.send_message(f"❌ {await _user_text(interaction, 'moderation.ban.self_ban', default='You cannot ban yourself.')}", ephemeral=True)
     if member.top_role >= interaction.user.top_role:
-        return await interaction.response.send_message("❌ You cannot ban someone with an equal or higher role.", ephemeral=True)
+        return await interaction.response.send_message(f"❌ {await _user_text(interaction, 'moderation.ban.hierarchy', default='You cannot ban someone with an equal or higher role.')}", ephemeral=True)
 
     try:
         await _notify_user_moderation_dm(
@@ -2120,10 +2330,12 @@ async def ban(
             except Exception:
                 pass
             try:
-                await _send_app_error(
+                rollback_msg = await _user_text(
                     interaction,
-                    "❌ Ban was applied but I couldn't confirm. The ban has been removed.",
+                    "moderation.ban.rollback",
+                    default="Ban was applied but I couldn't confirm. The ban has been removed.",
                 )
+                await _send_app_error(interaction, f"❌ {rollback_msg}")
             except Exception:
                 pass
             return
@@ -2153,10 +2365,12 @@ async def ban(
             except Exception:
                 pass
             try:
-                await _send_app_error(
+                rollback_msg = await _user_text(
                     interaction,
-                    "❌ Ban was applied but I couldn't confirm. The ban has been removed.",
+                    "moderation.ban.rollback",
+                    default="Ban was applied but I couldn't confirm. The ban has been removed.",
                 )
+                await _send_app_error(interaction, f"❌ {rollback_msg}")
             except Exception:
                 pass
             return
@@ -2175,12 +2389,12 @@ async def ban(
 async def unban(interaction: discord.Interaction, user_id: str):
     guild = interaction.guild
     if not guild:
-        return await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+        return await interaction.response.send_message(f"❌ {await _user_text(interaction, 'common.guild_only', default='Use this in a server.')}", ephemeral=True)
 
     try:
         user_id = int(user_id)
     except ValueError:
-        return await interaction.response.send_message("❌ Invalid user ID.", ephemeral=True)
+        return await interaction.response.send_message(f"❌ {await _user_text(interaction, 'common.invalid_user', default='Invalid user.')}", ephemeral=True)
 
     try:
         # Convert async iterator to list
@@ -2188,7 +2402,7 @@ async def unban(interaction: discord.Interaction, user_id: str):
         ban_entry = next((b for b in bans if b.user.id == user_id), None)
 
         if not ban_entry:
-            return await interaction.response.send_message(f"❌ No banned user with ID `{user_id}` found.", ephemeral=True)
+            return await interaction.response.send_message(f"❌ {await _user_text(interaction, 'moderation.unban.not_banned', default='That user is not banned.')}", ephemeral=True)
 
         await guild.unban(ban_entry.user, reason=f"Unbanned by {interaction.user}")
         msg = get_command_response_for_interaction(
@@ -2207,7 +2421,7 @@ async def unban(interaction: discord.Interaction, user_id: str):
             channel_id=interaction.channel.id if interaction.channel else None,
         )
     except discord.Forbidden:
-        await interaction.response.send_message("❌ I don't have permission to unban this user.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'moderation.unban.bot_hierarchy', default='I don\'t have permission to unban this user.')}", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(
             _redact_discord_token_in_text(f"❌ An error occurred: {e}"),
@@ -2435,7 +2649,7 @@ class AutoRoleView(discord.ui.View):
             config = autorole_config.get(guild_id, {})
 
             if not config:
-                await interaction.response.send_message("❌ No autoroles to remove.", ephemeral=True)
+                await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.autorole_legacy.no_roles', default='No autoroles to remove.')}", ephemeral=True)
                 return
 
             options = []
@@ -2465,7 +2679,7 @@ class AutoRoleView(discord.ui.View):
 
             remove_view = discord.ui.View(timeout=30)
             remove_view.add_item(RemoveDropdown())
-            await interaction.response.send_message("🗑️ Choose an autorole to remove:", view=remove_view, ephemeral=True)
+            await interaction.response.send_message(await _user_text(interaction, "bot.autorole_legacy.choose_remove", default="🗑️ Choose an autorole to remove:"), view=remove_view, ephemeral=True)
 
 MUTEROLE_FILE = os.path.join(_storage_dir, "Config", "mute_roles.json")
 
@@ -2489,7 +2703,7 @@ mute_config = load_mute_config()
 async def mute(interaction: discord.Interaction, member: discord.Member, duration: int, unit: str, reason: str = None):
     unit = unit.lower()
     if unit not in ("m", "h"):
-        await interaction.response.send_message("❌ Invalid time unit. Use 'm' for minutes or 'h' for hours.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'moderation.mute.invalid_unit', default='Invalid time unit. Use \'m\' for minutes or \'h\' for hours.')}", ephemeral=True)
         return
 
     duration_seconds = duration * 60 if unit == "m" else duration * 3600
@@ -2497,16 +2711,16 @@ async def mute(interaction: discord.Interaction, member: discord.Member, duratio
     mute_role_id = mute_config.get(guild_id)
 
     if not mute_role_id:
-        await interaction.response.send_message("⚠️ Mute role not set. Use `/muterole_create` or `/muterole_update`.", ephemeral=True)
+        await interaction.response.send_message(f"⚠️ {await _user_text(interaction, 'moderation.mute.role_not_set', default='Mute role not set. Use /muterole create or /muterole update.')}", ephemeral=True)
         return
 
     mute_role = interaction.guild.get_role(mute_role_id)
     if not mute_role:
-        await interaction.response.send_message("⚠️ Mute role does not exist. Please update it again.", ephemeral=True)
+        await interaction.response.send_message(f"⚠️ {await _user_text(interaction, 'moderation.mute.role_missing', default='Mute role does not exist. Please update it again.')}", ephemeral=True)
         return
 
     if mute_role in member.roles:
-        await interaction.response.send_message(f"❌ {member.mention} is already muted.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'moderation.mute.already_muted', default='That member is already muted.')}", ephemeral=True)
         return
 
     reason_cannot = _can_add_role_reason(interaction.guild, member, mute_role)
@@ -2584,7 +2798,7 @@ async def unmute(interaction: discord.Interaction, member: discord.Member):
     guild_id = str(interaction.guild_id)
     mute_role_id = mute_config.get(guild_id)
     if not mute_role_id:
-        await interaction.response.send_message("⚠️ No mute role configured.", ephemeral=True)
+        await interaction.response.send_message(f"⚠️ {await _user_text(interaction, 'moderation.unmute.role_not_set', default='No mute role configured.')}", ephemeral=True)
         return
 
     mute_role = interaction.guild.get_role(mute_role_id)
@@ -2629,7 +2843,7 @@ async def unmute(interaction: discord.Interaction, member: discord.Member):
             channel_id=interaction.channel.id if interaction.channel else None,
         )
     else:
-        await interaction.response.send_message(f"❌ {member.mention} is not muted.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'moderation.unmute.not_muted', default='That member is not muted.')}", ephemeral=True)
 
 
 muterole_group = app_commands.Group(name="muterole", description="Mute role management commands")
@@ -2720,7 +2934,7 @@ async def hardmute(interaction: discord.Interaction, member: discord.Member, rea
     guild_id = str(interaction.guild_id)
     mute_role_id = mute_config.get(guild_id)
     if not mute_role_id:
-        await interaction.response.send_message("⚠️ Mute role not set.", ephemeral=True)
+        await interaction.response.send_message(f"⚠️ {await _user_text(interaction, 'moderation.mute.role_not_set', default='Mute role not set.')}", ephemeral=True)
         return
 
     mute_role = interaction.guild.get_role(mute_role_id)
@@ -2895,7 +3109,7 @@ async def remindme(interaction: discord.Interaction, message: str, date: str, ti
         _save_reminders()
         await interaction.response.send_message(f"\u2705 Reminder set for {remind_time.strftime('%m/%d/%y %H:%M')}", ephemeral=True)
     except ValueError:
-        await interaction.response.send_message("\u274C Invalid date or time format. Use MM/DD/YY HH:MM.", ephemeral=True)
+        await interaction.response.send_message(f"\u274C {await _user_text(interaction, 'bot.timers.invalid_datetime', default='Invalid date or time format. Use MM/DD/YY HH:MM.')}", ephemeral=True)
 
 @tree.command(name="starttimer", description="Start a timer using s, m, or h (e.g., 10s, 5m, 2h)")
 @app_commands.describe(duration="Duration of the timer like 10s, 5m, or 1h")
@@ -2930,7 +3144,7 @@ async def starttimer(interaction: discord.Interaction, duration: str):
             _save_timers()
 
     except ValueError:
-        await interaction.response.send_message("\u274C Invalid format. Use like `10s`, `5m`, or `2h`.", ephemeral=True)
+        await interaction.response.send_message(f"\u274C {await _user_text(interaction, 'bot.timers.invalid_format', default='Invalid format. Use like 10s, 5m, 2h, or 1d.')}", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(
             _redact_discord_token_in_text(f"\u274C An error occurred: {e}"),
@@ -2948,23 +3162,23 @@ async def checktimers(interaction: discord.Interaction):
     if user_timers:
         await interaction.response.send_message("\n".join(user_timers), ephemeral=True)
     else:
-        await interaction.response.send_message("\u274C You have no active timers.", ephemeral=True)
+        await interaction.response.send_message(f"\u274C {await _user_text(interaction, 'bot.timers.no_timers', default='You have no active timers.')}", ephemeral=True)
 
 @tree.command(name="endtimer", description="Cancel a running timer by ID.")
 @app_commands.describe(timer_id="ID of the timer to cancel")
 async def endtimer(interaction: discord.Interaction, timer_id: int):
     timer = timers.get(timer_id)
     if not timer:
-        await interaction.response.send_message("\u274C Timer not found.", ephemeral=True)
+        await interaction.response.send_message(f"\u274C {await _user_text(interaction, 'bot.timers.timer_not_found', default='Timer not found or not yours.')}", ephemeral=True)
         return
 
     if timer["user_id"] != interaction.user.id:
-        await interaction.response.send_message("\u26D4 You can only end your own timers.", ephemeral=True)
+        await interaction.response.send_message(f"\u26D4 {await _user_text(interaction, 'bot.timers.own_only', default='You can only end your own timers.')}", ephemeral=True)
         return
 
     del timers[timer_id]
     _save_timers()
-    await interaction.response.send_message(f"\u23F9 Timer #{timer_id} has been cancelled.", ephemeral=True)
+    await interaction.response.send_message(await _user_text(interaction, "bot.timers.cancelled", default="⏹ Timer #{id} has been cancelled.", id=str(timer_id)), ephemeral=True)
 
 class SayView(discord.ui.View):
     def __init__(self, guild):
@@ -2991,7 +3205,7 @@ class SayView(discord.ui.View):
 
     async def send_message(self, interaction: discord.Interaction):
         await self.selected_channel.send(self.message_input.value)
-        await interaction.response.send_message("✅ Message sent!", ephemeral=True)
+        await interaction.response.send_message(await _user_text(interaction, "bot.say.message_sent", default="✅ Message sent!"), ephemeral=True)
 
 
 DM_OPTOUT_FOOTER = "\n\n_Use `/optout` in any server with this bot to stop receiving these messages._"
@@ -3021,7 +3235,7 @@ class DmModal(discord.ui.Modal, title="Type your DM"):
         body = f"{header}\n{self.msg_input.value}{DM_OPTOUT_FOOTER}"
         try:
             await self.selected_user.send(body)
-            await interaction.response.send_message("✅ Message sent!", ephemeral=True)
+            await interaction.response.send_message(await _user_text(interaction, "bot.say.message_sent", default="✅ Message sent!"), ephemeral=True)
             if "log_action" in globals():
                 author_label = "anonymous" if self.anonymous else str(self.staff_user)
                 await log_action(
@@ -3074,7 +3288,7 @@ class DmView(discord.ui.View):
     async def select_member(self, interaction: discord.Interaction) -> None:
         selected_user = self.guild.get_member(int(self.member_select.values[0]))
         if not selected_user:
-            await interaction.response.send_message("❌ User not found.", ephemeral=True)
+            await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.dm_cmd.user_not_found', default='User not found.')}", ephemeral=True)
             return
         await interaction.response.send_message(
             f"Send to {selected_user.mention} as:",
@@ -3170,19 +3384,23 @@ async def on_interaction(interaction: discord.Interaction):
 
 @tree.command(name="say", description="Send a message as the bot to a specific channel")
 async def say(interaction: discord.Interaction):
-    await interaction.response.send_message("Select a channel to send a message:", view=SayView(interaction.guild), ephemeral=True)
+    await interaction.response.send_message(await _user_text(interaction, "bot.say.choose_channel", default="Select a channel to send a message:"), view=SayView(interaction.guild), ephemeral=True)
 
 
 @tree.command(name="dm", description="Send a DM as the bot (requires Moderate Members)")
 async def dm(interaction: discord.Interaction):
-    await interaction.response.send_message("Select a user to DM:", view=DmView(interaction.guild), ephemeral=True)
+    await interaction.response.send_message(await _user_text(interaction, "bot.dm_cmd.choose_member", default="Select a user to DM:"), view=DmView(interaction.guild), ephemeral=True)
 
 
 @tree.command(name="optout", description="Opt out of receiving staff DMs from this bot")
 async def optout(interaction: discord.Interaction) -> None:
     _dm_optout_add(interaction.user.id)
     await interaction.response.send_message(
-        "✅ You have opted out of receiving staff DMs. Use `/optin` to opt back in.",
+        await _user_text(
+            interaction,
+            "bot.optout.optout_success",
+            default="You have opted out of receiving staff DMs. Use /optin to opt back in.",
+        ),
         ephemeral=True,
     )
 
@@ -3191,7 +3409,7 @@ async def optout(interaction: discord.Interaction) -> None:
 async def optin(interaction: discord.Interaction) -> None:
     _dm_optout_remove(interaction.user.id)
     await interaction.response.send_message(
-        "✅ You have opted back in to receiving staff DMs.",
+        await _user_text(interaction, "bot.optout.optin_success", default="You have opted back in to receiving staff DMs."),
         ephemeral=True,
     )
 
@@ -3205,12 +3423,12 @@ async def poll(interaction: discord.Interaction, question: str, duration_minutes
                 discord.SelectOption(label=channel.name, value=str(channel.id))
                 for channel in interaction.guild.text_channels if channel.permissions_for(interaction.guild.me).send_messages
             ][:25]
-            super().__init__(placeholder="Select a channel to send the poll to...", options=options)
+            super().__init__(placeholder=t_sync(interaction.user.id, "bot.poll.select_placeholder", default="Select a channel to send the poll to..."), options=options)
 
         async def callback(self, i: discord.Interaction):
             channel = interaction.guild.get_channel(int(self.values[0]))
-            embed = discord.Embed(title="📊 Poll", description=question, color=discord.Color.blue())
-            embed.set_footer(text=f"Poll ends in {duration_minutes} minute(s).")
+            embed = discord.Embed(title=await _user_text(i, "bot.poll.title", default="📊 Poll"), description=question, color=discord.Color.blue())
+            embed.set_footer(text=await _user_text(i, "bot.poll.footer", default="Poll ends in {minutes} minute(s).", minutes=str(duration_minutes)))
             msg = await channel.send(embed=embed)
             await msg.add_reaction("👍")
             await msg.add_reaction("👎")
@@ -3222,11 +3440,11 @@ async def poll(interaction: discord.Interaction, question: str, duration_minutes
                 details=f"duration_minutes={duration_minutes}; question={question[:200]}",
                 channel_id=channel.id,
             )
-            await i.response.send_message(f"✅ Poll sent to {channel.mention}", ephemeral=True)
+            await i.response.send_message(await _user_text(i, "bot.poll.sent", default="✅ Poll sent to {channel}", channel=channel.mention), ephemeral=True)
             await asyncio.sleep(duration_minutes * 60)
             try:
                 await msg.clear_reactions()
-                await channel.send("🛑 Poll ended! Thanks for voting.")
+                await channel.send(await t(interaction.user.id, "bot.poll.ended", default="🛑 Poll ended! Thanks for voting."))
                 _dispatch_module_log_event(
                     interaction.guild,
                     "polls",
@@ -3236,14 +3454,14 @@ async def poll(interaction: discord.Interaction, question: str, duration_minutes
                     channel_id=channel.id,
                 )
             except discord.Forbidden:
-                await channel.send("⚠️ I do not have permission to clear reactions.")
+                await channel.send(await t(interaction.user.id, "bot.poll.clear_reactions_denied", default="⚠️ I do not have permission to clear reactions."))
 
     class PollChannelView(discord.ui.View):
         def __init__(self):
             super().__init__()
             self.add_item(PollChannelSelect())
 
-    await interaction.response.send_message("📊 Choose a channel to send the poll:", view=PollChannelView(), ephemeral=True)
+    await interaction.response.send_message(await _user_text(interaction, "bot.poll.choose_channel", default="📊 Choose a channel to send the poll:"), view=PollChannelView(), ephemeral=True)
 
 VERIFY_FILE = os.path.join(_storage_dir, "Config", "verify_config.json")
 
@@ -3279,17 +3497,17 @@ class SimpleButtonView(discord.ui.View):
     @discord.ui.button(label="Verify Me ✅", style=discord.ButtonStyle.success)
     async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.user:
-            return await interaction.response.send_message("❌ This isn’t for you.", ephemeral=True)
+            return await interaction.response.send_message(f"❌ {t_sync(interaction.user.id, 'bot.verify.wrong_user', default='This isn\'t for you.')}", ephemeral=True)
         try:
             await self.user.add_roles(self.role)
         except discord.Forbidden as e:
             details = _format_error_details(exc=e)
             friendly, view = _error_details_view(
-                "❌ I cannot assign the role (missing permission or role hierarchy).",
+                f"❌ {t_sync(interaction.user.id, 'bot.verify.role_assign_failed', default='I cannot assign the role (missing permission or role hierarchy).')}",
                 details,
             )
             return await interaction.response.send_message(friendly, ephemeral=True, view=view)
-        await interaction.response.edit_message(content="✅ You’ve been verified!", view=None)
+        await interaction.response.edit_message(content=await _user_text(interaction, "bot.verify.button_success", default="✅ You've been verified!"), view=None)
         _dispatch_module_log_event(
             interaction.guild,
             "verification",
@@ -3299,12 +3517,12 @@ class SimpleButtonView(discord.ui.View):
             channel_id=interaction.channel.id if interaction.channel else None,
         )
         if self.log_channel:
-            await self.log_channel.send(f"✅ {self.user.mention} verified via **Simple Button**.")
+            await self.log_channel.send(await t(self.user.id, "bot.verify.log_button", default="✅ {user} verified via **Simple Button**.", user=self.user.mention))
 
 
 async def run_button_verify(interaction, user, role, log_channel):
     await interaction.response.send_message(
-        "Press the button below to verify yourself:",
+        await _user_text(interaction, "bot.verify.button_prompt", default="Press the button below to verify yourself:"),
         view=SimpleButtonView(user, role, log_channel),
         ephemeral=True
     )
@@ -3331,11 +3549,11 @@ class CodeVerifyModal(discord.ui.Modal, title="Enter Verification Code"):
             except discord.Forbidden as e:
                 details = _format_error_details(exc=e)
                 friendly, view = _error_details_view(
-                    "❌ I cannot assign the role (missing permission or role hierarchy).",
+                    f"❌ {t_sync(interaction.user.id, 'bot.verify.role_assign_failed', default='I cannot assign the role (missing permission or role hierarchy).')}",
                     details,
                 )
                 return await interaction.response.send_message(friendly, ephemeral=True, view=view)
-            await interaction.response.send_message("✅ Verification successful!", ephemeral=True)
+            await interaction.response.send_message(await _user_text(interaction, "bot.verify.code_success", default="✅ Verification successful!"), ephemeral=True)
             _dispatch_module_log_event(
                 interaction.guild,
                 "verification",
@@ -3345,9 +3563,9 @@ class CodeVerifyModal(discord.ui.Modal, title="Enter Verification Code"):
                 channel_id=interaction.channel.id if interaction.channel else None,
             )
             if self.log_channel:
-                await self.log_channel.send(f"✅ {self.user.mention} verified via **Code Method**.")
+                await self.log_channel.send(await t(self.user.id, "bot.verify.log_code", default="✅ {user} verified via **Code Method**.", user=self.user.mention))
         else:
-            await interaction.response.send_message("❌ Incorrect code. Try again later.", ephemeral=True)
+            await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.verify.code_wrong', default='Incorrect code. Try again later.')}", ephemeral=True)
             _dispatch_module_log_event(
                 interaction.guild,
                 "verification",
@@ -3369,7 +3587,7 @@ class CodeVerifyView(discord.ui.View):
     @discord.ui.button(label="Enter Code 🔢", style=discord.ButtonStyle.primary)
     async def enter_code(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user != self.user:
-            return await interaction.response.send_message("❌ Not your session.", ephemeral=True)
+            return await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.verify.color_not_your_session', default='❌ Not your session.')}", ephemeral=True)
         await interaction.response.send_modal(CodeVerifyModal(self.user, self.code, self.role, self.log_channel))
 
 
@@ -3414,7 +3632,7 @@ class ColorButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         if interaction.user != self.parent.user:
-            return await interaction.response.send_message("❌ This isn't your verification session.", ephemeral=True)
+            return await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.verify.color_wrong_session', default='This isn\'t your verification session.')}", ephemeral=True)
 
         if self.color == self.parent.correct_color:
             try:
@@ -3422,11 +3640,11 @@ class ColorButton(discord.ui.Button):
             except discord.Forbidden as e:
                 details = _format_error_details(exc=e)
                 friendly, view = _error_details_view(
-                    "❌ I cannot assign the role (missing permission or role hierarchy).",
+                    f"❌ {t_sync(interaction.user.id, 'bot.verify.role_assign_failed', default='I cannot assign the role (missing permission or role hierarchy).')}",
                     details,
                 )
                 return await interaction.response.send_message(friendly, ephemeral=True, view=view)
-            await interaction.response.send_message(f"✅ Correct! You’ve been verified.", ephemeral=True)
+            await interaction.response.send_message(await _user_text(interaction, "bot.verify.color_correct", default="✅ Correct! You've been verified."), ephemeral=True)
             _dispatch_module_log_event(
                 interaction.guild,
                 "verification",
@@ -3440,7 +3658,7 @@ class ColorButton(discord.ui.Button):
                     f"✅ {self.parent.user.mention} was verified via **Color Method**."
                 )
         else:
-            await interaction.response.send_message("❌ Incorrect color. Try again!", ephemeral=True)
+            await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.verify.color_wrong', default='Incorrect color. Try again!')}", ephemeral=True)
             _dispatch_module_log_event(
                 interaction.guild,
                 "verification",
@@ -3482,13 +3700,13 @@ async def _handle_verify_start_interaction(
     guild_id_key = str(interaction.guild.id) if interaction.guild else guild_id_fallback
     config = data.get(guild_id_key)
     if not config:
-        await interaction.response.send_message("⚙️ Verification not set up.", ephemeral=True)
+        await interaction.response.send_message(await _user_text(interaction, "bot.verify.not_setup", default="⚙️ Verification not set up."), ephemeral=True)
         return
 
     user = interaction.user
     guild = interaction.guild
     if guild is None:
-        await interaction.response.send_message("⚙️ Verification must be used in a server.", ephemeral=True)
+        await interaction.response.send_message(await _user_text(interaction, "bot.verify.guild_only", default="⚙️ Verification must be used in a server."), ephemeral=True)
         return
 
     try:
@@ -3524,7 +3742,7 @@ async def _handle_verify_start_interaction(
     method = config["method"]
 
     if role in user.roles:
-        await interaction.response.send_message("✅ You’re already verified!", ephemeral=True)
+        await interaction.response.send_message(await _user_text(interaction, "bot.verify.already_verified", default="✅ You're already verified!"), ephemeral=True)
         return
 
     if method == "button":
@@ -3534,7 +3752,7 @@ async def _handle_verify_start_interaction(
     elif method == "color":
         await run_color_verify(interaction, user, role, log_channel)
     else:
-        await interaction.response.send_message("❌ Invalid verification method.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.verify.invalid_method', default='Invalid verification method.')}", ephemeral=True)
 
 
 # ----------------------------------------
@@ -3556,6 +3774,71 @@ class VerifyStartView(discord.ui.View):
 
     async def _on_verify_start(self, interaction: discord.Interaction) -> None:
         await _handle_verify_start_interaction(interaction, self.guild_id)
+
+
+async def republish_verify_panel(
+    bot_instance,
+    guild: discord.Guild,
+    *,
+    force: bool = False,
+) -> str | None:
+    """Post a verification start button after backup restore.
+
+    In repair mode (force=False), reuse an existing panel message when found.
+    """
+    data = load_verify_config()
+    cfg = data.get(str(guild.id))
+    if not isinstance(cfg, dict):
+        return None
+    channel_id = cfg.get("verify_channel")
+    if channel_id is None or not str(channel_id).isdigit():
+        return "verify: no verify_channel configured"
+    channel = guild.get_channel(int(channel_id))
+    if not isinstance(channel, discord.TextChannel):
+        return f"verify: channel `{channel_id}` missing after restore"
+
+    expected_custom_id = f"{_VERIFY_START_CUSTOM_ID_PREFIX}{guild.id}"
+
+    async def _register(message_id: int | None = None) -> None:
+        try:
+            bot_instance.add_view(VerifyStartView(guild.id))
+            if message_id is not None:
+                bot_instance.add_view(VerifyStartView(guild.id), message_id=message_id)
+        except Exception:
+            pass
+
+    if not force:
+        panel_mid = cfg.get("panel_message_id")
+        if panel_mid is not None and str(panel_mid).isdigit():
+            try:
+                existing = await channel.fetch_message(int(panel_mid))
+                await _register(existing.id)
+                return f"verify: existing panel kept in #{channel.name}"
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                pass
+        try:
+            async for msg in channel.history(limit=40):
+                for row in msg.components:
+                    for child in row.children:
+                        if getattr(child, "custom_id", None) == expected_custom_id:
+                            cfg["panel_message_id"] = msg.id
+                            data[str(guild.id)] = cfg
+                            save_verify_config(data)
+                            await _register(msg.id)
+                            return f"verify: existing panel kept in #{channel.name}"
+        except (discord.Forbidden, discord.HTTPException):
+            pass
+
+    view = VerifyStartView(guild.id)
+    panel_msg = await channel.send(
+        f"☕ Welcome to **{guild.name}**! Click below to verify:",
+        view=view,
+    )
+    cfg["panel_message_id"] = panel_msg.id
+    data[str(guild.id)] = cfg
+    save_verify_config(data)
+    await _register(panel_msg.id)
+    return f"verify: panel republished in #{channel.name}"
 
 
 class LegacyVerifyStartView(discord.ui.View):
@@ -3626,10 +3909,21 @@ async def verifyconfig(interaction: discord.Interaction,
     await interaction.response.send_message(embed=embed)
 
     try:
-        await verify_channel.send(
+        panel_msg = await verify_channel.send(
             f"☕ Welcome to **{interaction.guild.name}**! Click below to verify:",
             view=VerifyStartView(interaction.guild.id)
         )
+        data = load_verify_config()
+        guild_cfg = data.get(guild_id)
+        if isinstance(guild_cfg, dict):
+            guild_cfg["panel_message_id"] = panel_msg.id
+            data[guild_id] = guild_cfg
+            save_verify_config(data)
+        try:
+            bot.add_view(VerifyStartView(interaction.guild.id))
+            bot.add_view(VerifyStartView(interaction.guild.id), message_id=panel_msg.id)
+        except Exception:
+            pass
     except Exception as e:
         await interaction.followup.send(
             _redact_discord_token_in_text(
@@ -3651,12 +3945,12 @@ class Nickname(commands.Cog):
     async def nickname(self, interaction, name: str):
         # Check permissions
         if not interaction.guild.me.guild_permissions.manage_nicknames:
-            await interaction.response.send_message("❌ I don’t have permission to change my nickname.", ephemeral=True)
+            await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.nickname.no_permission', default='I don\'t have permission to change my nickname.')}", ephemeral=True)
             return
 
         try:
             await interaction.guild.me.edit(nick=name)
-            await interaction.response.send_message(f"✅ Nickname changed to **{name}**")
+            await interaction.response.send_message(await _user_text(interaction, "bot.nickname.success_formatted", default="✅ Nickname changed to **{name}**", name=name))
             _dispatch_module_log_event(
                 interaction.guild,
                 "verification",
@@ -3698,7 +3992,7 @@ class StaffAppGroup(app_commands.Group):
     @app_commands.command(name="toggle", description="Toggle staff applications on or off")
     async def toggle(self, interaction: discord.Interaction):
         # Your toggle logic here
-        await interaction.response.send_message("Toggled staff applications!", ephemeral=True)
+        await interaction.response.send_message(await _user_text(interaction, "bot.applications.toggled", default="Toggled staff applications!"), ephemeral=True)
         _dispatch_module_log_event(
             interaction.guild,
             "applications",
@@ -3711,7 +4005,7 @@ class StaffAppGroup(app_commands.Group):
     @app_commands.command(name="addquestion", description="Add a staff application question")
     async def add_question(self, interaction: discord.Interaction, question: str):
         # Add question logic here
-        await interaction.response.send_message(f"Added question: {question}", ephemeral=True)
+        await interaction.response.send_message(await _user_text(interaction, "bot.applications.added_question", default="Added question: {question}", question=question), ephemeral=True)
         _dispatch_module_log_event(
             interaction.guild,
             "applications",
@@ -3753,7 +4047,7 @@ class StaffAppGroup(app_commands.Group):
 
         view = discord.ui.View(timeout=60)
         view.add_item(QSelect())
-        await interaction.response.send_message("Select question to delete:", view=view, ephemeral=True)
+        await interaction.response.send_message(await _user_text(interaction, "bot.applications.choose_delete", default="Select question to delete:"), view=view, ephemeral=True)
 
           #  /staffapp question list ---------------------------------------------
     @app_commands.command(name="list", description="List current questions")
@@ -3842,7 +4136,7 @@ async def application(interaction: discord.Interaction):
         return await interaction.response.send_message(
             "❌ I can’t DM you. Please enable DMs from this server and try again.", ephemeral=True)
 
-    await interaction.response.send_message("📨 Check your DMs to begin your application!", ephemeral=True)
+    await interaction.response.send_message(await _user_text(interaction, "bot.applications.check_dms", default="📨 Check your DMs to begin your application!"), ephemeral=True)
 
     answers: list[str] = []
     def dm_check(m: discord.Message):
@@ -4600,9 +4894,9 @@ async def call(
     guild = interaction.guild
     actor = interaction.user or interaction.member
     if not guild:
-        return await interaction.followup.send("❌ Guild not found.", ephemeral=True)
+        return await interaction.followup.send(f"❌ {await _user_text(interaction, 'bot.call.guild_not_found', default='Guild not found.')}", ephemeral=True)
     if actor is None:
-        return await interaction.followup.send("❌ Could not resolve your user for this command.", ephemeral=True)
+        return await interaction.followup.send(f"❌ {await _user_text(interaction, 'bot.call.user_not_found', default='Could not resolve your user for this command.')}", ephemeral=True)
 
     # Collect valid members
     invited = [
@@ -4713,7 +5007,7 @@ async def call_join(
     call_password = call_data.get("password")
     if call_password:
         if password != call_password:
-            return await interaction.response.send_message("❌ Incorrect password.", ephemeral=True)
+            return await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.call.join_wrong_password', default='Incorrect password.')}", ephemeral=True)
 
     # Add user (requires Manage Roles + bot role above user's highest role)
     reason = _call_set_permissions_reason(guild, user)
@@ -4760,7 +5054,7 @@ async def call_join(
     except Exception:
         pass
 
-    await interaction.response.send_message(f"✅ You joined <#{channel.id}>", ephemeral=True)
+    await interaction.response.send_message(await _user_text(interaction, "bot.call.join_success_channel", default="✅ You joined {channel}", channel=f"<#{channel.id}>"), ephemeral=True)
     _dispatch_module_log_event(
         interaction.guild,
         "calls",
@@ -4776,7 +5070,7 @@ async def call_join(
 @call_group.command(name="add", description="Add someone to your CoffeeCord call.")
 async def call_add(interaction: discord.Interaction, user: discord.Member):
     if interaction.guild is None or interaction.user is None:
-        return await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
+        return await interaction.response.send_message(f"❌ {await _user_text(interaction, 'common.guild_only', default='Use this in a server.')}", ephemeral=True)
     calls = load_calls()
     guild_id = str(interaction.guild.id)
 
@@ -4790,12 +5084,12 @@ async def call_add(interaction: discord.Interaction, user: discord.Member):
 
     call_id, info = get_host_call(calls, guild_id, str(interaction.user.id))
     if not info:
-        await interaction.response.send_message("❌ You aren’t the host of any active call.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.call.not_host', default='You aren\'t the host of any active call.')}", ephemeral=True)
         return
 
     channel = interaction.guild.get_channel(int(info["channel_id"]))
     if not channel:
-        await interaction.response.send_message("❌ Call channel no longer exists.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.call.channel_gone', default='Call channel no longer exists.')}", ephemeral=True)
         return
 
     # Give view_channel only; user must use /call join to get connect
@@ -4846,7 +5140,7 @@ async def call_add(interaction: discord.Interaction, user: discord.Member):
     except Exception:
         pass
 
-    await interaction.response.send_message(f"📨 Sent call invite to {user.mention}.")
+    await interaction.response.send_message(await _user_text(interaction, "bot.call.invite_sent", default="📨 Sent call invite to {user}.", user=user.mention))
     _dispatch_module_log_event(
         interaction.guild,
         "calls",
@@ -4862,7 +5156,7 @@ async def call_add(interaction: discord.Interaction, user: discord.Member):
 @call_group.command(name="remove", description="Remove someone from your CoffeeCord call.")
 async def call_remove(interaction: discord.Interaction, user: discord.Member):
     if interaction.guild is None or interaction.user is None:
-        return await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
+        return await interaction.response.send_message(f"❌ {await _user_text(interaction, 'common.guild_only', default='Use this in a server.')}", ephemeral=True)
     calls = load_calls()
     guild_id = str(interaction.guild.id)
 
@@ -4876,12 +5170,12 @@ async def call_remove(interaction: discord.Interaction, user: discord.Member):
 
     call_id, info = get_host_call(calls, guild_id, str(interaction.user.id))
     if not info:
-        await interaction.response.send_message("❌ You aren’t the host of any active call.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.call.not_host', default='You aren\'t the host of any active call.')}", ephemeral=True)
         return
 
     channel = interaction.guild.get_channel(int(info["channel_id"]))
     if not channel:
-        await interaction.response.send_message("❌ Call channel no longer exists.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.call.channel_gone', default='Call channel no longer exists.')}", ephemeral=True)
         return
 
     # Remove viewing & connecting permissions
@@ -4929,7 +5223,7 @@ async def call_remove(interaction: discord.Interaction, user: discord.Member):
     except Exception:
         pass
 
-    await interaction.response.send_message(f"🚫 Removed {user.mention} from the call.")
+    await interaction.response.send_message(await _user_text(interaction, "bot.call.remove_success", default="🚫 Removed {user} from the call.", user=user.mention))
     _dispatch_module_log_event(
         interaction.guild,
         "calls",
@@ -4946,13 +5240,13 @@ async def call_remove(interaction: discord.Interaction, user: discord.Member):
 @call_group.command(name="end", description="End your CoffeeCord call.")
 async def call_end(interaction: discord.Interaction):
     if interaction.guild is None or interaction.user is None:
-        return await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
+        return await interaction.response.send_message(f"❌ {await _user_text(interaction, 'common.guild_only', default='Use this in a server.')}", ephemeral=True)
     calls = load_calls()
     guild_id = str(interaction.guild.id)
     info = get_host_call(interaction.guild.id, interaction.user.id)
     call_id = str(info["channel_id"]) if info else None
     if not info:
-        await interaction.response.send_message("❌ You don’t currently host any active call.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.call.no_active_host', default='You don\'t currently host any active call.')}", ephemeral=True)
         return
 
     channel = interaction.guild.get_channel(int(info["channel_id"]))
@@ -4983,7 +5277,7 @@ async def call_end(interaction: discord.Interaction):
         del calls[guild_id]
 
     save_calls(calls)
-    await interaction.response.send_message("📞 Call ended.")
+    await interaction.response.send_message(await _user_text(interaction, "bot.call.end_success", default="📞 Call ended."))
     _dispatch_module_log_event(
         interaction.guild,
         "calls",
@@ -5000,22 +5294,22 @@ async def call_end(interaction: discord.Interaction):
 @call_group.command(name="promote", description="Transfer call host role to another user.")
 async def call_promote(interaction: discord.Interaction, user: discord.Member):
     if interaction.guild is None or interaction.user is None:
-        return await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
+        return await interaction.response.send_message(f"❌ {await _user_text(interaction, 'common.guild_only', default='Use this in a server.')}", ephemeral=True)
     calls = load_calls()
     guild_id = str(interaction.guild.id)
     info = get_host_call(interaction.guild.id, interaction.user.id)
     call_id = str(info["channel_id"]) if info else None
     if not info:
-        await interaction.response.send_message("❌ You aren’t the host of any active call.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.call.not_host', default='You aren\'t the host of any active call.')}", ephemeral=True)
         return
 
     if str(user.id) not in info["members"]:
-        await interaction.response.send_message("❌ That user isn’t in the call.", ephemeral=True)
+        await interaction.response.send_message(f"❌ {await _user_text(interaction, 'bot.call.remove_not_in_call', default='That user isn\'t in the call.')}", ephemeral=True)
         return
 
     calls[guild_id][call_id]["host_id"] = str(user.id)
     save_calls(calls)
-    await interaction.response.send_message(f"👑 {user.mention} is now the call host!")
+    await interaction.response.send_message(await _user_text(interaction, "bot.call.promote_success", default="👑 {user} is now the call host!", user=user.mention))
     _dispatch_module_log_event(
         interaction.guild,
         "calls",
@@ -5054,6 +5348,9 @@ def read_json(path):
 # BACKUP HELPERS
 # ==========================
 def backup_guild_data(guild: discord.Guild) -> dict:
+    from Modules.server_backup import collect_guild_storage_slice
+
+    slice_data = collect_guild_storage_slice(guild.id)
     backup = {
         "meta": {
             "id": guild.id,
@@ -5062,25 +5359,13 @@ def backup_guild_data(guild: discord.Guild) -> dict:
         },
         "files": {}
     }
-
-    for pattern in (
-        os.path.join(_storage_dir, "Config", "*.json"),
-        os.path.join(_storage_dir, "Data", "*.json"),
-        os.path.join(_storage_dir, "Temp", "*.json"),
-    ):
-        for path in glob.glob(pattern):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception:
-                continue
-
-            if isinstance(data, dict) and str(guild.id) in data:
-                backup["files"][path] = {str(guild.id): data[str(guild.id)]}
-
-            if os.path.basename(path).startswith(str(guild.id)):
-                backup["files"][path] = data
-
+    for rel, entry in (slice_data.get("files") or {}).items():
+        if not isinstance(entry, dict):
+            continue
+        abs_path = os.path.join(_storage_dir, rel)
+        data = entry.get("data")
+        if data is not None:
+            backup["files"][abs_path] = data
     return backup
 
 def save_backup_to_disk(guild_id: int, backup: dict) -> str:
@@ -5396,7 +5681,7 @@ class ConfirmView(discord.ui.View):
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
     async def no(self, interaction: discord.Interaction, btn: discord.ui.Button):
         self.result = False
-        await interaction.response.send_message("Uninstall cancelled.", ephemeral=True)
+        await interaction.response.send_message(await _user_text(interaction, "bot.uninstall.cancelled", default="Uninstall cancelled."), ephemeral=True)
         self.stop()
 
 class InProgressControls(discord.ui.View):
@@ -5562,8 +5847,11 @@ async def on_ready():
 
         for attempt in range(3):
             try:
+                from Modules.i18n import apply_catalog_slash_localizations
+
+                applied = apply_catalog_slash_localizations(tree)
                 synced = await tree.sync()
-                print("Synced:", len(synced))
+                print("Synced:", len(synced), f"(slash localizations: {applied})")
                 break
             except (discord.HTTPException, discord.ConnectionError) as e:
                 if attempt < 2:
@@ -5810,12 +6098,23 @@ async def _run_bot_with_kofi():
             flush=True,
         )
 
+    try:
+        await bot.load_extension("Modules.language")
+        print("Loaded extension: Modules.language", flush=True)
+    except commands.ExtensionAlreadyLoaded:
+        pass
+    except Exception as e:
+        print(
+            _redact_discord_token_in_text(f"Failed to load mandatory extension Modules.language: {e}"),
+            flush=True,
+        )
+
     skipped_missing_extensions: list[str] = []
     loaded_count = 0
     for module in await load_module_registry():
         extension = str(module.get("extension", "")).strip()
         module_id = str(module.get("id", "")).strip().lower()
-        if not extension or module_id == "modules_cmd":
+        if not extension or module_id in ("modules_cmd", "language"):
             continue
         if module_id in missing_module_ids:
             skipped_missing_extensions.append(extension)

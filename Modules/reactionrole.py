@@ -10,6 +10,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from Modules.i18n import t_sync
+
 # ---------------------------------------------------------------------------
 # Storage
 # ---------------------------------------------------------------------------
@@ -54,6 +56,11 @@ REACTION_PANEL_DEFAULT_EMOJIS: tuple[str, ...] = (
 DEFAULT_PANEL_TITLE = "Reaction Roles"
 DEFAULT_PANEL_FOOTER = "Pick your roles • Coffeecord"
 DEFAULT_PANEL_COLOR = 0x5865F2
+REACTIONROLE_I18N_PREFIX = "reactionrole."
+
+
+def _rr_text_sync(user_id: int | None, key: str, *, default: str, **params: str) -> str:
+    return t_sync(user_id, f"{REACTIONROLE_I18N_PREFIX}{key}", default=default, **params)
 
 
 def _build_panel_embed(
@@ -379,7 +386,14 @@ class ReactionRoleSetupView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.invoker_id:
-            await interaction.response.send_message("This setup belongs to another moderator.", ephemeral=True)
+            await interaction.response.send_message(
+                _rr_text_sync(
+                    interaction.guild.id if interaction.guild else None,
+                    "setup_owner_only",
+                    default="This setup belongs to another moderator.",
+                ),
+                ephemeral=True,
+            )
             return False
         return True
 
@@ -414,18 +428,29 @@ class ReactionRoleSetupView(discord.ui.View):
 
     async def publish(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(t_sync(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         if self.channel is None:
-            await interaction.response.send_message("Select a channel first.", ephemeral=True)
+            await interaction.response.send_message(
+                _rr_text_sync(None, "select_channel_first", default="Select a channel first."),
+                ephemeral=True,
+            )
             return
         roles = list(self.roles)
         if not roles:
-            await interaction.response.send_message("Select at least one role.", ephemeral=True)
+            await interaction.response.send_message(
+                _rr_text_sync(None, "select_one_role", default="Select at least one role."),
+                ephemeral=True,
+            )
             return
         if len(roles) > REACTION_ROLE_PANEL_MAX_ROLES:
             await interaction.response.send_message(
-                f"Select at most {REACTION_ROLE_PANEL_MAX_ROLES} roles per panel.",
+                _rr_text_sync(
+                    interaction.guild.id,
+                    "max_roles_per_panel",
+                    default="Select at most {max_roles} roles per panel.",
+                    max_roles=str(REACTION_ROLE_PANEL_MAX_ROLES),
+                ),
                 ephemeral=True,
             )
             return
@@ -434,7 +459,11 @@ class ReactionRoleSetupView(discord.ui.View):
         if len(roles) == 1:
             if not action:
                 await interaction.response.send_message(
-                    "Set the button label or reaction emoji first (step 4).",
+                    _rr_text_sync(
+                        interaction.guild.id,
+                        "set_label_or_emoji_first",
+                        default="Set the button label or reaction emoji first (step 4).",
+                    ),
                     ephemeral=True,
                 )
                 return
@@ -449,8 +478,12 @@ class ReactionRoleSetupView(discord.ui.View):
         else:
             if self.mode == "reaction" and len(roles) > len(REACTION_PANEL_DEFAULT_EMOJIS):
                 await interaction.response.send_message(
-                    f"Reaction mode supports up to {len(REACTION_PANEL_DEFAULT_EMOJIS)} roles in guided setup. "
-                    "Use fewer roles here or add more with `/reactionrole edit`.",
+                    _rr_text_sync(
+                        interaction.guild.id,
+                        "reaction_mode_max_guided",
+                        default="Reaction mode supports up to {max_roles} roles in guided setup. Use fewer roles here or add more with `/reactionrole edit`.",
+                        max_roles=str(len(REACTION_PANEL_DEFAULT_EMOJIS)),
+                    ),
                     ephemeral=True,
                 )
                 return
@@ -515,8 +548,12 @@ class ReactionRoleSetupView(discord.ui.View):
                     failed.append(str(em))
             if failed:
                 await interaction.response.send_message(
-                    f"Panel created, but some reactions could not be added: {', '.join(failed)}. "
-                    "Use `/reactionrole edit` to fix emojis.",
+                    _rr_text_sync(
+                        interaction.guild.id,
+                        "reaction_add_partial_failure",
+                        default="Panel created, but some reactions could not be added: {failed}. Use `/reactionrole edit` to fix emojis.",
+                        failed=", ".join(failed),
+                    ),
                     ephemeral=True,
                 )
                 return
@@ -524,8 +561,14 @@ class ReactionRoleSetupView(discord.ui.View):
         summary = f"{len(mappings)} role option(s)"
         await interaction.response.edit_message(
             content=(
-                f"✅ Reaction role panel created in {self.channel.mention} (`{panel_message.id}`) — {summary}. "
-                "Members can pick multiple roles from this panel unless you set **remove_others** or **max_roles** in `/reactionrole edit`."
+                _rr_text_sync(
+                    interaction.guild.id,
+                    "panel_created",
+                    default="✅ Reaction role panel created in {channel} (`{message_id}`) — {summary}. Members can pick multiple roles from this panel unless you set **remove_others** or **max_roles** in `/reactionrole edit`.",
+                    channel=self.channel.mention,
+                    message_id=str(panel_message.id),
+                    summary=summary,
+                )
             ),
             embed=None,
             view=None,
@@ -549,7 +592,7 @@ class ReactionRoleButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None or not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("This can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(t_sync(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         result = await self.cog.handle_toggle(interaction.guild, interaction.user, self.message_id, self.mapping_id, source="button")
         await interaction.response.send_message(result.message, ephemeral=True)
@@ -624,6 +667,137 @@ class ReactionRoleCog(
                 view = self.build_button_view(guild_id, int(message_id), item)
                 self.bot.add_view(view, message_id=int(message_id))
 
+    async def republish_panels_after_restore(self, guild: discord.Guild, *, force: bool = False) -> list[str]:
+        """Re-post reaction-role panels after backup restore.
+
+        Repair (force=False): keep panels whose message IDs still resolve.
+        Overwrite (force=True): always create fresh panels.
+        """
+        await self.reload_config()
+        cfg = await self.get_guild_config(guild.id)
+        old_messages = dict(cfg.get("messages") or {})
+        if not old_messages:
+            return []
+        notes: list[str] = []
+        next_messages: dict[str, Any] = {}
+
+        async def _publish_one(item: dict[str, Any]) -> tuple[str | None, dict[str, Any] | None, str | None]:
+            channel_id = item.get("channel_id")
+            if channel_id is None or not str(channel_id).isdigit():
+                return None, None, "reactionrole: panel missing channel_id"
+            channel = guild.get_channel(int(channel_id))
+            if not isinstance(channel, discord.TextChannel):
+                return None, None, f"reactionrole: channel `{channel_id}` missing"
+            mappings = item.get("mappings") or []
+            if not mappings:
+                return None, None, None
+            emb_raw = item.get("embed") or {}
+            if not isinstance(emb_raw, dict):
+                emb_raw = {}
+            panel_embed = _build_panel_embed(
+                str(item.get("content") or ""),
+                str(emb_raw.get("title") or ""),
+                str(emb_raw.get("description") or ""),
+                int(emb_raw.get("color", DEFAULT_PANEL_COLOR) or DEFAULT_PANEL_COLOR),
+                mappings,
+                guild,
+            )
+            panel_message = await channel.send(embed=panel_embed)
+            item_cfg = {
+                "channel_id": channel.id,
+                "mode": item.get("mode", "button"),
+                "content": item.get("content") or "",
+                "embed": emb_raw,
+                "mappings": mappings,
+                "max_roles": int(item.get("max_roles", 0) or 0),
+                "required_role_ids": item.get("required_role_ids") or [],
+                "remove_others": bool(item.get("remove_others", False)),
+                "logging": bool(item.get("logging", False)),
+            }
+            if item_cfg["mode"] == "button":
+                view = self.build_button_view(guild.id, panel_message.id, item_cfg)
+                await panel_message.edit(view=view)
+                self.bot.add_view(view, message_id=panel_message.id)
+            else:
+                for m in mappings:
+                    em = m.get("emoji")
+                    if not em:
+                        continue
+                    try:
+                        await panel_message.add_reaction(str(em))
+                    except discord.HTTPException:
+                        pass
+            return str(panel_message.id), item_cfg, f"reactionrole: panel republished in #{channel.name}"
+
+        for mid, item in old_messages.items():
+            if not isinstance(item, dict):
+                continue
+            if not force and str(mid).isdigit():
+                channel_id = item.get("channel_id")
+                channel = guild.get_channel(int(channel_id)) if channel_id and str(channel_id).isdigit() else None
+                if isinstance(channel, discord.TextChannel):
+                    try:
+                        msg = await channel.fetch_message(int(mid))
+                        next_messages[str(mid)] = item
+                        if item.get("mode") == "button":
+                            view = self.build_button_view(guild.id, int(mid), item)
+                            self.bot.add_view(view, message_id=int(mid))
+                            try:
+                                await msg.edit(view=view)
+                            except discord.HTTPException:
+                                pass
+                        notes.append(f"reactionrole: existing panel kept in #{channel.name}")
+                        continue
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        pass
+                    # Backup message id may be stale after repair; reuse a live panel in-channel.
+                    if item.get("mode") == "button":
+                        claimed = {int(k) for k in next_messages if str(k).isdigit()}
+                        found = await self._find_existing_button_panel(channel, prefix="rr:", claimed=claimed)
+                        if found is not None:
+                            next_messages[str(found.id)] = item
+                            view = self.build_button_view(guild.id, found.id, item)
+                            self.bot.add_view(view, message_id=found.id)
+                            try:
+                                await found.edit(view=view)
+                            except discord.HTTPException:
+                                pass
+                            notes.append(f"reactionrole: existing panel kept in #{channel.name}")
+                            continue
+            try:
+                new_mid, item_cfg, note = await _publish_one(item)
+                if new_mid and item_cfg is not None:
+                    next_messages[new_mid] = item_cfg
+                if note:
+                    notes.append(note)
+            except Exception as exc:
+                notes.append(f"reactionrole: failed: {exc}")
+
+        cfg["messages"] = next_messages
+        self._config[str(guild.id)] = cfg
+        await self.save_config()
+        return notes
+
+    async def _find_existing_button_panel(
+        self,
+        channel: discord.TextChannel,
+        *,
+        prefix: str,
+        claimed: set[int],
+    ) -> discord.Message | None:
+        try:
+            async for msg in channel.history(limit=50):
+                if msg.id in claimed:
+                    continue
+                for row in msg.components:
+                    for child in row.children:
+                        custom_id = getattr(child, "custom_id", None)
+                        if isinstance(custom_id, str) and custom_id.startswith(prefix):
+                            return msg
+        except (discord.Forbidden, discord.HTTPException):
+            return None
+        return None
+
     def _find_mapping(self, item_cfg: dict[str, Any], mapping_id: str) -> Optional[dict[str, Any]]:
         for mapping in item_cfg.get("mappings", []):
             if str(mapping.get("id")) == str(mapping_id):
@@ -655,13 +829,13 @@ class ReactionRoleCog(
     async def _check_assignable(self, guild: discord.Guild, member: discord.Member, role: discord.Role) -> Optional[str]:
         me = guild.me
         if me is None:
-            return "Bot member cache is unavailable."
+            return _rr_text_sync(member.id, "bot_member_unavailable", default="Bot member cache is unavailable.")
         if not guild.me.guild_permissions.manage_roles:
-            return "I need `Manage Roles` permission."
+            return _rr_text_sync(member.id, "missing_manage_roles", default="I need `Manage Roles` permission.")
         if role >= me.top_role:
-            return "I cannot manage that role due to role hierarchy."
+            return _rr_text_sync(member.id, "cannot_manage_role_hierarchy", default="I cannot manage that role due to role hierarchy.")
         if role >= member.top_role and member != guild.owner:
-            return "Role hierarchy prevents this change."
+            return _rr_text_sync(member.id, "target_role_hierarchy_block", default="Role hierarchy prevents this change.")
         return None
 
     async def handle_toggle(
@@ -674,23 +848,31 @@ class ReactionRoleCog(
     ) -> ToggleResult:
         cfg = await self.get_guild_config(guild.id)
         if not cfg.get("enabled", True):
-            return ToggleResult(False, "Reaction roles are disabled for this server.")
+            return ToggleResult(False, _rr_text_sync(member.id, "disabled", default="Reaction roles are disabled for this server."))
 
         item = cfg.get("messages", {}).get(str(message_id))
         if not item:
-            return ToggleResult(False, "This reaction role panel no longer exists.")
+            return ToggleResult(False, _rr_text_sync(member.id, "panel_missing", default="This reaction role panel no longer exists."))
 
         mapping = self._find_mapping(item, mapping_id)
         if not mapping:
-            return ToggleResult(False, "This role option no longer exists.")
+            return ToggleResult(False, _rr_text_sync(member.id, "role_option_missing", default="This role option no longer exists."))
 
         role = guild.get_role(int(mapping["role_id"]))
         if role is None:
-            return ToggleResult(False, "That role no longer exists. Ask staff to update this panel.")
+            return ToggleResult(False, _rr_text_sync(member.id, "mapped_role_missing", default="That role no longer exists. Ask staff to update this panel."))
 
         missing_required = [rid for rid in item.get("required_role_ids", []) if rid not in {r.id for r in member.roles}]
         if missing_required:
-            return ToggleResult(False, f"You need required role(s): {', '.join(f'<@&{rid}>' for rid in missing_required)}")
+            return ToggleResult(
+                False,
+                _rr_text_sync(
+                    guild.id,
+                    "missing_required_roles",
+                    default="You need required role(s): {roles}",
+                    roles=", ".join(f"<@&{rid}>" for rid in missing_required),
+                ),
+            )
 
         hierarchy_error = await self._check_assignable(guild, member, role)
         if hierarchy_error:
@@ -704,10 +886,15 @@ class ReactionRoleCog(
             try:
                 await member.remove_roles(role, reason=f"ReactionRole toggle ({source})")
             except discord.HTTPException:
-                return ToggleResult(False, "I couldn't remove that role due to a Discord API error.")
+                return ToggleResult(False, _rr_text_sync(member.id, "remove_role_failed", default="I couldn't remove that role due to a Discord API error."))
             if item.get("logging", False):
                 await self._emit_hook(guild, member, "role_removed", role.id, message_id, item["channel_id"])
-            return ToggleResult(True, f"Removed {role.mention}.", changed="removed", role_id=role.id)
+            return ToggleResult(
+                True,
+                _rr_text_sync(member.id, "remove_role_success", default="Removed {role}.", role=role.mention),
+                changed="removed",
+                role_id=role.id,
+            )
 
         # Add path
         max_roles = int(item.get("max_roles", 0) or 0)
@@ -716,20 +903,33 @@ class ReactionRoleCog(
             try:
                 await member.remove_roles(*current_from_panel, reason="ReactionRole exclusive selection")
             except discord.HTTPException:
-                return ToggleResult(False, "I couldn't update your existing panel roles.")
+                return ToggleResult(False, _rr_text_sync(member.id, "update_existing_roles_failed", default="I couldn't update your existing panel roles."))
             current_from_panel = []
 
         if max_roles > 0 and len(current_from_panel) >= max_roles:
-            return ToggleResult(False, f"You can only hold {max_roles} role(s) from this panel.")
+            return ToggleResult(
+                False,
+                _rr_text_sync(
+                    guild.id,
+                    "max_roles_reached",
+                    default="You can only hold {max_roles} role(s) from this panel.",
+                    max_roles=str(max_roles),
+                ),
+            )
 
         try:
             await member.add_roles(role, reason=f"ReactionRole toggle ({source})")
         except discord.HTTPException:
-            return ToggleResult(False, "I couldn't add that role due to a Discord API error.")
+            return ToggleResult(False, _rr_text_sync(member.id, "add_role_failed", default="I couldn't add that role due to a Discord API error."))
 
         if item.get("logging", False):
             await self._emit_hook(guild, member, "role_added", role.id, message_id, item["channel_id"])
-        return ToggleResult(True, f"Added {role.mention}.", changed="added", role_id=role.id)
+        return ToggleResult(
+            True,
+            _rr_text_sync(member.id, "add_role_success", default="Added {role}.", role=role.mention),
+            changed="added",
+            role_id=role.id,
+        )
 
     async def _toggle_for_reaction_payload(self, payload: discord.RawReactionActionEvent, removed: bool) -> None:
         if payload.guild_id is None:
@@ -782,10 +982,10 @@ class ReactionRoleCog(
     @app_commands.command(
         name="create",
         description="Create a reaction role panel with guided setup (select multiple roles at once).",
-    )
+)
     async def reactionrole_create(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(t_sync(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         cfg = await self.get_guild_config(interaction.guild.id)
         view = ReactionRoleSetupView(
@@ -796,18 +996,32 @@ class ReactionRoleCog(
         )
         await interaction.response.send_message(embed=view._preview_embed(), view=view, ephemeral=True)
 
-    @app_commands.command(name="list", description="List reaction role panels in this server.")
+    @app_commands.command(
+        name="list",
+        description="List reaction role panels in this server.",
+)
     async def reactionrole_list(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(t_sync(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         cfg = await self.get_guild_config(interaction.guild.id)
         messages = cfg.get("messages", {})
-        embed = discord.Embed(title="Reaction Role Panels", color=discord.Color.blurple())
-        embed.add_field(name="Enabled", value="Yes" if cfg.get("enabled", True) else "No", inline=True)
-        embed.add_field(name="Panels", value=str(len(messages)), inline=True)
+        embed = discord.Embed(
+            title=_rr_text_sync(interaction.user.id, "list_title", default="Reaction Role Panels"),
+            color=discord.Color.blurple(),
+        )
+        embed.add_field(
+            name=_rr_text_sync(interaction.user.id, "field_enabled", default="Enabled"),
+            value=t_sync(interaction.user.id, "common.yes") if cfg.get("enabled", True) else t_sync(interaction.user.id, "common.no"),
+            inline=True,
+        )
+        embed.add_field(
+            name=_rr_text_sync(interaction.user.id, "field_panels", default="Panels"),
+            value=str(len(messages)),
+            inline=True,
+        )
         if not messages:
-            embed.description = "No reaction role panels configured."
+            embed.description = _rr_text_sync(interaction.user.id, "list_empty", default="No reaction role panels configured.")
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         lines = []
@@ -815,21 +1029,34 @@ class ReactionRoleCog(
             lines.append(
                 f"`{message_id}` • <#{item['channel_id']}> • `{item['mode']}` • {len(item.get('mappings', []))} role option(s)"
             )
-        embed.add_field(name="Configured Panels", value="\n".join(lines), inline=False)
+        embed.add_field(
+            name=_rr_text_sync(interaction.user.id, "field_configured_panels", default="Configured Panels"),
+            value="\n".join(lines),
+            inline=False,
+        )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="delete", description="Delete a reaction role panel by message ID.")
+    @app_commands.command(
+        name="delete",
+        description="Delete a reaction role panel by message ID.",
+)
     async def reactionrole_delete(self, interaction: discord.Interaction, message_id: str) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(t_sync(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         if not message_id.isdigit():
-            await interaction.response.send_message("Message ID must be numeric.", ephemeral=True)
+            await interaction.response.send_message(
+                _rr_text_sync(interaction.user.id, "message_id_numeric", default="Message ID must be numeric."),
+                ephemeral=True,
+            )
             return
         cfg = await self.get_guild_config(interaction.guild.id)
         item = cfg.get("messages", {}).pop(message_id, None)
         if item is None:
-            await interaction.response.send_message("Panel not found.", ephemeral=True)
+            await interaction.response.send_message(
+                _rr_text_sync(interaction.user.id, "panel_not_found", default="Panel not found."),
+                ephemeral=True,
+            )
             return
         self._config[str(interaction.guild.id)] = cfg
         await self.save_config()
@@ -841,9 +1068,20 @@ class ReactionRoleCog(
                 await msg.edit(view=None)
             except discord.HTTPException:
                 pass
-        await interaction.response.send_message(f"Deleted panel `{message_id}`.", ephemeral=True)
+        await interaction.response.send_message(
+            _rr_text_sync(
+                interaction.guild.id,
+                "delete_success",
+                default="Deleted panel `{message_id}`.",
+                message_id=message_id,
+            ),
+            ephemeral=True,
+        )
 
-    @app_commands.command(name="config", description="Set defaults for reaction role panels in this server.")
+    @app_commands.command(
+        name="config",
+        description="Set defaults for reaction role panels in this server.",
+)
     @app_commands.describe(enabled="Enable or disable reaction roles globally for this guild.")
     @app_commands.choices(
         default_mode=[
@@ -859,7 +1097,7 @@ class ReactionRoleCog(
         default_logging: Optional[bool] = None,
     ) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(t_sync(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         cfg = await self.get_guild_config(interaction.guild.id)
         if enabled is not None:
@@ -871,11 +1109,21 @@ class ReactionRoleCog(
         self._config[str(interaction.guild.id)] = cfg
         await self.save_config()
         await interaction.response.send_message(
-            f"Updated config: enabled={cfg['enabled']}, default_mode={cfg['default_mode']}, default_logging={cfg['default_logging']}",
+            _rr_text_sync(
+                interaction.guild.id,
+                "config_updated",
+                default="Updated config: enabled={enabled}, default_mode={mode}, default_logging={logging}",
+                enabled=str(cfg["enabled"]),
+                mode=str(cfg["default_mode"]),
+                logging=str(cfg["default_logging"]),
+            ),
             ephemeral=True,
         )
 
-    @app_commands.command(name="edit", description="Edit mappings and advanced options for a panel.")
+    @app_commands.command(
+        name="edit",
+        description="Edit mappings and advanced options for a panel.",
+)
     @app_commands.describe(
         message_id="Target panel message ID.",
         role="Role to add/update/remove in this panel.",
@@ -910,15 +1158,21 @@ class ReactionRoleCog(
         logging_enabled: Optional[bool] = None,
     ) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(t_sync(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         if not message_id.isdigit():
-            await interaction.response.send_message("Message ID must be numeric.", ephemeral=True)
+            await interaction.response.send_message(
+                _rr_text_sync(interaction.user.id, "message_id_numeric", default="Message ID must be numeric."),
+                ephemeral=True,
+            )
             return
         cfg = await self.get_guild_config(interaction.guild.id)
         item = cfg.get("messages", {}).get(message_id)
         if item is None:
-            await interaction.response.send_message("Panel not found.", ephemeral=True)
+            await interaction.response.send_message(
+                _rr_text_sync(interaction.user.id, "panel_not_found", default="Panel not found."),
+                ephemeral=True,
+            )
             return
 
         if mode is not None:
@@ -938,7 +1192,10 @@ class ReactionRoleCog(
             existing = next((m for m in item["mappings"] if int(m["role_id"]) == role.id), None)
             if remove_mapping:
                 if existing is None:
-                    await interaction.response.send_message("That role is not mapped on this panel.", ephemeral=True)
+                    await interaction.response.send_message(
+                        _rr_text_sync(interaction.user.id, "role_not_mapped", default="That role is not mapped on this panel."),
+                        ephemeral=True,
+                    )
                     return
                 item["mappings"] = [m for m in item["mappings"] if int(m["role_id"]) != role.id]
             else:
@@ -956,11 +1213,17 @@ class ReactionRoleCog(
                     if emoji is not None:
                         existing["emoji"] = emoji
         elif remove_mapping:
-            await interaction.response.send_message("Provide `role` when using `remove_mapping`.", ephemeral=True)
+            await interaction.response.send_message(
+                _rr_text_sync(interaction.user.id, "provide_role_for_remove", default="Provide `role` when using `remove_mapping`."),
+                ephemeral=True,
+            )
             return
 
         if not item["mappings"]:
-            await interaction.response.send_message("Panel must keep at least one role mapping.", ephemeral=True)
+            await interaction.response.send_message(
+                _rr_text_sync(interaction.user.id, "panel_requires_one_mapping", default="Panel must keep at least one role mapping."),
+                ephemeral=True,
+            )
             return
 
         cfg["messages"][message_id] = item
@@ -998,7 +1261,15 @@ class ReactionRoleCog(
             except discord.HTTPException:
                 pass
 
-        await interaction.response.send_message(f"Updated panel `{message_id}`.", ephemeral=True)
+        await interaction.response.send_message(
+            _rr_text_sync(
+                interaction.guild.id,
+                "panel_updated",
+                default="Updated panel `{message_id}`.",
+                message_id=message_id,
+            ),
+            ephemeral=True,
+        )
 
     # -----------------------------------------------------------------------
     # Event listeners

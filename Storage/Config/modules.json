@@ -73,10 +73,28 @@
       "category": "utilities"
     },
     {
+      "id": "color_roles",
+      "extension": "Modules.color_roles",
+      "path": "Modules/color_roles.py",
+      "display_name": "Color Roles",
+      "description": "Exclusive self-assign color roles via buttons or emoji reactions.",
+      "default_enabled": true,
+      "category": "configuration"
+    },
+    {
       "id": "command_perm_overrides",
       "extension": "Modules.command_perm_overrides",
       "path": "Modules/command_perm_overrides.py",
       "display_name": "Command Perm Overrides",
+      "description": "",
+      "default_enabled": true,
+      "category": "utilities"
+    },
+    {
+      "id": "dev_broadcast",
+      "extension": "Modules.dev_broadcast",
+      "path": "Modules/dev_broadcast.py",
+      "display_name": "Dev Broadcast",
       "description": "",
       "default_enabled": true,
       "category": "utilities"
@@ -89,6 +107,42 @@
       "description": "8ball, flipcoin, hug, kiss, dog, cat, roast, and other fun commands.",
       "default_enabled": true,
       "category": "engagement"
+    },
+    {
+      "id": "getting_started_guide",
+      "extension": "Modules.getting_started_guide",
+      "path": "Modules/getting_started_guide.py",
+      "display_name": "Getting Started Guide",
+      "description": "",
+      "default_enabled": true,
+      "category": "utilities"
+    },
+    {
+      "id": "help_search",
+      "extension": "Modules.help_search",
+      "path": "Modules/help_search.py",
+      "display_name": "Help Search",
+      "description": "",
+      "default_enabled": true,
+      "category": "utilities"
+    },
+    {
+      "id": "host_console",
+      "extension": "Modules.host_console",
+      "path": "Modules/host_console.py",
+      "display_name": "Host Console",
+      "description": "",
+      "default_enabled": true,
+      "category": "utilities"
+    },
+    {
+      "id": "inactive_members",
+      "extension": "Modules.inactive_members",
+      "path": "Modules/inactive_members.py",
+      "display_name": "Inactive Members",
+      "description": "Track member activity and remove inactive members by configurable rules.",
+      "default_enabled": true,
+      "category": "moderation"
     },
     {
       "id": "json_cache",
@@ -109,6 +163,15 @@
       "category": "integrations"
     },
     {
+      "id": "language",
+      "extension": "Modules.language",
+      "path": "Modules/language.py",
+      "display_name": "Language",
+      "description": "Choose your language for Coffeecord replies (English, Spanish, Portuguese, Russian).",
+      "default_enabled": true,
+      "category": "configuration"
+    },
+    {
       "id": "leveling",
       "extension": "Modules.leveling",
       "path": "Modules/leveling.py",
@@ -116,6 +179,15 @@
       "description": "XP gain, level-up logic, rewards, and level cards.",
       "default_enabled": true,
       "category": "engagement"
+    },
+    {
+      "id": "log_actor",
+      "extension": "Modules.log_actor",
+      "path": "Modules/log_actor.py",
+      "display_name": "Log Actor",
+      "description": "",
+      "default_enabled": true,
+      "category": "utilities"
     },
     {
       "id": "logging",
@@ -177,6 +249,15 @@
       "path": "Modules/reactionrole.py",
       "display_name": "Reaction Roles",
       "description": "Reaction/button based self-role assignment.",
+      "default_enabled": true,
+      "category": "configuration"
+    },
+    {
+      "id": "server_backup",
+      "extension": "Modules.server_backup",
+      "path": "Modules/server_backup.py",
+      "display_name": "Server Backup",
+      "description": "Encrypted server structure + Coffeecord config backups with host slots.",
       "default_enabled": true,
       "category": "configuration"
     },

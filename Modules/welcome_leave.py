@@ -10,6 +10,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from Modules.i18n import t, t_sync
 from Modules.module_registry import is_module_enabled
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,12 +26,17 @@ WELCOME_DEFAULT_MESSAGE = "Welcome {user_mention} to {server_name}! We now have 
 LEAVE_DEFAULT_MESSAGE = "Goodbye {user_name}. We're sad to see you go!"
 
 DEFAULT_STICKY_MESSAGE = "📌 **Welcome** — read the rules, grab roles, and say hello!"
+WELCOME_LEAVE_I18N_PREFIX = "welcome_leave."
 STICKY_RATE_WINDOW_S = 60.0
 STICKY_HIGH_RATE_THRESHOLD = 100
 STICKY_BUMP_DEBOUNCE_LOW_S = 0.35
 STICKY_BUMP_DEBOUNCE_HIGH_S = 5.0
 
 _WELCOME_STICKY_BUMP_LOCKS: dict[tuple[int, int], asyncio.Lock] = defaultdict(lambda: asyncio.Lock())
+
+
+def _wl_text_sync(user_id: int | None, key: str, *, default: str, **params: str) -> str:
+    return t_sync(user_id, f"{WELCOME_LEAVE_I18N_PREFIX}{key}", default=default, **params)
 
 
 def _default_section(message: str) -> dict[str, Any]:
@@ -395,13 +401,21 @@ async def _forward_exit_survey_to_channel(
     if not perms.view_channel or not perms.send_messages:
         return
     embed = discord.Embed(
-        title="Exit Survey Response",
+        title=_wl_text_sync(None, "exit_survey_response_title", default="Exit Survey Response"),
         color=discord.Color.dark_orange(),
         description=reason[:2000],
     )
-    embed.add_field(name="User", value=f"<@{user_id}> (`{user_id}`)", inline=False)
-    embed.add_field(name="Server Left", value=guild_name, inline=False)
-    embed.set_footer(text="Coffeecord Exit Survey")
+    embed.add_field(
+        name=_wl_text_sync(None, "exit_survey_field_user", default="User"),
+        value=f"<@{user_id}> (`{user_id}`)",
+        inline=False,
+    )
+    embed.add_field(
+        name=_wl_text_sync(None, "exit_survey_field_server_left", default="Server Left"),
+        value=guild_name,
+        inline=False,
+    )
+    embed.set_footer(text=_wl_text_sync(None, "exit_survey_footer", default="Coffeecord Exit Survey"))
     try:
         await channel.send(embed=embed)
     except discord.HTTPException:
@@ -417,15 +431,22 @@ async def _attempt_exit_survey(
 ) -> None:
     try:
         prompt = (
-            f"Why did you leave **{guild_name}**?\n"
-            "Reply with a short answer, or choose one of these:\n"
-            "1) Too many pings\n"
-            "2) Not active enough\n"
-            "3) Not my community\n"
-            "4) Moderation concerns\n"
-            "5) Other\n"
-            "6) Custom reason (write your own)\n\n"
-            "Reply with a number or your own text. This request expires in 5 minutes."
+            _wl_text_sync(
+                guild_id,
+                "exit_survey_prompt",
+                default=(
+                    "Why did you leave **{guild_name}**?\n"
+                    "Reply with a short answer, or choose one of these:\n"
+                    "1) Too many pings\n"
+                    "2) Not active enough\n"
+                    "3) Not my community\n"
+                    "4) Moderation concerns\n"
+                    "5) Other\n"
+                    "6) Custom reason (write your own)\n\n"
+                    "Reply with a number or your own text. This request expires in 5 minutes."
+                ),
+                guild_name=guild_name,
+            )
         )
         await member.send(prompt)
     except discord.HTTPException:
@@ -444,7 +465,13 @@ async def _attempt_exit_survey(
     reason = _normalize_survey_reason((reply.content or "").strip())
     if reason == "__custom__":
         try:
-            await member.send("Please type your custom reason in one message.")
+            await member.send(
+                _wl_text_sync(
+                    guild_id,
+                    "exit_survey_custom_prompt",
+                    default="Please type your custom reason in one message.",
+                )
+            )
             reply = await bot.wait_for("message", timeout=300, check=_check)
         except (asyncio.TimeoutError, discord.HTTPException):
             return
@@ -564,7 +591,10 @@ class WelcomeCog(
         self.bot = bot
         self._sticky = _StickyBumpController(bot)
 
-    @app_commands.command(name="config", description="Configure welcome message settings.")
+    @app_commands.command(
+        name="config",
+        description="Configure welcome message settings.",
+)
     @app_commands.describe(
         channel="Channel where welcome messages are sent (and sticky, if enabled).",
         message="Message text. Supports placeholders like {user_mention}.",
@@ -595,7 +625,7 @@ class WelcomeCog(
         sticky_use_embed: bool = False,
     ) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
 
         dlv = delivery if delivery in ("channel", "dm", "both") else "channel"
@@ -617,9 +647,20 @@ class WelcomeCog(
         )
         await save_welcome_leave_config(interaction.guild.id, cfg)
         await interaction.response.send_message(
-            f"✅ Welcome config updated.\n"
-            f"Channel: {channel.mention}\nEnabled: `{enabled}`\nEmbed: `{use_embed}`\n"
-            f"Delivery: `{dlv}`\nSticky: `{sticky_enabled}`\n",
+            _wl_text_sync(
+                interaction.guild.id,
+                "welcome_config_updated",
+                default=(
+                    "✅ Welcome config updated.\n"
+                    "Channel: {channel}\nEnabled: `{enabled}`\nEmbed: `{embed}`\n"
+                    "Delivery: `{delivery}`\nSticky: `{sticky}`\n"
+                ),
+                channel=channel.mention,
+                enabled=str(enabled),
+                embed=str(use_embed),
+                delivery=dlv,
+                sticky=str(sticky_enabled),
+            ),
             ephemeral=True,
         )
         if sticky_enabled and interaction.guild:
@@ -627,15 +668,21 @@ class WelcomeCog(
                 _execute_sticky_bump(self.bot, interaction.guild, cfg["welcome"]),
             )
 
-    @app_commands.command(name="test", description="Send a test welcome message.")
+    @app_commands.command(
+        name="test",
+        description="Send a test welcome message.",
+)
     async def test(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         cfg = await load_welcome_leave_config(interaction.guild.id)
         member = interaction.user if isinstance(interaction.user, discord.Member) else interaction.guild.me
         if member is None:
-            await interaction.response.send_message("Could not resolve member.", ephemeral=True)
+            await interaction.response.send_message(
+                _wl_text_sync(interaction.user.id, "member_resolve_failed", default="Could not resolve member."),
+                ephemeral=True,
+            )
             return
         delivery = str(cfg["welcome"].get("delivery", "channel")).lower()
         results: list[str] = []
@@ -645,7 +692,7 @@ class WelcomeCog(
                 self.bot,
                 member,
                 cfg["welcome"],
-                title="Welcome!",
+                title=_wl_text_sync(interaction.user.id, "welcome_title", default="Welcome!"),
                 color=discord.Color.green(),
                 ignore_enabled=True,
             )
@@ -655,7 +702,7 @@ class WelcomeCog(
                 self.bot,
                 member,
                 cfg["welcome"],
-                title="Welcome!",
+                title=_wl_text_sync(interaction.user.id, "welcome_title", default="Welcome!"),
                 color=discord.Color.green(),
             )
             results.append(f"dm: {'ok' if ok_dm else reason_dm}")
@@ -668,12 +715,22 @@ class WelcomeCog(
             msg = get_command_response_for_interaction(
                 interaction,
                 "success",
-                "✅ Sent welcome test (" + ", ".join(results) + ").",
+                _wl_text_sync(
+                    interaction.guild.id,
+                    "welcome_test_success",
+                    default="✅ Sent welcome test ({results}).",
+                    results=", ".join(results),
+                ),
             )
             await interaction.response.send_message(msg, ephemeral=True)
         else:
             await interaction.response.send_message(
-                "⚠️ Could not send welcome test: " + ", ".join(results),
+                _wl_text_sync(
+                    interaction.guild.id,
+                    "welcome_test_failed",
+                    default="⚠️ Could not send welcome test: {results}",
+                    results=", ".join(results),
+                ),
                 ephemeral=True,
             )
 
@@ -686,7 +743,7 @@ class WelcomeCog(
                 self.bot,
                 member,
                 w,
-                title="Welcome!",
+                title=_wl_text_sync(member.guild.id, "welcome_title", default="Welcome!"),
                 color=discord.Color.green(),
             )
             if w.get("sticky_enabled", False) and isinstance(w.get("channel_id"), int):
@@ -738,7 +795,10 @@ class LeaveCog(
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @app_commands.command(name="config", description="Configure leave message settings.")
+    @app_commands.command(
+        name="config",
+        description="Configure leave message settings.",
+)
     @app_commands.describe(
         channel="Channel where leave messages are sent.",
         message="Message text. Supports placeholders like {user_name}.",
@@ -758,7 +818,7 @@ class LeaveCog(
         exit_survey_log_channel: Optional[discord.TextChannel] = None,
     ) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
 
         cfg = await load_welcome_leave_config(interaction.guild.id)
@@ -778,24 +838,38 @@ class LeaveCog(
         )
         await interaction.response.send_message(
             (
-                f"✅ Leave config updated.\nChannel: {channel.mention}\nEnabled: `{enabled}`\n"
-                f"Embed: `{use_embed}`\nExit survey: `{enable_exit_survey}`\n"
-                f"Survey log channel: {log_target}"
+                _wl_text_sync(
+                    interaction.guild.id,
+                    "leave_config_updated",
+                    default=(
+                        "✅ Leave config updated.\nChannel: {channel}\nEnabled: `{enabled}`\n"
+                        "Embed: `{embed}`\nExit survey: `{exit_survey}`\n"
+                        "Survey log channel: {log_channel}"
+                    ),
+                    channel=channel.mention,
+                    enabled=str(enabled),
+                    embed=str(use_embed),
+                    exit_survey=str(enable_exit_survey),
+                    log_channel=log_target,
+                )
             ),
             ephemeral=True,
         )
 
-    @app_commands.command(name="test", description="Send a test leave message.")
+    @app_commands.command(
+        name="test",
+        description="Send a test leave message.",
+)
     async def test(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(await t(interaction.user.id, "common.guild_only"), ephemeral=True)
             return
         cfg = await load_welcome_leave_config(interaction.guild.id)
         ok, reason = await _send_configured_message(
             self.bot,
             interaction.user if isinstance(interaction.user, discord.Member) else interaction.guild.me,
             cfg["leave"],
-            title="Goodbye!",
+            title=_wl_text_sync(interaction.user.id, "leave_title", default="Goodbye!"),
             color=discord.Color.orange(),
             ignore_enabled=True,
         )
@@ -805,12 +879,17 @@ class LeaveCog(
             msg = get_command_response_for_interaction(
                 interaction,
                 "success",
-                "✅ Sent a leave test message.",
+                _wl_text_sync(interaction.user.id, "leave_test_success", default="✅ Sent a leave test message."),
             )
             await interaction.response.send_message(msg, ephemeral=True)
         else:
             await interaction.response.send_message(
-                f"⚠️ Could not send leave test message (`{reason}`). Check channel and bot permissions.",
+                _wl_text_sync(
+                    interaction.guild.id,
+                    "leave_test_failed",
+                    default="⚠️ Could not send leave test message (`{reason}`). Check channel and bot permissions.",
+                    reason=reason,
+                ),
                 ephemeral=True,
             )
 
@@ -823,7 +902,7 @@ class LeaveCog(
                 self.bot,
                 member,
                 leave_cfg,
-                title="Goodbye!",
+                title=_wl_text_sync(member.guild.id, "leave_title", default="Goodbye!"),
                 color=discord.Color.orange(),
             )
             if leave_cfg.get("exit_survey_enabled", False) and not member.bot:

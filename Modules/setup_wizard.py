@@ -8,6 +8,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from Modules.i18n import t_sync
 from Modules.reactionrole import DEFAULT_PANEL_COLOR, _build_panel_embed
 from Modules.welcome_leave import normalize_welcome_section
 
@@ -20,7 +21,7 @@ REACTIONROLE_PATH = BASE_DIR / "Storage" / "Config" / "reactionrole_config.json"
 TICKETS_PATH = BASE_DIR / "Storage" / "Data" / "tickets.json"
 
 FEATURE_ORDER = ["welcome", "leave", "logging", "automod", "reaction_roles", "tickets"]
-FEATURE_LABELS = {
+FEATURE_LABEL_DEFAULTS = {
     "welcome": "Welcome Messages",
     "leave": "Leave Messages",
     "logging": "Logging",
@@ -28,6 +29,10 @@ FEATURE_LABELS = {
     "reaction_roles": "Reaction Roles",
     "tickets": "Tickets",
 }
+DEFAULT_REACTION_ROLE_MESSAGE = "Pick your role:"
+DEFAULT_TICKET_MESSAGE = "Click below to create a ticket."
+DEFAULT_TICKET_BUTTON_LABEL = "Open Ticket"
+SETUP_WIZARD_PREFIX = "setup_wizard"
 
 LOGGING_EVENT_KEYS = [
     "message_delete",
@@ -37,6 +42,20 @@ LOGGING_EVENT_KEYS = [
     "automod",
     "warn",
 ]
+
+
+def _sw_t(user_id: int | None, key: str, default: str, **params: object) -> str:
+    return t_sync(
+        user_id,
+        f"{SETUP_WIZARD_PREFIX}.{key}",
+        default=default,
+        **{name: str(value) for name, value in params.items()},
+    )
+
+
+def _feature_label(user_id: int, feature_key: str) -> str:
+    default = FEATURE_LABEL_DEFAULTS.get(feature_key, feature_key)
+    return _sw_t(user_id, f"features.{feature_key}", default)
 
 
 def _read_json(path: Path, default: dict[str, Any]) -> dict[str, Any]:
@@ -94,7 +113,7 @@ def _default_draft() -> dict[str, Any]:
         "reaction_roles": {
             "enabled": True,
             "channel_id": None,
-            "message_text": "Pick your role:",
+            "message_text": DEFAULT_REACTION_ROLE_MESSAGE,
             "mode": "toggle",  # toggle | radio
             "role_ids": [],
             "emojis": [],
@@ -104,8 +123,8 @@ def _default_draft() -> dict[str, Any]:
             "category_or_channel_id": None,
             "support_role_ids": [],
             "ticket_channel_id": None,
-            "ticket_message": "Click below to create a ticket.",
-            "button_label": "Open Ticket",
+            "ticket_message": DEFAULT_TICKET_MESSAGE,
+            "button_label": DEFAULT_TICKET_BUTTON_LABEL,
             "one_ticket_per_user": True,
         },
     }
@@ -137,7 +156,11 @@ class BaseOwnedView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.session.user_id:
             await interaction.response.send_message(
-                "This setup wizard belongs to another admin.",
+                _sw_t(
+                    self.session.user_id,
+                    "messages.belongs_to_other_admin",
+                    "This setup wizard belongs to another admin.",
+                ),
                 ephemeral=True,
             )
             return False
@@ -149,13 +172,19 @@ class MessageTemplateModal(discord.ui.Modal):
         super().__init__(title=title, timeout=300)
         self.parent_view = parent
         self.section_key, self.message_key = draft_path
+        guild_id = self.parent_view.session.guild_id
+        user_id = self.parent_view.session.user_id
         self.template = discord.ui.TextInput(
-            label="Message template",
+            label=_sw_t(user_id, "modal.message_template.label", "Message template"),
             style=discord.TextStyle.paragraph,
             max_length=2000,
             required=True,
             default=current[:2000],
-            placeholder="Use placeholders like {user_mention}, {server_name}",
+            placeholder=_sw_t(
+                user_id,
+                "modal.message_template.placeholder",
+                "Use placeholders like {user_mention}, {server_name}",
+            ),
         )
         self.add_item(self.template)
 
@@ -167,15 +196,20 @@ class MessageTemplateModal(discord.ui.Modal):
 
 class CommaWordsModal(discord.ui.Modal):
     def __init__(self, parent: "SetupStepView", current_words: list[str]):
-        super().__init__(title="Blocked Words", timeout=300)
+        guild_id = parent.session.guild_id
+        user_id = parent.session.user_id
+        super().__init__(
+            title=_sw_t(user_id, "modal.blocked_words.title", "Blocked Words"),
+            timeout=300,
+        )
         self.parent_view = parent
         self.words = discord.ui.TextInput(
-            label="Comma-separated words",
+            label=_sw_t(user_id, "modal.blocked_words.label", "Comma-separated words"),
             style=discord.TextStyle.paragraph,
             required=False,
             max_length=1500,
             default=", ".join(current_words)[:1500],
-            placeholder="word1, word2, phrase3",
+            placeholder=_sw_t(user_id, "modal.blocked_words.placeholder", "word1, word2, phrase3"),
         )
         self.add_item(self.words)
 
@@ -188,15 +222,20 @@ class CommaWordsModal(discord.ui.Modal):
 
 class EmojisModal(discord.ui.Modal):
     def __init__(self, parent: "SetupStepView", current_emojis: list[str]):
-        super().__init__(title="Reaction Role Emojis", timeout=300)
+        guild_id = parent.session.guild_id
+        user_id = parent.session.user_id
+        super().__init__(
+            title=_sw_t(user_id, "modal.reaction_emojis.title", "Reaction Role Emojis"),
+            timeout=300,
+        )
         self.parent_view = parent
         self.emojis = discord.ui.TextInput(
-            label="Comma-separated emojis (1-3)",
+            label=_sw_t(user_id, "modal.reaction_emojis.label", "Comma-separated emojis (1-3)"),
             style=discord.TextStyle.short,
             required=False,
             max_length=80,
             default=", ".join(current_emojis)[:80],
-            placeholder="✅, 🎮, 📣",
+            placeholder=_sw_t(user_id, "modal.reaction_emojis.placeholder", "✅, 🎮, 📣"),
         )
         self.add_item(self.emojis)
 
@@ -209,28 +248,37 @@ class EmojisModal(discord.ui.Modal):
 
 class TicketLabelModal(discord.ui.Modal):
     def __init__(self, parent: "SetupStepView", current_text: str, current_label: str):
-        super().__init__(title="Ticket Panel Text", timeout=300)
+        guild_id = parent.session.guild_id
+        user_id = parent.session.user_id
+        super().__init__(
+            title=_sw_t(user_id, "modal.ticket_text.title", "Ticket Panel Text"),
+            timeout=300,
+        )
         self.parent_view = parent
         self.message = discord.ui.TextInput(
-            label="Ticket message",
+            label=_sw_t(user_id, "modal.ticket_text.message_label", "Ticket message"),
             style=discord.TextStyle.paragraph,
             required=True,
             max_length=2000,
             default=current_text[:2000],
         )
         self.label = discord.ui.TextInput(
-            label="Button label",
+            label=_sw_t(user_id, "modal.ticket_text.button_label", "Button label"),
             style=discord.TextStyle.short,
             required=True,
             max_length=80,
-            default=current_label[:80] or "Open Ticket",
+            default=current_label[:80] or _sw_t(user_id, "defaults.ticket_button", DEFAULT_TICKET_BUTTON_LABEL),
         )
         self.add_item(self.message)
         self.add_item(self.label)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         self.parent_view.session.draft["tickets"]["ticket_message"] = str(self.message.value).strip()
-        self.parent_view.session.draft["tickets"]["button_label"] = str(self.label.value).strip() or "Open Ticket"
+        self.parent_view.session.draft["tickets"]["button_label"] = str(self.label.value).strip() or _sw_t(
+            self.parent_view.session.guild_id,
+            "defaults.ticket_button",
+            DEFAULT_TICKET_BUTTON_LABEL,
+        )
         await interaction.response.defer()
         await self.parent_view.cog.redraw_from_modal(self.parent_view.session)
 
@@ -238,12 +286,14 @@ class TicketLabelModal(discord.ui.Modal):
 class FeatureSelect(discord.ui.Select):
     def __init__(self, parent: "FeatureSelectView") -> None:
         self.parent_view = parent
+        guild_id = self.parent_view.session.guild_id
+        user_id = self.parent_view.session.user_id
         options = [
-            discord.SelectOption(label=FEATURE_LABELS[k], value=k)
+            discord.SelectOption(label=_feature_label(user_id, k), value=k)
             for k in FEATURE_ORDER
         ]
         super().__init__(
-            placeholder="Select modules to configure",
+            placeholder=_sw_t(user_id, "select.features.placeholder", "Select modules to configure"),
             min_values=1,
             max_values=len(options),
             options=options,
@@ -259,26 +309,8 @@ class FeatureSelectView(BaseOwnedView):
     def __init__(self, cog: "QuickSetupCog", session: SetupSession) -> None:
         super().__init__(cog, session)
         self.add_item(FeatureSelect(self))
-
-    @discord.ui.button(label="Start", style=discord.ButtonStyle.success)
-    async def start_button(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        if not self.session.selected:
-            self.session.notice = "Select at least one feature before starting."
-            await self.cog.redraw(interaction, self.session)
-            return
-        self.session.notice = ""
-        self.session.step_index = 0
-        await self.cog.redraw(interaction, self.session)
-
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger)
-    async def cancel_button(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        self.cog.sessions.pop((self.session.guild_id, self.session.user_id), None)
-        embed = discord.Embed(
-            title="Setup Cancelled",
-            description="Draft discarded. No changes were applied.",
-            color=discord.Color.red(),
-        )
-        await interaction.response.edit_message(embed=embed, view=None)
+        self.add_item(_StartButton(session.user_id))
+        self.add_item(_CancelButton(session.user_id))
 
 
 class TextChannelSelect(discord.ui.ChannelSelect):
@@ -304,8 +336,14 @@ class TextChannelSelect(discord.ui.ChannelSelect):
 class CategoryOrChannelSelect(discord.ui.ChannelSelect):
     def __init__(self, parent: "SetupStepView") -> None:
         self.parent_view = parent
+        guild_id = self.parent_view.session.guild_id
+        user_id = self.parent_view.session.user_id
         super().__init__(
-            placeholder="Select ticket category (or channel fallback)",
+            placeholder=_sw_t(
+                guild_id,
+                "placeholders.ticket_category_or_channel",
+                "Select ticket category (or channel fallback)",
+            ),
             channel_types=[discord.ChannelType.category, discord.ChannelType.text],
             min_values=1,
             max_values=1,
@@ -335,16 +373,33 @@ class RoleMultiSelect(discord.ui.RoleSelect):
 class LoggingEventSelect(discord.ui.Select):
     def __init__(self, parent: "SetupStepView") -> None:
         self.parent_view = parent
+        guild_id = self.parent_view.session.guild_id
+        user_id = self.parent_view.session.user_id
         options = [
-            discord.SelectOption(label="Message Delete/Edit", value="message_delete"),
-            discord.SelectOption(label="Member Join/Leave", value="member_join"),
-            discord.SelectOption(label="Automod Actions", value="automod"),
-            discord.SelectOption(label="Warns", value="warn"),
-            discord.SelectOption(label="Message Edited", value="message_edit"),
-            discord.SelectOption(label="Member Leave", value="member_leave"),
+            discord.SelectOption(
+                label=_sw_t(user_id, "logging_events.message_delete_edit", "Message Delete/Edit"),
+                value="message_delete",
+            ),
+            discord.SelectOption(
+                label=_sw_t(user_id, "logging_events.member_join_leave", "Member Join/Leave"),
+                value="member_join",
+            ),
+            discord.SelectOption(
+                label=_sw_t(user_id, "logging_events.automod_actions", "Automod Actions"),
+                value="automod",
+            ),
+            discord.SelectOption(label=_sw_t(user_id, "logging_events.warns", "Warns"), value="warn"),
+            discord.SelectOption(
+                label=_sw_t(user_id, "logging_events.message_edited", "Message Edited"),
+                value="message_edit",
+            ),
+            discord.SelectOption(
+                label=_sw_t(user_id, "logging_events.member_leave", "Member Leave"),
+                value="member_leave",
+            ),
         ]
         super().__init__(
-            placeholder="Select logging events",
+            placeholder=_sw_t(user_id, "placeholders.logging_events", "Select logging events"),
             min_values=1,
             max_values=min(6, len(options)),
             options=options,
@@ -364,14 +419,19 @@ class LoggingEventSelect(discord.ui.Select):
 class MatchTypeSelect(discord.ui.Select):
     def __init__(self, parent: "SetupStepView") -> None:
         self.parent_view = parent
+        guild_id = self.parent_view.session.guild_id
+        user_id = self.parent_view.session.user_id
         super().__init__(
-            placeholder="Blocked word match type",
+            placeholder=_sw_t(user_id, "placeholders.blocked_word_match_type", "Blocked word match type"),
             min_values=1,
             max_values=1,
             options=[
-                discord.SelectOption(label="Contains", value="contains"),
-                discord.SelectOption(label="Starts With", value="starts_with"),
-                discord.SelectOption(label="Ends With", value="ends_with"),
+                discord.SelectOption(label=_sw_t(user_id, "match_type.contains", "Contains"), value="contains"),
+                discord.SelectOption(
+                    label=_sw_t(user_id, "match_type.starts_with", "Starts With"),
+                    value="starts_with",
+                ),
+                discord.SelectOption(label=_sw_t(user_id, "match_type.ends_with", "Ends With"), value="ends_with"),
             ],
         )
 
@@ -383,13 +443,18 @@ class MatchTypeSelect(discord.ui.Select):
 class SurveyModeSelect(discord.ui.Select):
     def __init__(self, parent: "SetupStepView") -> None:
         self.parent_view = parent
+        guild_id = self.parent_view.session.guild_id
+        user_id = self.parent_view.session.user_id
         super().__init__(
-            placeholder="Exit survey type",
+            placeholder=_sw_t(user_id, "placeholders.exit_survey_type", "Exit survey type"),
             min_values=1,
             max_values=1,
             options=[
-                discord.SelectOption(label="Preset choices", value="preset"),
-                discord.SelectOption(label="Free text", value="free_text"),
+                discord.SelectOption(
+                    label=_sw_t(user_id, "survey_mode.preset", "Preset choices"),
+                    value="preset",
+                ),
+                discord.SelectOption(label=_sw_t(user_id, "survey_mode.free_text", "Free text"), value="free_text"),
             ],
         )
 
@@ -401,13 +466,18 @@ class SurveyModeSelect(discord.ui.Select):
 class RRModeSelect(discord.ui.Select):
     def __init__(self, parent: "SetupStepView") -> None:
         self.parent_view = parent
+        guild_id = self.parent_view.session.guild_id
+        user_id = self.parent_view.session.user_id
         super().__init__(
-            placeholder="Reaction role mode",
+            placeholder=_sw_t(user_id, "placeholders.reaction_role_mode", "Reaction role mode"),
             min_values=1,
             max_values=1,
             options=[
-                discord.SelectOption(label="Toggle", value="toggle"),
-                discord.SelectOption(label="Radio (remove other roles)", value="radio"),
+                discord.SelectOption(label=_sw_t(user_id, "rr_mode.toggle", "Toggle"), value="toggle"),
+                discord.SelectOption(
+                    label=_sw_t(user_id, "rr_mode.radio", "Radio (remove other roles)"),
+                    value="radio",
+                ),
             ],
         )
 
@@ -424,57 +494,209 @@ class SetupStepView(BaseOwnedView):
         self._add_nav_buttons()
 
     def _build_feature_controls(self) -> None:
+        guild_id = self.session.guild_id
+        user_id = self.session.user_id
         if self.feature_key == "welcome":
-            self.add_item(TextChannelSelect(self, "welcome", "channel_id", "Welcome channel"))
-            self.add_item(_ToggleButton("Toggle Enabled", "welcome", "enabled", discord.ButtonStyle.secondary))
-            self.add_item(_ToggleButton("Toggle Embed", "welcome", "embed_enabled", discord.ButtonStyle.secondary))
-            self.add_item(_EditMessageButton("Edit Welcome Message", "welcome", "message"))
+            self.add_item(
+                TextChannelSelect(
+                    self,
+                    "welcome",
+                    "channel_id",
+                    _sw_t(user_id, "placeholders.welcome_channel", "Welcome channel"),
+                )
+            )
+            self.add_item(
+                _ToggleButton(
+                    _sw_t(user_id, "buttons.toggle_enabled", "Toggle Enabled"),
+                    "welcome",
+                    "enabled",
+                    discord.ButtonStyle.secondary,
+                )
+            )
+            self.add_item(
+                _ToggleButton(
+                    _sw_t(user_id, "buttons.toggle_embed", "Toggle Embed"),
+                    "welcome",
+                    "embed_enabled",
+                    discord.ButtonStyle.secondary,
+                )
+            )
+            self.add_item(
+                _EditMessageButton(
+                    _sw_t(user_id, "buttons.edit_welcome_message", "Edit Welcome Message"),
+                    "welcome",
+                    "message",
+                )
+            )
         elif self.feature_key == "leave":
-            self.add_item(TextChannelSelect(self, "leave", "channel_id", "Leave channel"))
-            self.add_item(_ToggleButton("Toggle Enabled", "leave", "enabled", discord.ButtonStyle.secondary))
-            self.add_item(_ToggleButton("Toggle Embed", "leave", "embed_enabled", discord.ButtonStyle.secondary))
-            self.add_item(_ToggleButton("Toggle Exit Survey", "leave", "exit_survey_enabled", discord.ButtonStyle.secondary))
+            self.add_item(
+                TextChannelSelect(
+                    self,
+                    "leave",
+                    "channel_id",
+                    _sw_t(user_id, "placeholders.leave_channel", "Leave channel"),
+                )
+            )
+            self.add_item(
+                _ToggleButton(
+                    _sw_t(user_id, "buttons.toggle_enabled", "Toggle Enabled"),
+                    "leave",
+                    "enabled",
+                    discord.ButtonStyle.secondary,
+                )
+            )
+            self.add_item(
+                _ToggleButton(
+                    _sw_t(user_id, "buttons.toggle_embed", "Toggle Embed"),
+                    "leave",
+                    "embed_enabled",
+                    discord.ButtonStyle.secondary,
+                )
+            )
+            self.add_item(
+                _ToggleButton(
+                    _sw_t(user_id, "buttons.toggle_exit_survey", "Toggle Exit Survey"),
+                    "leave",
+                    "exit_survey_enabled",
+                    discord.ButtonStyle.secondary,
+                )
+            )
             self.add_item(SurveyModeSelect(self))
-            self.add_item(_EditMessageButton("Edit Leave Message", "leave", "message"))
+            self.add_item(
+                _EditMessageButton(
+                    _sw_t(user_id, "buttons.edit_leave_message", "Edit Leave Message"),
+                    "leave",
+                    "message",
+                )
+            )
         elif self.feature_key == "logging":
-            self.add_item(TextChannelSelect(self, "logging", "channel_id", "Logging channel"))
-            self.add_item(_ToggleButton("Toggle Enabled", "logging", "enabled", discord.ButtonStyle.secondary))
+            self.add_item(
+                TextChannelSelect(
+                    self,
+                    "logging",
+                    "channel_id",
+                    _sw_t(user_id, "placeholders.logging_channel", "Logging channel"),
+                )
+            )
+            self.add_item(
+                _ToggleButton(
+                    _sw_t(user_id, "buttons.toggle_enabled", "Toggle Enabled"),
+                    "logging",
+                    "enabled",
+                    discord.ButtonStyle.secondary,
+                )
+            )
             self.add_item(LoggingEventSelect(self))
-            self.add_item(_PreviewLoggingButton())
+            self.add_item(_PreviewLoggingButton(user_id))
         elif self.feature_key == "automod":
-            self.add_item(_ToggleButton("Discord AutoMod", "automod", "use_discord_automod", discord.ButtonStyle.secondary))
-            self.add_item(_ToggleButton("Bot-side Checks", "automod", "use_bot_checks", discord.ButtonStyle.secondary))
+            self.add_item(
+                _ToggleButton(
+                    _sw_t(user_id, "buttons.discord_automod", "Discord AutoMod"),
+                    "automod",
+                    "use_discord_automod",
+                    discord.ButtonStyle.secondary,
+                )
+            )
+            self.add_item(
+                _ToggleButton(
+                    _sw_t(user_id, "buttons.bot_checks", "Bot-side Checks"),
+                    "automod",
+                    "use_bot_checks",
+                    discord.ButtonStyle.secondary,
+                )
+            )
             self.add_item(MatchTypeSelect(self))
-            self.add_item(RoleMultiSelect(self, "automod", "exempt_role_ids", "Exempt roles", max_values=10))
-            self.add_item(TextChannelSelect(self, "automod", "exempt_channel_id", "Exempt channel (single quick setup)"))
-            self.add_item(_BlockedWordsButton())
+            self.add_item(
+                RoleMultiSelect(
+                    self,
+                    "automod",
+                    "exempt_role_ids",
+                    _sw_t(user_id, "placeholders.exempt_roles", "Exempt roles"),
+                    max_values=10,
+                )
+            )
+            self.add_item(
+                TextChannelSelect(
+                    self,
+                    "automod",
+                    "exempt_channel_id",
+                    _sw_t(user_id, "placeholders.exempt_channel", "Exempt channel (single quick setup)"),
+                )
+            )
+            self.add_item(_BlockedWordsButton(user_id))
         elif self.feature_key == "reaction_roles":
-            self.add_item(TextChannelSelect(self, "reaction_roles", "channel_id", "Reaction role panel channel"))
+            self.add_item(
+                TextChannelSelect(
+                    self,
+                    "reaction_roles",
+                    "channel_id",
+                    _sw_t(user_id, "placeholders.reaction_role_panel_channel", "Reaction role panel channel"),
+                )
+            )
             self.add_item(RRModeSelect(self))
-            self.add_item(RoleMultiSelect(self, "reaction_roles", "role_ids", "Select 1-3 roles", max_values=3))
-            self.add_item(_ReactionEmojisButton())
-            self.add_item(_ReactionMessageButton())
+            self.add_item(
+                RoleMultiSelect(
+                    self,
+                    "reaction_roles",
+                    "role_ids",
+                    _sw_t(user_id, "placeholders.select_reaction_roles", "Select 1-3 roles"),
+                    max_values=3,
+                )
+            )
+            self.add_item(_ReactionEmojisButton(user_id))
+            self.add_item(_ReactionMessageButton(user_id))
         elif self.feature_key == "tickets":
-            self.add_item(_ToggleButton("Enable Tickets", "tickets", "enabled", discord.ButtonStyle.secondary))
+            self.add_item(
+                _ToggleButton(
+                    _sw_t(user_id, "buttons.enable_tickets", "Enable Tickets"),
+                    "tickets",
+                    "enabled",
+                    discord.ButtonStyle.secondary,
+                )
+            )
             self.add_item(CategoryOrChannelSelect(self))
-            self.add_item(RoleMultiSelect(self, "tickets", "support_role_ids", "Support roles", max_values=10))
-            self.add_item(TextChannelSelect(self, "tickets", "ticket_channel_id", "Ticket panel channel"))
-            self.add_item(_ToggleButton("One Ticket Per User", "tickets", "one_ticket_per_user", discord.ButtonStyle.secondary))
-            self.add_item(_TicketTextButton())
+            self.add_item(
+                RoleMultiSelect(
+                    self,
+                    "tickets",
+                    "support_role_ids",
+                    _sw_t(user_id, "placeholders.support_roles", "Support roles"),
+                    max_values=10,
+                )
+            )
+            self.add_item(
+                TextChannelSelect(
+                    self,
+                    "tickets",
+                    "ticket_channel_id",
+                    _sw_t(user_id, "placeholders.ticket_panel_channel", "Ticket panel channel"),
+                )
+            )
+            self.add_item(
+                _ToggleButton(
+                    _sw_t(user_id, "buttons.one_ticket_per_user", "One Ticket Per User"),
+                    "tickets",
+                    "one_ticket_per_user",
+                    discord.ButtonStyle.secondary,
+                )
+            )
+            self.add_item(_TicketTextButton(user_id))
 
     def _add_nav_buttons(self) -> None:
-        self.add_item(_BackButton())
-        self.add_item(_SkipButton())
-        self.add_item(_NextButton())
-        self.add_item(_CancelButton())
+        guild_id = self.session.guild_id
+        user_id = self.session.user_id
+        self.add_item(_BackButton(user_id))
+        self.add_item(_SkipButton(user_id))
+        self.add_item(_NextButton(user_id))
+        self.add_item(_CancelButton(user_id))
 
 
 class ConfirmView(BaseOwnedView):
     def __init__(self, cog: "QuickSetupCog", session: SetupSession) -> None:
         super().__init__(cog, session)
-        self.add_item(_BackButton())
-        self.add_item(_ConfirmButton())
-        self.add_item(_CancelButton())
+        self.add_item(_BackButton(session.user_id))
+        self.add_item(_ConfirmButton(session.user_id))
+        self.add_item(_CancelButton(session.user_id))
 
 
 class _ToggleButton(discord.ui.Button):
@@ -489,6 +711,30 @@ class _ToggleButton(discord.ui.Button):
             return
         current = bool(view.session.draft[self.section].get(self.key, False))
         view.session.draft[self.section][self.key] = not current
+        await view.cog.redraw(interaction, view.session)
+
+
+class _StartButton(discord.ui.Button):
+    def __init__(self, user_id: int) -> None:
+        super().__init__(
+            label=_sw_t(user_id, "buttons.start", "Start"),
+            style=discord.ButtonStyle.success,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        view = self.view
+        if not isinstance(view, FeatureSelectView):
+            return
+        if not view.session.selected:
+            view.session.notice = _sw_t(
+                view.session.user_id,
+                "messages.select_one_feature",
+                "Select at least one feature before starting.",
+            )
+            await view.cog.redraw(interaction, view.session)
+            return
+        view.session.notice = ""
+        view.session.step_index = 0
         await view.cog.redraw(interaction, view.session)
 
 
@@ -508,8 +754,11 @@ class _EditMessageButton(discord.ui.Button):
 
 
 class _BlockedWordsButton(discord.ui.Button):
-    def __init__(self) -> None:
-        super().__init__(label="Edit Blocked Words", style=discord.ButtonStyle.primary)
+    def __init__(self, user_id: int) -> None:
+        super().__init__(
+            label=_sw_t(user_id, "buttons.edit_blocked_words", "Edit Blocked Words"),
+            style=discord.ButtonStyle.primary,
+        )
 
     async def callback(self, interaction: discord.Interaction) -> None:
         view = self.view
@@ -520,8 +769,11 @@ class _BlockedWordsButton(discord.ui.Button):
 
 
 class _ReactionEmojisButton(discord.ui.Button):
-    def __init__(self) -> None:
-        super().__init__(label="Set Emojis", style=discord.ButtonStyle.primary)
+    def __init__(self, user_id: int) -> None:
+        super().__init__(
+            label=_sw_t(user_id, "buttons.set_emojis", "Set Emojis"),
+            style=discord.ButtonStyle.primary,
+        )
 
     async def callback(self, interaction: discord.Interaction) -> None:
         view = self.view
@@ -532,21 +784,32 @@ class _ReactionEmojisButton(discord.ui.Button):
 
 
 class _ReactionMessageButton(discord.ui.Button):
-    def __init__(self) -> None:
-        super().__init__(label="Edit Panel Message", style=discord.ButtonStyle.primary)
+    def __init__(self, user_id: int) -> None:
+        super().__init__(
+            label=_sw_t(user_id, "buttons.edit_panel_message", "Edit Panel Message"),
+            style=discord.ButtonStyle.primary,
+        )
 
     async def callback(self, interaction: discord.Interaction) -> None:
         view = self.view
         if not isinstance(view, SetupStepView):
             return
-        current = str(view.session.draft["reaction_roles"].get("message_text", "Pick your role:"))
-        modal = MessageTemplateModal("Reaction Role Message", view, ("reaction_roles", "message_text"), current)
+        current = str(view.session.draft["reaction_roles"].get("message_text", DEFAULT_REACTION_ROLE_MESSAGE))
+        modal = MessageTemplateModal(
+            _sw_t(view.session.user_id, "modal.reaction_message.title", "Reaction Role Message"),
+            view,
+            ("reaction_roles", "message_text"),
+            current,
+        )
         await interaction.response.send_modal(modal)
 
 
 class _TicketTextButton(discord.ui.Button):
-    def __init__(self) -> None:
-        super().__init__(label="Edit Ticket Text", style=discord.ButtonStyle.primary)
+    def __init__(self, user_id: int) -> None:
+        super().__init__(
+            label=_sw_t(user_id, "buttons.edit_ticket_text", "Edit Ticket Text"),
+            style=discord.ButtonStyle.primary,
+        )
 
     async def callback(self, interaction: discord.Interaction) -> None:
         view = self.view
@@ -555,27 +818,37 @@ class _TicketTextButton(discord.ui.Button):
         data = view.session.draft["tickets"]
         modal = TicketLabelModal(
             view,
-            str(data.get("ticket_message", "Click below to create a ticket.")),
-            str(data.get("button_label", "Open Ticket")),
+            str(data.get("ticket_message", DEFAULT_TICKET_MESSAGE)),
+            str(data.get("button_label", _sw_t(view.session.user_id, "defaults.ticket_button", DEFAULT_TICKET_BUTTON_LABEL))),
         )
         await interaction.response.send_modal(modal)
 
 
 class _PreviewLoggingButton(discord.ui.Button):
-    def __init__(self) -> None:
-        super().__init__(label="Test Log (Preview)", style=discord.ButtonStyle.secondary)
+    def __init__(self, user_id: int) -> None:
+        super().__init__(
+            label=_sw_t(user_id, "buttons.preview_logging", "Test Log (Preview)"),
+            style=discord.ButtonStyle.secondary,
+        )
 
     async def callback(self, interaction: discord.Interaction) -> None:
         view = self.view
         if not isinstance(view, SetupStepView):
             return
-        view.session.notice = "Preview only: a test log entry would be sent after Confirm."
+        view.session.notice = _sw_t(
+            view.session.guild_id,
+            "messages.preview_log_notice",
+            "Preview only: a test log entry would be sent after Confirm.",
+        )
         await view.cog.redraw(interaction, view.session)
 
 
 class _BackButton(discord.ui.Button):
-    def __init__(self) -> None:
-        super().__init__(label="Back", style=discord.ButtonStyle.secondary)
+    def __init__(self, user_id: int) -> None:
+        super().__init__(
+            label=_sw_t(user_id, "buttons.back", "Back"),
+            style=discord.ButtonStyle.secondary,
+        )
 
     async def callback(self, interaction: discord.Interaction) -> None:
         view = self.view
@@ -587,8 +860,11 @@ class _BackButton(discord.ui.Button):
 
 
 class _SkipButton(discord.ui.Button):
-    def __init__(self) -> None:
-        super().__init__(label="Skip", style=discord.ButtonStyle.secondary)
+    def __init__(self, user_id: int) -> None:
+        super().__init__(
+            label=_sw_t(user_id, "buttons.skip", "Skip"),
+            style=discord.ButtonStyle.secondary,
+        )
 
     async def callback(self, interaction: discord.Interaction) -> None:
         view = self.view
@@ -601,8 +877,11 @@ class _SkipButton(discord.ui.Button):
 
 
 class _NextButton(discord.ui.Button):
-    def __init__(self) -> None:
-        super().__init__(label="Next", style=discord.ButtonStyle.success)
+    def __init__(self, user_id: int) -> None:
+        super().__init__(
+            label=_sw_t(user_id, "buttons.next", "Next"),
+            style=discord.ButtonStyle.success,
+        )
 
     async def callback(self, interaction: discord.Interaction) -> None:
         view = self.view
@@ -615,8 +894,11 @@ class _NextButton(discord.ui.Button):
 
 
 class _CancelButton(discord.ui.Button):
-    def __init__(self) -> None:
-        super().__init__(label="Cancel", style=discord.ButtonStyle.danger)
+    def __init__(self, user_id: int) -> None:
+        super().__init__(
+            label=_sw_t(user_id, "buttons.cancel", "Cancel"),
+            style=discord.ButtonStyle.danger,
+        )
 
     async def callback(self, interaction: discord.Interaction) -> None:
         view = self.view
@@ -624,16 +906,23 @@ class _CancelButton(discord.ui.Button):
             return
         view.cog.sessions.pop((view.session.guild_id, view.session.user_id), None)
         embed = discord.Embed(
-            title="Setup Cancelled",
-            description="Draft discarded. No changes were applied.",
+            title=_sw_t(view.session.user_id, "messages.cancelled_title", "Setup Cancelled"),
+            description=_sw_t(
+                view.session.user_id,
+                "messages.cancelled_description",
+                "Draft discarded. No changes were applied.",
+            ),
             color=discord.Color.red(),
         )
         await interaction.response.edit_message(embed=embed, view=None)
 
 
 class _ConfirmButton(discord.ui.Button):
-    def __init__(self) -> None:
-        super().__init__(label="Confirm", style=discord.ButtonStyle.success)
+    def __init__(self, user_id: int) -> None:
+        super().__init__(
+            label=_sw_t(user_id, "buttons.confirm", "Confirm"),
+            style=discord.ButtonStyle.success,
+        )
 
     async def callback(self, interaction: discord.Interaction) -> None:
         view = self.view
@@ -666,20 +955,31 @@ class QuickSetupCog(commands.Cog):
                 session.message = None
 
     def build_screen(self, session: SetupSession) -> tuple[discord.Embed, discord.ui.View]:
+        guild_id = session.guild_id
         if session.step_index < 0:
             embed = discord.Embed(
-                title="Coffeecord Quick Setup",
-                description="Select what you want to configure. You can skip anything.",
+                title=_sw_t(user_id, "screen.select.title", "Coffeecord Quick Setup"),
+                description=_sw_t(
+                    guild_id,
+                    "screen.select.description",
+                    "Select what you want to configure. You can skip anything.",
+                ),
                 color=discord.Color.blurple(),
             )
             selected = session.selected
             embed.add_field(
-                name="Selected",
-                value=", ".join(FEATURE_LABELS[x] for x in selected) if selected else "Nothing selected yet.",
+                name=_sw_t(user_id, "screen.select.selected_field", "Selected"),
+                value=", ".join(_feature_label(user_id, x) for x in selected)
+                if selected
+                else _sw_t(user_id, "screen.select.none_selected", "Nothing selected yet."),
                 inline=False,
             )
             if session.notice:
-                embed.add_field(name="Notice", value=session.notice, inline=False)
+                embed.add_field(
+                    name=_sw_t(user_id, "screen.notice_field", "Notice"),
+                    value=session.notice,
+                    inline=False,
+                )
             return embed, FeatureSelectView(self, session)
 
         selected = session.selected
@@ -691,35 +991,66 @@ class QuickSetupCog(commands.Cog):
         return embed, SetupStepView(self, session, feature_key)
 
     def _build_confirm_screen(self, session: SetupSession) -> discord.Embed:
+        guild_id = session.guild_id
         embed = discord.Embed(
-            title="Confirm Setup",
-            description="Review your draft. Nothing has been applied yet.",
+            title=_sw_t(user_id, "screen.confirm.title", "Confirm Setup"),
+            description=_sw_t(
+                guild_id,
+                "screen.confirm.description",
+                "Review your draft. Nothing has been applied yet.",
+            ),
             color=discord.Color.gold(),
         )
         for key in session.selected:
-            summary = self._module_summary(session.draft, key)
-            embed.add_field(name=FEATURE_LABELS[key], value=summary, inline=False)
+            summary = self._module_summary(session.draft, key, guild_id)
+            embed.add_field(name=_feature_label(user_id, key), value=summary, inline=False)
         if session.notice:
-            embed.add_field(name="Notice", value=session.notice, inline=False)
+            embed.add_field(
+                name=_sw_t(user_id, "screen.notice_field", "Notice"),
+                value=session.notice,
+                inline=False,
+            )
         return embed
 
     def _build_step_embed(self, session: SetupSession, feature_key: str) -> discord.Embed:
+        guild_id = session.guild_id
         embed = discord.Embed(
-            title=f"Quick Setup • {FEATURE_LABELS[feature_key]}",
+            title=_sw_t(
+                guild_id,
+                "screen.step.title",
+                "Quick Setup • {feature}",
+                feature=_feature_label(user_id, feature_key),
+            ),
             color=discord.Color.blurple(),
-            description="This is a draft step. Nothing is applied until Confirm.",
+            description=_sw_t(
+                guild_id,
+                "screen.step.description",
+                "This is a draft step. Nothing is applied until Confirm.",
+            ),
         )
         embed.add_field(
-            name="Current Draft",
-            value=self._module_summary(session.draft, feature_key),
+            name=_sw_t(user_id, "screen.step.current_draft_field", "Current Draft"),
+            value=self._module_summary(session.draft, feature_key, guild_id),
             inline=False,
         )
-        embed.set_footer(text=f"Step {session.step_index + 1}/{max(len(session.selected), 1)}")
+        embed.set_footer(
+            text=_sw_t(
+                guild_id,
+                "screen.step.footer",
+                "Step {current}/{total}",
+                current=session.step_index + 1,
+                total=max(len(session.selected), 1),
+            )
+        )
         if session.notice:
-            embed.add_field(name="Notice", value=session.notice, inline=False)
+            embed.add_field(
+                name=_sw_t(user_id, "screen.notice_field", "Notice"),
+                value=session.notice,
+                inline=False,
+            )
         return embed
 
-    def _module_summary(self, draft: dict[str, Any], key: str) -> str:
+    def _module_summary(self, draft: dict[str, Any], key: str, guild_id: int) -> str:
         if key == "welcome":
             d = draft["welcome"]
             return (
@@ -753,12 +1084,15 @@ class QuickSetupCog(commands.Cog):
                 f"enabled={d['enabled']}, panel_channel_id={d['ticket_channel_id']}, "
                 f"support_roles={len(d['support_role_ids'])}, one_ticket_per_user={d['one_ticket_per_user']}"
             )
-        return "Not configured."
+        return _sw_t(user_id, "screen.not_configured", "Not configured.")
 
     @app_commands.command(name="setup", description="Start Coffeecord quick setup wizard.")
     async def setup_command(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("Run this in a server.", ephemeral=True)
+            await interaction.response.send_message(
+                _sw_t(None, "messages.run_in_server", "Run this in a server."),
+                ephemeral=True,
+            )
             return
         session = SetupSession(guild_id=interaction.guild.id, user_id=interaction.user.id)
         self.sessions[self._session_key(session.guild_id, session.user_id)] = session
@@ -772,11 +1106,21 @@ class QuickSetupCog(commands.Cog):
     @app_commands.command(name="setup_resume", description="Resume your quick setup draft.")
     async def setup_resume(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("Run this in a server.", ephemeral=True)
+            await interaction.response.send_message(
+                _sw_t(None, "messages.run_in_server", "Run this in a server."),
+                ephemeral=True,
+            )
             return
         session = self.sessions.get(self._session_key(interaction.guild.id, interaction.user.id))
         if session is None:
-            await interaction.response.send_message("No active draft found. Use `/setup` first.", ephemeral=True)
+            await interaction.response.send_message(
+                _sw_t(
+                    interaction.guild.id,
+                    "messages.no_active_draft",
+                    "No active draft found. Use `/setup` first.",
+                ),
+                ephemeral=True,
+            )
             return
         embed, view = self.build_screen(session)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
@@ -788,24 +1132,40 @@ class QuickSetupCog(commands.Cog):
     @app_commands.command(name="setup_cancel", description="Discard your quick setup draft.")
     async def setup_cancel(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("Run this in a server.", ephemeral=True)
+            await interaction.response.send_message(
+                _sw_t(None, "messages.run_in_server", "Run this in a server."),
+                ephemeral=True,
+            )
             return
         key = self._session_key(interaction.guild.id, interaction.user.id)
         if key in self.sessions:
             self.sessions.pop(key, None)
-            await interaction.response.send_message("Draft discarded.", ephemeral=True)
+            await interaction.response.send_message(
+                _sw_t(interaction.user.id, "messages.draft_discarded", "Draft discarded."),
+                ephemeral=True,
+            )
             return
-        await interaction.response.send_message("No active draft found.", ephemeral=True)
+        await interaction.response.send_message(
+            _sw_t(interaction.user.id, "messages.no_active_draft_short", "No active draft found."),
+            ephemeral=True,
+        )
 
     async def confirm(self, interaction: discord.Interaction, session: SetupSession) -> None:
         if interaction.guild is None:
-            await interaction.response.send_message("Run this in a server.", ephemeral=True)
+            await interaction.response.send_message(
+                _sw_t(None, "messages.run_in_server", "Run this in a server."),
+                ephemeral=True,
+            )
             return
         errors = self._validate_before_confirm(interaction.guild, session.draft)
         if errors:
-            session.notice = "Fix permissions/config before confirming."
+            session.notice = _sw_t(
+                interaction.guild.id,
+                "messages.fix_before_confirm",
+                "Fix permissions/config before confirming.",
+            )
             embed = discord.Embed(
-                title="Cannot Apply Setup",
+                title=_sw_t(interaction.user.id, "messages.cannot_apply_title", "Cannot Apply Setup"),
                 description="\n".join(f"• {e}" for e in errors[:20]),
                 color=discord.Color.red(),
             )
@@ -817,71 +1177,160 @@ class QuickSetupCog(commands.Cog):
         if ok:
             self.sessions.pop(self._session_key(session.guild_id, session.user_id), None)
             embed = discord.Embed(
-                title="Setup Applied",
-                description="All selected modules were saved successfully.",
+                title=_sw_t(interaction.user.id, "messages.applied_title", "Setup Applied"),
+                description=_sw_t(
+                    interaction.guild.id,
+                    "messages.applied_description",
+                    "All selected modules were saved successfully.",
+                ),
                 color=discord.Color.green(),
             )
             await interaction.edit_original_response(embed=embed, view=None)
             return
 
         embed = discord.Embed(
-            title="Apply Failed",
-            description=message,
+            title=_sw_t(interaction.user.id, "messages.apply_failed_title", "Apply Failed"),
+            description=_sw_t(
+                interaction.guild.id,
+                "messages.apply_failed_description",
+                "No changes applied. Reason: {reason}",
+                reason=message,
+            ),
             color=discord.Color.red(),
         )
         await interaction.edit_original_response(embed=embed, view=ConfirmView(self, session))
 
     def _validate_before_confirm(self, guild: discord.Guild, draft: dict[str, Any]) -> list[str]:
+        guild_id = guild.id
         issues: list[str] = []
         me = guild.me
         if me is None:
-            issues.append("Bot member object is unavailable in this guild.")
+            issues.append(
+                _sw_t(
+                    guild_id,
+                    "validation.bot_member_unavailable",
+                    "Bot member object is unavailable in this guild.",
+                )
+            )
             return issues
 
         def _check_text_channel(channel_id: Optional[int], label: str, need_embed: bool = False) -> None:
             if not channel_id:
-                issues.append(f"{label}: channel is not selected.")
+                issues.append(
+                    _sw_t(
+                        guild_id,
+                        "validation.channel_not_selected",
+                        "{label}: channel is not selected.",
+                        label=label,
+                    )
+                )
                 return
             channel = guild.get_channel(int(channel_id))
             if not isinstance(channel, discord.TextChannel):
-                issues.append(f"{label}: selected channel is invalid.")
+                issues.append(
+                    _sw_t(
+                        guild_id,
+                        "validation.channel_invalid",
+                        "{label}: selected channel is invalid.",
+                        label=label,
+                    )
+                )
                 return
             perms = channel.permissions_for(me)
             if not perms.view_channel or not perms.send_messages:
-                issues.append(f"{label}: bot needs view/send messages in {channel.mention}.")
+                issues.append(
+                    _sw_t(
+                        guild_id,
+                        "validation.needs_view_send",
+                        "{label}: bot needs view/send messages in {channel}.",
+                        label=label,
+                        channel=channel.mention,
+                    )
+                )
             if need_embed and not perms.embed_links:
-                issues.append(f"{label}: bot needs embed links in {channel.mention}.")
+                issues.append(
+                    _sw_t(
+                        guild_id,
+                        "validation.needs_embed_links",
+                        "{label}: bot needs embed links in {channel}.",
+                        label=label,
+                        channel=channel.mention,
+                    )
+                )
 
         if "welcome" in draft["selected_features"]:
             w = draft["welcome"]
-            _check_text_channel(w.get("channel_id"), "Welcome", need_embed=bool(w.get("embed_enabled", False)))
+            _check_text_channel(
+                w.get("channel_id"),
+                _feature_label(user_id, "welcome"),
+                need_embed=bool(w.get("embed_enabled", False)),
+            )
         if "leave" in draft["selected_features"]:
             l = draft["leave"]
-            _check_text_channel(l.get("channel_id"), "Leave", need_embed=bool(l.get("embed_enabled", False)))
+            _check_text_channel(
+                l.get("channel_id"),
+                _feature_label(user_id, "leave"),
+                need_embed=bool(l.get("embed_enabled", False)),
+            )
         if "logging" in draft["selected_features"]:
             lg = draft["logging"]
-            _check_text_channel(lg.get("channel_id"), "Logging", need_embed=True)
+            _check_text_channel(lg.get("channel_id"), _feature_label(user_id, "logging"), need_embed=True)
         if "reaction_roles" in draft["selected_features"]:
             rr = draft["reaction_roles"]
             if rr.get("enabled", True):
-                _check_text_channel(rr.get("channel_id"), "Reaction Roles", need_embed=False)
+                _check_text_channel(rr.get("channel_id"), _feature_label(user_id, "reaction_roles"), need_embed=False)
                 roles = rr.get("role_ids", [])
                 if not roles:
-                    issues.append("Reaction Roles: select at least one role.")
+                    issues.append(
+                        _sw_t(
+                            guild_id,
+                            "validation.reaction_roles_need_role",
+                            "{label}: select at least one role.",
+                            label=_feature_label(user_id, "reaction_roles"),
+                        )
+                    )
         if "tickets" in draft["selected_features"]:
             tk = draft["tickets"]
             if tk.get("enabled", True):
-                _check_text_channel(tk.get("ticket_channel_id"), "Tickets", need_embed=True)
+                _check_text_channel(tk.get("ticket_channel_id"), _feature_label(user_id, "tickets"), need_embed=True)
                 if not tk.get("support_role_ids"):
-                    issues.append("Tickets: select at least one support role.")
+                    issues.append(
+                        _sw_t(
+                            guild_id,
+                            "validation.tickets_need_support_role",
+                            "{label}: select at least one support role.",
+                            label=_feature_label(user_id, "tickets"),
+                        )
+                    )
                 if not me.guild_permissions.manage_channels:
-                    issues.append("Tickets: bot needs Manage Channels to create ticket channels.")
+                    issues.append(
+                        _sw_t(
+                            guild_id,
+                            "validation.tickets_manage_channels",
+                            "{label}: bot needs Manage Channels to create ticket channels.",
+                            label=_feature_label(user_id, "tickets"),
+                        )
+                    )
                 if not me.guild_permissions.manage_roles:
-                    issues.append("Tickets: bot needs Manage Roles to apply ticket overwrites.")
+                    issues.append(
+                        _sw_t(
+                            guild_id,
+                            "validation.tickets_manage_roles",
+                            "{label}: bot needs Manage Roles to apply ticket overwrites.",
+                            label=_feature_label(user_id, "tickets"),
+                        )
+                    )
         if "automod" in draft["selected_features"]:
             a = draft["automod"]
             if a.get("use_discord_automod", False) and not me.guild_permissions.manage_guild:
-                issues.append("Automod: bot needs Manage Guild for Discord AutoMod rule management.")
+                issues.append(
+                    _sw_t(
+                        guild_id,
+                        "validation.automod_manage_guild",
+                        "{label}: bot needs Manage Guild for Discord AutoMod rule management.",
+                        label=_feature_label(user_id, "automod"),
+                    )
+                )
         return issues
 
     async def _apply_draft(self, guild: discord.Guild, draft: dict[str, Any]) -> tuple[bool, str]:
@@ -1027,7 +1476,7 @@ class QuickSetupCog(commands.Cog):
                 if rr.get("enabled", True) and channel_id and role_ids:
                     channel = guild.get_channel(int(channel_id))
                     if isinstance(channel, discord.TextChannel):
-                        message_text = str(rr.get("message_text", "Pick your role:")).strip() or "Pick your role:"
+                        message_text = str(rr.get("message_text", DEFAULT_REACTION_ROLE_MESSAGE)).strip() or DEFAULT_REACTION_ROLE_MESSAGE
                         mappings = []
                         emojis = list(rr.get("emojis", []))
                         for idx, rid in enumerate(role_ids[:3]):
@@ -1081,9 +1530,9 @@ class QuickSetupCog(commands.Cog):
                         "ticket_channel": int(panel_channel.id),
                         "support_roles": support_roles,
                         "ticket_types": ["Support"],
-                        "ticket_message": str(tk.get("ticket_message", "Click below to create a ticket.")),
+                        "ticket_message": str(tk.get("ticket_message", DEFAULT_TICKET_MESSAGE)),
                         "tickets": {},
-                        "button_label": str(tk.get("button_label", "Open Ticket")),
+                        "button_label": str(tk.get("button_label", DEFAULT_TICKET_BUTTON_LABEL)),
                         "category_id": int(tk["category_or_channel_id"]) if tk.get("category_or_channel_id") else None,
                         "one_ticket_per_user": bool(tk.get("one_ticket_per_user", True)),
                     }
@@ -1094,7 +1543,7 @@ class QuickSetupCog(commands.Cog):
                         import tickets  # type: ignore
                         embed = discord.Embed(
                             title="🎫 Support Tickets",
-                            description=str(tk.get("ticket_message", "Click below to create a ticket.")),
+                            description=str(tk.get("ticket_message", DEFAULT_TICKET_MESSAGE)),
                             color=discord.Color.blue(),
                         )
                         panel = await panel_channel.send(embed=embed, view=tickets.TicketPanel(gid))
