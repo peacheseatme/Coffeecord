@@ -66,6 +66,8 @@ _usage() {
     echo "  update --branch          git pull on current branch (dev) → pip → restart"
     echo "  update -f / --force      Continue even if git/archive step fails"
     echo ""
+    echo "  publish-release <ver> [-f]  Push branch + tag (maintainer); -f overwrites tag"
+    echo ""
     echo "  module refresh            Scan Modules/ — add new files to registry"
     echo "  module refresh_registry   Alias for 'module refresh'"
     echo "  module refresh --dry-run  Preview additions without writing"
@@ -833,6 +835,18 @@ _update_bot() {
     echo "  - Bot state         : running"
 }
 
+# ── publish-release (maintainer) ──────────────────────────────────────────────
+# Push current branch and create/overwrite a version tag for c-cord update.
+_publish_release() {
+    local script="${SCRIPT_DIR}/scripts/ccord_publish_release.sh"
+    if [[ ! -x "${script}" && ! -f "${script}" ]]; then
+        err "Missing ${script}"
+        exit 1
+    fi
+    chmod +x "${script}" 2>/dev/null || true
+    exec bash "${script}" "$@"
+}
+
 # ── repair ───────────────────────────────────────────────────────────────────
 # Same as: (cd repo && "${py}" scripts/repair_clone.py "$@") — exec so argv/exit match the script.
 # Default: git fetch + restore missing tracked files, then storage repair. Use --storage-only for JSON only.
@@ -923,6 +937,9 @@ main() {
             ;;
         update)
             _update_bot "$@"
+            ;;
+        publish-release|publish_release)
+            _publish_release "$@"
             ;;
         repair)
             _repair_storage "$@"
