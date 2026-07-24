@@ -1,0 +1,1955 @@
+{
+  "about": {
+    "button_github": "GitHub",
+    "button_invite_me": "Пригласить меня",
+    "button_kofi": "Ko-fi",
+    "button_privacy_policy": "Политика конфиденциальности",
+    "button_support_server": "Сервер поддержки",
+    "button_terms_of_service": "Условия использования",
+    "button_topgg": "топ.гг",
+    "cmd_description": "О Coffeecord",
+    "cpu": "ЦП",
+    "cpu_value": "{pct}%",
+    "developer": "Разработчик",
+    "developer_not_configured": "Не настроено",
+    "footer": "Coffeecord • Сделано с ☕ и discord.py ❤",
+    "memory": "Память",
+    "memory_value": "{mb} МБ",
+    "ping": "Пинг",
+    "ping_value": "{ms} мс",
+    "servers": "Серверы",
+    "servers_value": "{count} серверы",
+    "title": "О Coffeecord",
+    "uptime": "Аптайм",
+    "uptime_value": "{hours}h {minutes}m",
+    "version": "Версия"
+  },
+  "anti_abuse": {
+    "guild_block": "Этот сервер временно превысил лимиты команд. Подождите несколько минут.",
+    "rate_limit": "Вы отправляете команды слишком быстро. Пожалуйста, замедлитесь.",
+    "user_block": "Вы временно заблокированы из-за чрезмерного использования команд."
+  },
+  "announcement": {
+    "language_support": {
+      "body": "В Coffeecord теперь есть поддержка испанского, португальского и русского! Чтобы выбрать язык, используйте `/language set`. Мы не будем присылать вам сообщения об обновлениях функций в будущем, если вы не включите это.",
+      "optout_note": "Используйте `/optout` на любом сервере с этим ботом, чтобы перестать получать такие сообщения."
+    }
+  },
+  "automod": {
+    "admin_required": "Нужно право `Управление сервером` для команд администрирования automod.",
+    "badword_added": "Добавлено `{word}` в список запрещённых слов.",
+    "badword_already_exists": "`{word}` уже в списке запрещённых слов.",
+    "badword_empty": "Слово не может быть пустым.",
+    "badword_list": "Запрещённые слова ({count}): {words}",
+    "badword_list_empty": "Запрещённые слова не настроены.",
+    "badword_not_found": "`{word}` не было в списке запрещённых слов.",
+    "badword_removed": "Удалено `{word}` из списка запрещённых слов.",
+    "disabled": "Automod отключён для этого сервера.",
+    "enabled": "Automod включён для этого сервера.",
+    "escalation_cleared": "Эскалация предупреждений сброшена для warn 1-5 (всё none/off).",
+    "escalation_invalid": "Неверная конфигурация эскалации:\n- {errors}",
+    "escalation_updated": "Эскалация предупреждений обновлена:\n{lines}",
+    "exempt_roles_list": "Исключённые роли: {roles}",
+    "exempt_roles_updated": "Исключённые роли обновлены ({action}: {role}).",
+    "field_log_channel": "Канал логов",
+    "field_rules": "Правила",
+    "field_status": "Статус",
+    "field_violation_warn_counting": "Подсчёт предупреждений за нарушения",
+    "log_channel_cleared": "Канал логов automod очищен.",
+    "log_channel_set": "Канал логов automod установлен: {channel}.",
+    "no_exempt_roles": "Исключённые роли не настроены.",
+    "not_set": "Не задано",
+    "override_action_expected": "`action` должно быть одним из: {actions}.",
+    "override_bool_expected": "`{setting}` ожидает `true` или `false`.",
+    "override_cleared": "Переопределение снято для {channel} на `{rule}`.",
+    "override_not_found": "Нет переопределения для этого канала/правила.",
+    "override_numeric_expected": "`{setting}` ожидает числовое значение.",
+    "override_set_success": "Переопределение для {channel}: `{rule}.{setting} = {value}`",
+    "override_setting_unsupported": "Параметр `{setting}` не поддерживается для `{rule}`.",
+    "overview_title": "Обзор Automod",
+    "preset_applied": "✅ Применён пресет automod: **{preset}**\n{footer}",
+    "preset_choose_prompt": "Выберите пресет automod:",
+    "preset_owner_only": "Эти кнопки пресета может использовать только автор команды.",
+    "reloaded": "Конфигурация automod перезагружена.",
+    "set_action_success": "Действие `{rule}` установлено: `{action}`.",
+    "set_deletemessage_success": "`{rule}.delete_message` установлено в `{enabled}`.",
+    "set_value_invalid_setting": "Недопустимый параметр для `{rule}`. Разрешено: {allowed}.",
+    "set_value_invalid_value": "Недопустимое значение `{value}` для `{setting}`.",
+    "set_value_success": "Обновлено `{rule}.{setting}` → `{value}`.",
+    "set_violationwarns_success": "`count_rule_violations_as_warns` установлено в `{enabled}`.",
+    "status_result": "Automod {status}.",
+    "toggle_rule_success": "Правило `{rule}` установлено: {state}.",
+    "warn_add_bot_blocked": "Нельзя выдать предупреждение боту.",
+    "warn_cleared": "Снято **{count}** предупреждение(й) с {member}.",
+    "warn_list_empty": "У {member} нет предупреждений automod.",
+    "warn_list_result": "У {member} **{count}** предупреждение(й).\nНедавние:\n{lines}",
+    "warn_remove_empty": "У {member} нет предупреждений.",
+    "warn_remove_invalid_index": "Неверный индекс. Используйте значение от 1 до {max_index}.",
+    "warn_removed": "Удалено предупреждение #{index} для {member}: {reason}",
+    "warn_threshold_action": "\nДействие по порогу: `{action}`",
+    "whitelist_channels_updated": "Белый список каналов обновлён ({action}: {channel}).",
+    "whitelist_roles_updated": "Белый список ролей обновлён ({action}: {role})."
+  },
+  "autorole": {
+    "add_prompt": "Выберите событие и роль(и), затем нажмите **Save Rule**.",
+    "event_set": "Событие установлено на `{event}`.",
+    "field_delay": "Задерживать",
+    "field_enabled": "Включено",
+    "field_event": "Событие",
+    "field_roles": "Роли",
+    "field_rule_count": "Количество правил",
+    "field_rule_id": "Идентификатор правила",
+    "field_rules": "Правила",
+    "no_rules": "Правила не настроены.",
+    "pick_one_role": "Сначала выберите хотя бы одну роль.",
+    "roles_selected": "Выбранные роли: {roles}",
+    "rule_added_title": "Добавлено правило автоматической роли",
+    "rule_not_found": "Правило не найдено.",
+    "rule_removed": "Удалено правило `{rule_id}`.",
+    "rule_saved": "✅ Правило сохранено.",
+    "setup_panel_owner_only": "Эта панель настройки принадлежит кому-то другому.",
+    "status_title": "Статус автоматических ролей",
+    "test_title": "Автоматический ролевой тест",
+    "toggle_result": "Автоматические роли теперь **{state}**."
+  },
+  "bot": {
+    "applications": {
+      "added_question": "Добавлен вопрос: {question}",
+      "check_dms": "📨 Чтобы подать заявку, проверьте свои личные сообщения!",
+      "choose_delete": "Выберите вопрос для удаления:",
+      "toggled": "Переключены штатные приложения!"
+    },
+    "autorole_legacy": {
+      "choose_remove": "🗑️ Выберите автороль для удаления:",
+      "no_roles": "Нет авторолей для удаления."
+    },
+    "call": {
+      "add_success": "В звонок добавлен {user}.",
+      "channel_gone": "Канал звонка больше не существует.",
+      "create_failed": "Не удалось создать канал вызова: {error}.",
+      "create_forbidden": "Мне нужен **Manage Channels** (и разрешение на управление этой категорией) для создания каналов вызова. Попросите администратора предоставить боту **Manage Channels**.",
+      "created": "📞 Создан звонок: {channel}\nПриглашенные пользователи должны использовать **/call join**, чтобы присоединиться.\n{password_line}",
+      "dm_invite": "📞 **{host} is calling you!**\n➡️ Чтобы присоединиться, используйте **/call join**: {channel}.\n{password_line}",
+      "end_success": "Звонок завершился.",
+      "guild_not_found": "Гильдия не найдена.",
+      "invite_sent": "📨 Отправил приглашение на звонок на {user}.",
+      "join_guild_only": "Используйте это на сервере (не удалось определить гильдию или пользователя).",
+      "join_hierarchy": "Бот занимает недостаточно высокое место в иерархии ролей (или ему не хватает разрешений).",
+      "join_not_found": "Этот звонок не существует или истёк.",
+      "join_success": "✅ Вы присоединились к звонку в {channel}.",
+      "join_success_channel": "✅ Вы присоединились к {channel}",
+      "join_wrong_password": "Неверный пароль.",
+      "no_active_host": "В настоящее время у вас нет активных вызовов.",
+      "not_host": "Вы не являетесь хостом активного звонка.",
+      "password_line": "🔑 Пароль: `{password}`",
+      "promote_success": "Promoted {user} to call host.",
+      "remove_not_in_call": "Этот пользователь не участвует в разговоре.",
+      "remove_success": "Removed {user} from the call.",
+      "user_not_found": "Не удалось разрешить вашего пользователя для этой команды."
+    },
+    "command_perms": {
+      "deny_everyone": "Вы не можете использовать эту команду.",
+      "deny_guild_only": "Эту команду можно использовать только на сервере.",
+      "deny_manage_guild": "Вам понадобится **Manage Server** (или **Administrator**) для изменения разрешений на команды.",
+      "deny_member_resolve": "Не удалось разрешить ваши права участника.",
+      "deny_mod_combo": "Для использования этой команды вам понадобится **Manage Roles**, **Moderate Members**, **Manage Server** или **Administrator**.",
+      "deny_need_all": "Вам нужны все эти разрешения: **{permissions}**.",
+      "deny_no_permission": "У вас нет прав на эту команду.",
+      "docs_button": "Открыть документ о разрешениях",
+      "docs_description": "Полная справка: какие команды с косой чертой используют какие разрешения **member** и какие функции разрешений **bot** нужны. Используйте `/command_perms edit` (Управление сервером), чтобы ввести любое имя команды с косой чертой и установить требования.",
+      "docs_footer": "Изменения для каждой гильдии применяются после следующей синхронизации; по умолчанию поставляется с ботом.",
+      "docs_quick_links": "Быстрые ссылки",
+      "docs_title": "Права команд",
+      "edit_custom_required": "Для **Custom** введите `custom_permissions` (имена разрешений, разделенные запятыми).",
+      "edit_no_match": "Нет соответствующей команды косой черты. Используйте имя, которое показывает Discord (например, `help`, `call create`, `modules toggle`).",
+      "edit_removed": "Удалены пользовательские правила для **`/{command}`** (нет шлюза разрешений участника CoffeeCord).",
+      "edit_reset_default": "Сбросьте **`/{command}`** к настройкам бота по умолчанию.",
+      "edit_set": "**`/{command}`** теперь требует: {rule}",
+      "list_empty": "На этом сервере нет переопределений. Команды используют настройки бота по умолчанию.",
+      "list_title": "Переопределения прав команд"
+    },
+    "debug": {
+      "commands_printed": "Зарегистрированные команды выводятся на консоль."
+    },
+    "dm_cmd": {
+      "choose_member": "Выберите пользователя для DM",
+      "sent": "DM отправлен на {user}.",
+      "user_not_found": "Пользователь не найден."
+    },
+    "kofi": {
+      "add_success": "{user} отмечен как активный сторонник.",
+      "claim_none": "Для `{email}` несвязанных платежей не обнаружено.",
+      "claim_success": "Заявлены отвязанные платежи **{count}** для `{email}`.",
+      "field_last_payment": "Последний платеж",
+      "field_tier": "Уровень",
+      "field_total_usd": "Всего долларов США",
+      "invalid_email": "Укажите действительный адрес электронной почты.",
+      "link_queued": "Связан `{email}`. Вы **#{position}** в очереди на следующий платеж Ko-fi по этому электронному письму. Бонусы активируются при поступлении платежа.",
+      "link_success": "Связано. Заявлены существующие платежи Ko-Fi **{count}** для `{email}`.",
+      "not_supporter": "Вы ещё не отмечены как supporter.",
+      "remove_no_record": "Для этого пользователя не существует записи о поддержке.",
+      "remove_success": "Статус сторонника отключен для {user}.",
+      "status_title": "Статус сторонника Ko-fi"
+    },
+    "nickname": {
+      "no_permission": "У меня нет разрешения менять свой никнейм.",
+      "success": "Никнейм изменен на `{name}`.",
+      "success_formatted": "✅ Никнейм изменен на **{name}**"
+    },
+    "optout": {
+      "optin_success": "Вы снова подписаны на ЛС от staff.",
+      "optout_success": "Вы больше не будете получать ЛС от staff этого бота."
+    },
+    "poll": {
+      "choose_channel": "📊 Выберите канал для опроса:",
+      "clear_reactions_denied": "⚠️ У меня нет разрешения на уточнение реакций.",
+      "ended": "🛑 Опрос завершён! Спасибо за голос.",
+      "footer": "Опрос завершится через {minutes} минут.",
+      "select_placeholder": "Выберите канал, на который нужно отправить опрос...",
+      "sent": "✅ Опрос отправлен в {channel}",
+      "title": "📊 Опрос"
+    },
+    "purge": {
+      "complete": "Удалены сообщения **{count}**.",
+      "failed": "Не удалось очистить: {error}.",
+      "no_permission": "У меня нет разрешения на удаление сообщений в этом канале.",
+      "stopped": "Остановка очистки — завершение текущей партии, затем остановка…"
+    },
+    "say": {
+      "choose_channel": "Выберите канал для отправки сообщения:",
+      "message_sent": "✅ Сообщение отправлено!",
+      "sent": "Сообщение отправлено на {channel}."
+    },
+    "support": {
+      "description": "Нажмите кнопку ниже, чтобы поддержать нас через Ko-fi.\n\n✅ Привяжите свою учетную запись Discord к Ko-fi и купите нам кофе или членство, чтобы поддержать нас!\n\n**Perks:**\n- Роль `Supporter`!\n- Доступ к частному каналу!\n- Ранний доступ к новым функциям!\n- Воспроизводите GIF-файлы на своей карте прокачки!\n- Неограниченное количество переводов!\n\n- До 3 зашифрованных слотов бэкапа сервера на хосте (`/backup`)!\n\n**How to activate your perks:**\n1. Нажмите **Support us via Ko-fi** ниже и завершите пожертвование или членство.\n2. Вернитесь в Discord и запустите `/kofi link email:you@example.com` — используйте тот же адрес электронной почты, который вы использовали в Ko-fi.\n3. Ваши льготы активируются мгновенно. Запустите `/kofi status` для подтверждения.\n\nНужна помощь? Присоединяйтесь к серверу поддержки: {invite}",
+      "kofi_button": "Поддержите нас через Ko-fi",
+      "title": "Поддержите Кофекорд! 💙"
+    },
+    "ticket_io": {
+      "export_failed": "Не удалось экспортировать билет: {error}.",
+      "import_success": "Билет импортирован в {channel}.",
+      "invalid_signature": "Недействительная или просроченная подпись экспорта билета."
+    },
+    "timers": {
+      "cancelled": "⏹ Таймер #{id} отменен.",
+      "invalid_datetime": "Неверный формат даты или времени. Используйте MM/DD/YY HH:MM.",
+      "invalid_format": "Неверный формат. Используйте, например, 10 секунд, 5 минут, 2 часа или 1 день.",
+      "no_timers": "У вас нет активных таймеров.",
+      "own_only": "Вы можете завершить только свои собственные таймеры.",
+      "reminder_set": "⏰ Набор напоминаний для <t:{timestamp}:R>",
+      "started": "⏳ Таймер #{id} запущен для {value}{unit}.",
+      "timer_cancelled": "Таймер #{id} отменен.",
+      "timer_dm": "⏰ Таймер #{id} активирован!",
+      "timer_list": "Ваши активные таймеры: {list}",
+      "timer_not_found": "Таймер не найден или не ваш.",
+      "timer_started": "⏳ Таймер #{id} заканчивается в <t:{timestamp}:R>."
+    },
+    "uninstall": {
+      "cancelled": "Удаление отменено.",
+      "complete": "Удаление завершено.",
+      "confirm_body": "Это приведет к удалению каналов, ролей и данных Coffeecord с этого сервера. Введите **CONFIRM**, чтобы продолжить.",
+      "confirm_title": "☕ Подтвердите удаление",
+      "started": "Удаление началось…",
+      "wrong_confirm": "Текст подтверждения не совпал. Удаление отменено."
+    },
+    "verify": {
+      "already_verified": "✅Вы уже проверены!",
+      "button_label": "Подтвердите меня ✅",
+      "button_prompt": "Нажмите кнопку ниже, чтобы подтвердить свою личность:",
+      "button_success": "✅ Вы прошли верификацию!",
+      "code_input_label": "Проверочный код",
+      "code_input_placeholder": "Введите свой 4-значный код",
+      "code_modal_title": "Введите код подтверждения",
+      "code_success": "✅ Верификация успешна!",
+      "code_wrong": "❌ Неверный код. Попробуйте позже.",
+      "color_correct": "✅Правильно! Вы прошли проверку.",
+      "color_not_your_session": "❌Не ваша сессия.",
+      "color_wrong": "❌Неправильный цвет. Попробуйте еще раз!",
+      "color_wrong_session": "Это не ваша проверочная сессия.",
+      "guild_only": "⚙️ Верификация должна использоваться на сервере.",
+      "invalid_method": "❌ Неверный метод проверки.",
+      "log_button": "✅ {user} проверен через **Simple Button**.",
+      "log_code": "✅ {user} проверен через **Keypad Code**.",
+      "log_color": "✅ {user} проверен через **Color Buttons**.",
+      "not_setup": "⚙️ Верификация не настроена.",
+      "role_assign_failed": "Я не могу назначить роль (отсутствует разрешение или иерархия ролей).",
+      "wrong_user": "Это не для вас."
+    }
+  },
+  "color_roles": {
+    "add_failed": "Я не смог добавить эту цветовую роль.",
+    "add_success": "Теперь у вас есть {role}.",
+    "assign_protected_blocked": "Эта роль защищена и не может быть назначена с помощью цветовых ролей.",
+    "bot_member_unavailable": "Кэш участников бота недоступен.",
+    "cannot_manage_role_hierarchy": "Я не могу управлять этой ролью из-за иерархии ролей.",
+    "clear_failed": "Не удалось удалить цветовые роли.",
+    "clear_success": "Удалены цветовые роли {count} из {member}.",
+    "delete_success": "Удалена панель `{message_id}`.",
+    "disabled": "Цветовые роли отключены для этого сервера.",
+    "draft_channel_missing": "Черновой канал больше не существует.",
+    "draft_missing": "Черновик не сохранен. Сначала запустите `/colorrole setup` или `/colorrole generate`.",
+    "draft_missing_channel": "В черновике отсутствует канал. Запустите `/colorrole setup` еще раз.",
+    "draft_roles_missing": "Черновых ролей больше не существует.",
+    "field_configured_panels": "Настроенные панели",
+    "field_enabled": "Включено",
+    "field_notes": "Примечания",
+    "field_panels": "Панели",
+    "field_preset_roles": "Предустановленные роли",
+    "field_roles_processed": "Роли обработаны",
+    "list_empty": "Панели цветовых ролей не настроены.",
+    "list_title": "Цветовые ролевые панели",
+    "mapped_role_missing": "Этой роли больше не существует. Попросите сотрудников обновить эту панель.",
+    "max_roles": "Выберите не более ролей {max_roles}.",
+    "member_no_panel_roles": "{member} не ​​имеет ролей цвета панели.",
+    "message_id_numeric": "Идентификатор сообщения должен быть числовым.",
+    "missing_manage_roles": "Мне нужно разрешение `Manage Roles`.",
+    "no_roles_generated": "Не удалось создать или найти цветовые роли.",
+    "option_missing": "Этого варианта цвета больше не существует.",
+    "panel_created": "Панель цветовых ролей, созданная в {channel} (`{message_id}`) с цветами {count}. Участники могут одновременно хранить один цвет.{warn_text}",
+    "panel_max_colors": "Панель может иметь не более {max_colors} цветов.",
+    "panel_missing": "Эта цветовая панель больше не существует.",
+    "panel_not_found": "Панель не найдена.",
+    "panel_requires_mapping": "Панель должна сохранить хотя бы одну цветовую карту.",
+    "panel_updated": "Обновлена ​​панель `{message_id}`.",
+    "preset_ready_title": "Готовые предустановленные цветовые роли",
+    "protected_role_blocked": "{role} — это защищенная роль модератора, которую нельзя использовать в качестве роли цвета.",
+    "provide_role_for_remove": "Укажите `role` при использовании `remove_mapping`.",
+    "publish_success": "Опубликована цветная панель в {channel} (`{message_id}`).",
+    "remove_failed": "Я не смог удалить эту цветовую роль.",
+    "remove_success": "Удален {role}.",
+    "role_not_on_panel": "Этой роли нет в этой группе.",
+    "select_channel_first": "Сначала выберите канал.",
+    "select_one_color_role": "Выберите хотя бы одну цветовую роль.",
+    "setup_footer": "Используйте /colorrole setup to publish a panel.",
+    "setup_owner_only": "Эта установка принадлежит другому модератору.",
+    "sync_no_roles": "Цветовые роли не настроены. Запустите `/colorrole generate` или сначала опубликуйте панель.",
+    "sync_success": "Все настроенные цветовые роли были успешно синхронизированы.",
+    "sync_title": "Синхронизация цветовых ролей",
+    "target_hierarchy_blocked": "Иерархия ролей предотвращает это изменение.",
+    "update_existing_failed": "Мне не удалось обновить существующие цветовые роли."
+  },
+  "common": {
+    "bot_missing_permissions": "У меня нет необходимых прав.",
+    "cancelled": "Отменено.",
+    "channel_not_found": "Канал не найден.",
+    "confirm": "Подтвердить",
+    "created": "Созданный.",
+    "deleted": "Удален.",
+    "deny": "Отклонить",
+    "disabled": "Отключено",
+    "dm_failed": "Не удалось отправить личное сообщение этому пользователю.",
+    "enabled": "Включено",
+    "error_generic": "Что-то пошло не так. Попробуйте снова.",
+    "guild_only": "Эту команду можно использовать только на серверах.",
+    "invalid_duration": "Неверный формат продолжительности.",
+    "invalid_id": "Неверный идентификатор.",
+    "invalid_user": "Неверный пользователь.",
+    "loading": "Обработка…",
+    "member_not_found": "Участник не найден.",
+    "module_disabled": "Этот модуль отключён. Администратор может включить его через /modules.",
+    "no": "Нет",
+    "no_changes": "Никаких изменений не произошло.",
+    "no_permission": "У вас нет прав для использования этой команды.",
+    "no_reason_provided": "Причина не указана",
+    "none": "Никто",
+    "not_configured": "Не настроено.",
+    "nothing_to_do": "Нечего делать.",
+    "owner_only": "Эта команда только для владельца бота.",
+    "page_footer": "Страница {current}/{total}",
+    "pagination_next": "Далее",
+    "pagination_prev": "Назад",
+    "role_not_found": "Роль не найдена.",
+    "saved": "Сохранено.",
+    "staff_only": "Эта команда только для персонала.",
+    "success": "Готово.",
+    "supporter_only": "Для этой функции требуется активная подписка сторонника.",
+    "unknown": "Неизвестный",
+    "updated": "Настройки обновлены.",
+    "usage_hint": "Используйте /help search:{query} для поиска команд.",
+    "user_not_found": "Пользователь не найден.",
+    "yes": "Да"
+  },
+  "fun": {
+    "abracadaberamotherafu": {
+      "success": "🪄 **ABRACADABERA MOTHERAFU—**\n{user} только что отправил танк в другое измерение! 💥🚓🔥\n{url}"
+    },
+    "ak47": {
+      "success": "Гифка АК-47 отправлена. {url}"
+    },
+    "bet": {
+      "success": "{user} поставил {amount} на {result}!"
+    },
+    "cat": {
+      "success": "Фотография кота доставлена. {url}"
+    },
+    "cat_error": "❌ Не удалось получить изображение кота.",
+    "dare": {
+      "success": "{user} осмелился {member}: **{dare}**"
+    },
+    "dog": {
+      "success": "Вот собака{breed}. {url}"
+    },
+    "dog_error": "❌ Порода не найдена или ошибка при получении изображения собаки.",
+    "dog_unavailable": "❌ Сервисы изображений собак временно недоступны. Попробуйте позже.",
+    "eightball": {
+      "format": "🎱 **Вопрос:** {question}\n**Ответ:** {answer}",
+      "r01": "Бесспорно.",
+      "r02": "Без сомнений.",
+      "r03": "Можете положиться на это.",
+      "r04": "Да, определённо.",
+      "r05": "Однозначно да.",
+      "r06": "Как я вижу, да.",
+      "r07": "Скорее всего.",
+      "r08": "Хорошие перспективы.",
+      "r09": "Да.",
+      "r10": "Признаки указывают на да.",
+      "r11": "Ответ туманный, попробуйте снова.",
+      "r12": "Спросите позже.",
+      "r13": "Лучше не говорить сейчас.",
+      "r14": "Сейчас нельзя предсказать.",
+      "r15": "Сосредоточьтесь и спросите снова.",
+      "r16": "Не рассчитывайте на это.",
+      "r17": "Мой ответ — нет.",
+      "r18": "Мои источники говорят нет.",
+      "r19": "Перспективы не очень.",
+      "r20": "Очень сомнительно."
+    },
+    "flipcoin": {
+      "heads": "Орёл",
+      "success": "🪙 Монета упала на **{result}**!",
+      "success_with_prize": "🪙 Монета упала на **{result}**! {user} выигрывает {prize}!",
+      "tails": "Решка"
+    },
+    "giftnuke": {
+      "success": "Сюрприз! 🎁 {user} сделал подарок {member}! {url}"
+    },
+    "hug": {
+      "success": "🤗 {user} крепко обнимает {member}!"
+    },
+    "kiss": {
+      "success": "{user} поцеловал {member}!"
+    },
+    "lovecalc": {
+      "success": "Любовная совместимость между {user1} и {user2}: **{percentage}%** {hearts}"
+    },
+    "petpet": {
+      "success": "Petpet GIF создан для {member}."
+    },
+    "petpet_missing_dependency": "❌Петпет не установлен. Установить с помощью: pip install petpetgif",
+    "roast": {
+      "r01": "Ты такой же яркий, как черная дыра, и в два раза плотнее.",
+      "r02": "У тебя что-то на подбородке… нет, третье внизу.",
+      "r03": "Вы причина, по которой генофонду нужен спасатель.",
+      "r04": "Ты приносишь всем столько радости… когда выходишь из комнаты.",
+      "r05": "У тебя идеальное лицо для радио.",
+      "r06": "Ты как облако. Когда ты исчезаешь, это прекрасный день.",
+      "success": "Подкол: **{roast}**"
+    },
+    "truth": {
+      "success": "{user} задал {member} правдивый вопрос: **{question}**"
+    },
+    "uwuify": {
+      "success": "Uwuified текст: {text}"
+    },
+    "uwuify_missing_dependency": "❌ uwuify не установлен. Установить с помощью: pip install uwuify"
+  },
+  "getting_started": {
+    "cmd_description": "Подробное постраничное руководство по настройке Coffeecord",
+    "page1": {
+      "description": "Coffeecord модульный: включайте только нужные функции, настраивайте по серверу и используйте `/help` в любой момент, чтобы посмотреть все slash-команды.",
+      "field1": {
+        "name": "Перед началом настройки",
+        "value": "1. **Роль бота** — Перетащите роль Coffeecord **выше** ролей, которые бот должен выдавать (верификация, mute, цветовые роли, награды уровней).\n2. **Права** — Выдайте **Управление сервером** (или Администратор) сотрудникам, которые будут выполнять команды настройки.\n3. **Каналы** — Создайте `#mod-log`, `#welcome` и `#verify`, если их ещё нет."
+      },
+      "field2": {
+        "name": "Самый быстрый путь: мастер настройки",
+        "value": "Запустите **`/setup`** для пошагового черновика: welcome, leave, logging, automod, reaction roles и tickets. Ничего не применяется до подтверждения в конце.\nПродолжить позже можно через **`/setup_resume`**, отменить — через **`/setup_cancel`**."
+      },
+      "field3": {
+        "name": "Проверить, что включено",
+        "value": "**`/modules status`** — показывает все модули и их состояние на сервере.\n**`/modules toggle`** / **`enable`** / **`disable`** — включить или выключить функции.\n**`/modules info`** — описание конкретного модуля."
+      },
+      "footer": "Используйте ◀ ▶ для перехода по руководству • Страница {current} из {total}",
+      "title": "Начало работы ({current}/{total}) — Обзор"
+    },
+    "page2": {
+      "description": "Логирование даёт команде единый канал аудита. Настройте его сразу, чтобы с первого дня сохранялись входы, баны, правки и действия automod.",
+      "field1": {
+        "name": "Первичная настройка",
+        "value": "**`/logging setup`** — выберите канал логов и включите логирование.\n**`/logging status`** — проверьте канал, активные события и модули."
+      },
+      "field2": {
+        "name": "Тонкая настройка",
+        "value": "**`/logging toggle`** — включать/выключать отдельные события (удаление/редактирование сообщений, вход/выход участников, тайм-ауты, баны, изменения ролей, перемещения в голосе и т. д.).\n**`/logging module`** — включать или отключать логирование целых областей (сообщения, модерация, тикеты, уровни, …).\n**`/logging disable`** — полностью выключить логирование для сервера."
+      },
+      "field3": {
+        "name": "Советы",
+        "value": "• Используйте **закрытый staff-канал**; логи могут содержать текст сообщений и ID.\n• Сначала включите **`member_join`** и **`automod`** — это помогает против рейдов и спама.\n• Добавьте **`/automod set log`**, чтобы у automod тоже был журнал."
+      },
+      "footer": "Страница {current} из {total} • Далее: верификация и онбординг",
+      "title": "Начало работы ({current}/{total}) — Логирование"
+    },
+    "page3": {
+      "description": "Верификация ограничивает новых участников до прохождения проверки. Auto roles и welcome-сообщения управляют действиями после входа.",
+      "field1": {
+        "name": "Верификация",
+        "value": "**`/verifyconfig`** — выберите метод, роль verified, канал verify и канал логов.\nМетоды: **Simple Button**, **Keypad Code** или **Color Buttons**.\nБот публикует постоянную панель **Verify Me** в канале верификации."
+      },
+      "field2": {
+        "name": "Автоматические роли",
+        "value": "**`/autorole status`** — посмотреть правила.\n**`/autorole add`** — интерактивный конструктор правил (при входе, после первого сообщения и т. д.).\n**`/autorole toggle`** — включить/выключить autorole на сервере.\n**`/autorole test`** — предпросмотр правил, применимых к вам."
+      },
+      "field3": {
+        "name": "Welcome и leave сообщения",
+        "value": "**`/welcome config`** — канал, сообщение, embed, закреплённое welcome.\n**`/welcome test`** — предпросмотр welcome-сообщения.\n**`/leave config`** — прощальное сообщение и опциональный exit survey.\n**`/leave test`** — предпросмотр поведения при выходе."
+      },
+      "footer": "Страница {current} из {total} • Далее: модерация",
+      "title": "Начало работы ({current}/{total}) — Верификация и онбординг"
+    },
+    "page4": {
+      "description": "Комбинируйте права Discord, slash-команды Coffeecord и automod для многоуровневой защиты.",
+      "field1": {
+        "name": "Модерация через slash",
+        "value": "**`/ban`** / **`/unban`** — бан по участнику или ID пользователя.\n**`/mute`** / **`/unmute`** — тайм-аут с длительностью (минуты/часы).\n**`/hardmute`** — снятие прав на отправку через роли.\n**`/muterole create`** / **`update`** — настройка mute-роли.\n**`/giverole`** / **`/removerole`** — ручные изменения ролей.\n**`/purge`** / **`/specific_purge`** — массовое удаление сообщений."
+      },
+      "field2": {
+        "name": "Автомод",
+        "value": "**`/automod overview`** — правила и состояние.\n**`/automod on`** / **`off`** — основной переключатель.\n**`/automod preset`** — применить стартовый набор правил.\n**`/automod toggle rule`** — включить/выключить отдельные правила.\n**`/automod set log`** — канал журнала automod.\n**`/automod badword add`** — расширить фильтр слов."
+      },
+      "field3": {
+        "name": "Неактивные участники",
+        "value": "**`/inactive info`** — как работает функция.\n**`/inactive setup`** — через сколько дней без активности применять действие (kick/ban).\n**`/inactive bootstrap`** — пометить текущих участников как активных (один раз при первом включении).\n**`/inactive enable`** / **`disable`** — плановые проверки."
+      },
+      "footer": "Страница {current} из {total} • Далее: роли и самообслуживание",
+      "title": "Начало работы ({current}/{total}) — Модерация"
+    },
+    "page5": {
+      "description": "Позвольте участникам выбирать роли без участия модераторов. Color roles и reaction roles работают в эксклюзивном режиме.",
+      "field1": {
+        "name": "Роли реакции",
+        "value": "**`/reactionrole create`** — создать панель (кнопки или реакции).\n**`/reactionrole list`** / **`delete`** / **`edit`** / **`config`** — управление панелями.\nПодходит для игровых пингов, регионов и уведомлений."
+      },
+      "field2": {
+        "name": "Цветовые роли",
+        "value": "**`/colorrole info`** — прочитайте перед настройкой.\n**`/colorrole generate`** — создать предустановленные цветовые роли.\n**`/colorrole setup`** — пошаговый черновик панели (UI Discord).\n**`/colorrole publish`** — опубликовать панель из черновика.\n**`/colorrole sync`** — исправить цвета и порядок ролей после ручных правок."
+      },
+      "field3": {
+        "name": "Закреплённые уведомления",
+        "value": "**`/sticky_msg create`** — повторно публикует сообщение внизу канала при новых сообщениях.\n**`/sticky_msg list`** / **`remove`** — управление правилами sticky.\nПолезно для напоминаний о правилах и информации поддержки."
+      },
+      "footer": "Страница {current} из {total} • Далее: вовлечённость",
+      "title": "Начало работы ({current}/{total}) — Роли и самообслуживание"
+    },
+    "page6": {
+      "description": "Поддерживайте активность сообщества с XP, опросами и дополнительными бонусами для supporters.",
+      "field1": {
+        "name": "Уровни и XP",
+        "value": "**`/level`** — показать вашу (или чужую) карточку уровня.\n**`/xp config`** — ставки XP, cooldown, игнорируемые каналы (админ).\n**`/xpset`** — вручную установить XP/уровень пользователю.\n**`/levelreward add`** — выдача ролей за уровень.\n**`/levelcard customize`** / **`preset`** — внешний вид карточки."
+      },
+      "field2": {
+        "name": "Опросы и развлечения",
+        "value": "**`/poll`** — опрос с таймером и несколькими вариантами.\n**`/quests list`** / **`checkin`** — ежедневная активность квестов (если включено).\nКоманды развлечений (`/8ball`, `/flipcoin`, `/hug`, …) не требуют настройки — смотрите **`/help`**."
+      },
+      "field3": {
+        "name": "Подписчики Ko-fi",
+        "value": "**`/kofi link`** — привязать Ko-fi email к аккаунту Discord.\n**`/kofi status`** / **`claim`** — статус supporter.\nАдмины: **`/kofi add`** / **`remove`** для ручной выдачи supporter-статуса."
+      },
+      "footer": "Страница {current} из {total} • Далее: тикеты и утилиты",
+      "title": "Начало работы ({current}/{total}) — Вовлечённость"
+    },
+    "page7": {
+      "description": "Процессы поддержки и полезные инструменты для крупных серверов.",
+      "field1": {
+        "name": "Тикеты",
+        "value": "**`/ticket setup`** — канал панели, категория, роль поддержки (интерактивно).\n**`/ticket add`** / **`remove`** — пользователи в текущем тикете.\n**`/ticket_export`** / **`ticket_import`** — подписанный JSON backup/restore."
+      },
+      "field2": {
+        "name": "Заявки и звонки",
+        "value": "**`/application setup`** — вопросы для заявок в staff и роль ревьюера.\n**`/application`** — участник начинает заявку.\n**`/call create`** — временный voice-hub; **`join`**, **`add`**, **`end`** управляют им."
+      },
+      "field3": {
+        "name": "Перевод и slowmode",
+        "value": "**`/translate text`** — перевести фрагмент текста.\n**`/translate settings`** — live-перевод, язык, доставка в ЛС.\n**`/adaptive_slowmode`** — автонастройка slowmode по активности (до 3 правил)."
+      },
+      "footer": "Страница {current} из {total} • Далее: администрирование и полировка",
+      "title": "Начало работы ({current}/{total}) — Тикеты и утилиты"
+    },
+    "page8": {
+      "description": "Ограничьте доступ к командам, настройте внешний вид и знайте, где получить помощь.",
+      "field1": {
+        "name": "Права команд",
+        "value": "**`/command_perms docs`** — как работают overrides.\n**`/command_perms edit`** — пресеты прав slash-команд для сервера (everyone, manage server, кастомные наборы).\nСтандартные значения адекватны; ужесточите чувствительные команды (purge, ban, modules) при необходимости."
+      },
+      "field2": {
+        "name": "Темы и брендинг",
+        "value": "**`/theme list`** / **`set`** / **`preview`** — цвета и стиль embed-сообщений.\n**`/theme upload`** — пользовательская JSON-тема (есть лимит размера).\n**`/theme responses`** — пользовательские текстовые ключи ответов."
+      },
+      "field3": {
+        "name": "Нужна дополнительная помощь?",
+        "value": "**`/help`** — полный список команд с поиском.\n**`/about`** — версия, uptime, ссылки.\n**`/getting_started`** — откройте это руководство снова в любой момент.\nПрисоединяйтесь к **серверу поддержки** через кнопки welcome-сообщения или **`/about`**."
+      },
+      "footer": "Страница {current} из {total} • Вы готовы настраивать Coffeecord ☕",
+      "title": "Начало работы ({current}/{total}) — Администрирование и полировка"
+    }
+  },
+  "guild_join": {
+    "buttons": {
+      "getting_started": "Начало работы",
+      "invite_me": "Пригласить меня",
+      "support_server": "Сервер поддержки"
+    },
+    "description": "Используйте кнопки ниже для поддержки и пошагового руководства.",
+    "title": "Спасибо, что добавили Coffeecord!"
+  },
+  "help": {
+    "categories": {
+      "automod": "Автомод",
+      "calls": "Звонки",
+      "fun": "Развлечения",
+      "general": "Общее",
+      "kofi": "Ko-fi",
+      "leveling": "Уровни",
+      "logging": "Логирование",
+      "misc": "Разное",
+      "moderation": "Модерация",
+      "reaction_roles": "Роли по реакциям",
+      "setup_wizard": "Мастер настройки",
+      "themes": "Темы",
+      "tickets": "Тикеты",
+      "timers": "Таймеры / Напоминания",
+      "translation": "Перевод",
+      "welcome_leave": "Приветствие и выход"
+    },
+    "cmd_description": "Просмотр команд бота или поиск",
+    "detail_missing": "Эта команда больше не доступна.",
+    "detail_no_description": "Нет описания.",
+    "detail_optional": "необязательный",
+    "detail_parameters": "Параметры",
+    "detail_required": "обязательный",
+    "detail_usage": "Использование",
+    "footer_browse": "{count} команд(а) • /help search:<что вы хотите сделать>",
+    "no_commands": "Slash-команды ещё не зарегистрированы.",
+    "param_search": "Что вы хотите сделать, или `all` для полного списка (напр. бан, логи, all)",
+    "search_footer": "Используйте меню ниже для подробностей о команде.",
+    "search_intro": "Команды, подходящие под ваш запрос:",
+    "search_none": "Команды не найдены для `{query}`. Попробуйте другие слова или `all` для полного списка.",
+    "search_select_placeholder": "Подробнее о команде…",
+    "title_page": "Помощь — {label} ({current}/{total})",
+    "title_prefix": "📖 Справка — {label}"
+  },
+  "help_search": {
+    "detail_missing": "Эта команда больше недоступна.",
+    "detail_no_description": "Нет описания.",
+    "detail_optional": "необязательный",
+    "detail_param_empty": "—",
+    "detail_parameters": "Параметры",
+    "detail_required": "обязательный",
+    "detail_select_option_fallback": "Показать детали команды",
+    "detail_select_placeholder": "Подробнее о команде…",
+    "detail_usage": "Использование",
+    "results_footer": "Используйте меню ниже, чтобы посмотреть детали команды.",
+    "results_intro": "Команды, соответствующие вашему запросу:",
+    "results_more": "\n\n…и ещё {count}. Уточните запрос.",
+    "results_none": "Команды не найдены.",
+    "results_title": "Поиск: {query}",
+    "all_title": "Все команды ({current}/{total})",
+    "all_intro": "Все зарегистрированные slash-команды ({count}):",
+    "all_footer": "Часть {current}/{total} • /help search:<тема> для деталей"
+  },
+  "inactive_members": {
+    "bootstrap_done": "Участники **{count}** отмечены как активные сегодня.\nДалее: `/inactive setup`, затем `/inactive enable`.",
+    "check_member": "**{member_name}**\nПоследний активный: {last_active}\nПростой: **{idle_days}** дней (лимит: {limit})\nПредварительное предупреждение: **{warn_status}** ({warn_schedule})\nЗащищено: **{protected}**",
+    "disable_success": "Неактивные проверки — **off**. Отслеживание по-прежнему будет работать, если оно будет включено позже.",
+    "enable_requires_bootstrap": "Сначала запустите `/inactive bootstrap` — он помечает текущих участников как активных.",
+    "enable_success": "Неактивные проверки — **on**. Участники, простаивающие в течение **{days}** дней, могут быть подвергнуты {action}.",
+    "exempt_added": "{role} не ​​будет удален за неактивность.",
+    "exempt_already": "{role} уже освобожден от налога.",
+    "exempt_removed": "{role} удален из списка освобожденных.",
+    "field_action": "Действие",
+    "field_advance_warning": "Предварительное предупреждение",
+    "field_bootstrapped": "Загрузочный",
+    "field_exempt_roles": "Освобожденные роли",
+    "field_inactive_after": "Неактивен после",
+    "field_last_scan": "Последнее сканирование",
+    "field_log_channel": "Журнал канала",
+    "field_module_on": "Модуль включен (/modules)",
+    "field_next_step": "Следующий шаг",
+    "field_scanning_enabled": "Сканирование включено",
+    "info_footer": "Расширенные параметры (правила ударов, регулярное выражение, голосовая активность) могут быть добавлены позже.",
+    "info_title": "Неактивные участники — Краткое руководство",
+    "manage_server_required": "Вам понадобится **Manage Server**, чтобы изменить настройки неактивного участника.",
+    "module_disabled": "Неактивные участники отключены. Администратор может включить его с помощью `/modules`.",
+    "next_step_bootstrap": "Запустите `/inactive bootstrap`, затем `/inactive setup`.",
+    "next_step_enable": "Запустите `/inactive enable`, когда будете готовы.",
+    "scan_done": "Проверил участников **{count}**.",
+    "setup_done": "Сделанный. Участниками, у которых не было сообщений в течение дней **{days}**, будет **{action}**.\n{warn_schedule}\nМеняйте предупреждения в любое время с помощью `/inactive warn`. Запустите `/inactive bootstrap`, если еще не сделали, то `/inactive enable`.",
+    "status_title": "Статус неактивных участников",
+    "warn_off": "DM с предварительным предупреждением: **off**. Участники не будут предупреждены перед удалением.",
+    "warn_set": "Предварительное предупреждение установлено. {warn_schedule}\nЗатронутые участники получают DM, когда пересекают порог простоя."
+  },
+  "language": {
+    "choice_en": "English",
+    "choice_es": "Español",
+    "choice_pt": "Português",
+    "choice_ru": "Русский",
+    "cmd_set_description": "Установить язык ответов Coffeecord.",
+    "cmd_status_description": "Показать ваш текущий язык Coffeecord.",
+    "group_description": "Выберите язык ответов Coffeecord.",
+    "param_language": "Язык ответов и embed-сообщений.",
+    "set_success": "Ваш язык: **{language}**.",
+    "status_body": "Coffeecord отвечает вам на **{language}**.",
+    "status_title": "Ваш язык"
+  },
+  "leveling": {
+    "default_reward_message": "🎉 {user} достиг уровня {level} и получил {role}!",
+    "level_card_label_level": "Уровень",
+    "level_card_label_rank": "Ранг",
+    "level_card_label_xp": "XP",
+    "level_up_announcement": "🎉 {user} повысился до **Уровня {level}**!",
+    "levelcard": {
+      "applied_preset": "✅ Пресет `{preset}` применён к вашей карточке уровня.",
+      "download_failed": "❌ Не удалось загрузить фон.",
+      "invalid_color": "❌ Неверный цвет для `{key}`. Используйте hex вроде `#50FF78`.",
+      "invalid_image_url": "❌ Неверный URL изображения.",
+      "load_error": "❌ Ошибка загрузки фона: {error}",
+      "no_changes": "ℹ️ Нет изменений. Укажите хотя бы один цвет или URL.",
+      "render_failed": "❌ Не удалось отрисовать карточку уровня: {error}",
+      "supporter_gif_only": "🚫 Только supporters могут использовать GIF-фоны.",
+      "unknown_preset": "❌ Выбран неизвестный пресет.",
+      "updated_response": "✅ Карточка уровня обновлена: {preview}"
+    },
+    "levelreward": {
+      "added": "✅ Добавлена награда для уровня **{level}** -> {role}",
+      "list_line": "**Уровень {level}** -> {role}",
+      "list_title": "🎁 Награды за уровень",
+      "missing_role": "❓ Роль не найдена",
+      "mode_replace_off": "⚙️ Теперь старые роли-награды сохраняются.",
+      "mode_replace_on": "✅ Теперь старые роли-награды удаляются.",
+      "none_configured": "ℹ️ Награды ещё не настроены.",
+      "not_found": "❌ Награда для этого уровня не найдена.",
+      "removed": "🗑️ Награда для уровня **{level}** удалена."
+    },
+    "xp": {
+      "base_xp": "**Базовый XP (Уровень 1):** {value}",
+      "config_title": "✅ Настройки XP обновлены!",
+      "message_xp": "**XP за сообщение:** {value}",
+      "poll_vote_xp": "**XP за голос в опросе:** {value}",
+      "preview_header": "📊 **Предпросмотр XP:**",
+      "preview_line": "Уровень {level}: всего {total_xp} XP",
+      "reaction_xp": "**XP за реакцию:** {value}",
+      "scale": "**Масштаб XP:** {value}",
+      "vc_minute_xp": "**XP за минуту в голосе:** {value}"
+    },
+    "xpset": {
+      "success": "✅ XP пользователя {user} установлен на {xp}, а уровень на {level}."
+    }
+  },
+  "logging": {
+    "embed": {
+      "account_created": "Аккаунт создан",
+      "action": "Действие",
+      "action_by": "Действие",
+      "after": "После",
+      "author": "Автор",
+      "automod": "Автомод",
+      "before": "До",
+      "changes": "Изменения",
+      "channel": "Канал",
+      "command": "Команда",
+      "content": "Содержимое",
+      "details": "Подробности",
+      "enabled": "Включено",
+      "events": "События",
+      "from": "От",
+      "log_channel": "Канал логов",
+      "member": "Участник",
+      "message": "Сообщение",
+      "module": "Модуль",
+      "modules": "Модули",
+      "no_reason": "Причина не указана",
+      "no_text": "Нет текста",
+      "no_text_short": "Нет текста",
+      "prefix": "Префикс",
+      "reason": "Причина",
+      "role": "Роль",
+      "roles": "Роли",
+      "rule": "Правило",
+      "slash": "Слэш",
+      "source": "Источник",
+      "target": "Цель",
+      "to": "К",
+      "type": "Тип",
+      "unknown_channel": "Неизвестный",
+      "until": "До",
+      "user": "Пользователь"
+    },
+    "events": {
+      "automod": "Действие automod",
+      "automod_action": "Автомод Экшен",
+      "ban": "Участник забанен",
+      "channel_create": "Канал создан",
+      "channel_delete": "Канал удален",
+      "channel_update": "Канал обновлен",
+      "command_use": "Команда использована",
+      "member_join": "Участник присоединился",
+      "member_leave": "Участник вышел",
+      "message_delete": "Сообщение удалено",
+      "message_edit": "Сообщение изменено",
+      "module_action": "Действие модуля",
+      "module_event": "Событие модуля",
+      "nickname_change": "Псевдоним изменен",
+      "role_assign": "Роль(и) добавлена",
+      "role_create": "Роль создана",
+      "role_delete": "Роль удалена",
+      "role_remove": "Роль(и) удалена",
+      "role_update": "Роль обновлена",
+      "ticket_event": "Событие тикета",
+      "timeout": "Тайм-аут участника",
+      "timeout_added": "Тайм-аут выдан",
+      "timeout_removed": "Тайм-аут снят",
+      "unban": "Участник разбанен",
+      "voice_join": "Голосовое присоединение",
+      "voice_leave": "Голосовой отпуск",
+      "voice_move": "Голосовое движение",
+      "warn": "Участник предупреждён"
+    },
+    "status": {
+      "title": "Статус логирования"
+    }
+  },
+  "moderation": {
+    "ban": {
+      "bot_hierarchy": "Я не могу забанить кого-то с такой же или более высокой ролью, чем я.",
+      "cmd_description": "Забанить или временно забанить участника.",
+      "dm_description": "Вас забанили на сервере {guild_name}.",
+      "dm_title": "Вас забанили",
+      "duration_minutes": "{minutes} мин.",
+      "duration_permanent": "Постоянно",
+      "failed": "Не удалось забанить {member}.",
+      "hierarchy": "Вы не можете забанить кого-то с равной или более высокой ролью.",
+      "rollback": "Бан применен, но я не смог подтвердить действие. Бан был отменен.",
+      "self_ban": "Вы не можете забанить себя.",
+      "success": "🔨 {member} забанен на {duration}.\nПричина: {reason}",
+      "success_permanent": "🔨 {member} забанен навсегда.\nПричина: {reason}"
+    },
+    "dm": {
+      "field_duration": "Длительность",
+      "field_reason": "Причина",
+      "field_server": "Сервер",
+      "notice_title": "Уведомление модерации: {action}"
+    },
+    "hardmute": {
+      "cannot_add_mute_role": "Я не могу выдать роль mute (нет прав или мешает иерархия ролей). Роли были восстановлены.",
+      "cannot_hardmute": "Я не могу применить hardmute к {member}.",
+      "cmd_description": "Заглушить и снять все роли",
+      "missing_permissions": "Недостаточно прав для управления ролями (или мешает иерархия ролей).",
+      "success": "🔇 {member} жёстко заглушён. Ролей снято: {count}"
+    },
+    "kick": {
+      "dm_description": "Вас исключили с сервера {guild_name}.",
+      "dm_title": "Вас кикнули"
+    },
+    "mute": {
+      "already_muted": "У этого участника уже отключен звук.",
+      "cannot_add_mute_role": "Я не могу выдать роль mute для {member} (нет прав или мешает иерархия ролей).",
+      "cannot_mute": "Я не могу заглушить {member}.",
+      "cmd_description": "Заглушить участника на время.",
+      "duration_hours": "{duration} ч.",
+      "duration_minutes": "{duration} мин.",
+      "invalid_unit": "Неверная единица времени. Используйте 'm' для минут или 'h' для часов.",
+      "role_missing": "Роль mute не существует. Обновите настройку снова.",
+      "role_not_set": "Роль mute не настроена. Используйте `/muterole_create` или `/muterole_update`.",
+      "rollback": "Mute применен, но я не смог подтвердить это в канале. Mute был отменен.",
+      "success": "🔇 {member} заглушён на {duration}.\nПричина: {reason}"
+    },
+    "timeout": {
+      "dm_description": "Вам выдали тайм-аут на сервере {guild_name}.",
+      "dm_title": "Вам выдали тайм-аут"
+    },
+    "unban": {
+      "bot_hierarchy": "У меня нет прав, чтобы разбанить этого пользователя.",
+      "cmd_description": "Разбанить пользователя по ID (только админ)",
+      "not_banned": "Этот пользователь не забанен.",
+      "success": "✅ Разбанен `{user_id}`."
+    },
+    "unmute": {
+      "cannot_remove_mute_role": "Я не могу снять роль mute с {member} (нет прав или мешает иерархия ролей).",
+      "cannot_unmute": "Я не могу снять заглушение с {member}.",
+      "cmd_description": "Снять заглушение вручную",
+      "not_muted": "Этот участник не отключен.",
+      "reason_expired": "Срок mute истек",
+      "reason_manual": "Ручное снятие mute модератором",
+      "role_not_set": "Роль mute не настроена.",
+      "success": "🔊 С {member} снята заглушка."
+    },
+    "warn": {
+      "dm_description": "Вы получили предупреждение на сервере {guild_name}.",
+      "dm_title": "Вам выдали предупреждение",
+      "success": "⚠️ Предупрежден {member}.\nПричина: {reason}"
+    }
+  },
+  "modules_cmd": {
+    "cannot_disable_self": "Команду модулей нельзя отключить.",
+    "group_description": "Просмотр и переключение модулей сервера.",
+    "info_field_category": "Категория",
+    "info_field_default": "По умолчанию",
+    "info_field_description": "Описание",
+    "info_field_enabled_here": "Включён здесь",
+    "info_field_id": "ИДЕНТИФИКАТОР",
+    "info_field_path": "Путь",
+    "info_title": "Модуль: {module}",
+    "no_description": "Нет описания.",
+    "status_description": "Состояние модулей на сервере.",
+    "status_footer": "Страница {current}/{total} • Используйте /modules toggle <модуль> для изменения",
+    "status_title": "Статус модулей",
+    "toggle_success_off": "Модуль **{module}** отключён на сервере.",
+    "toggle_success_on": "Модуль **{module}** включён на сервере.",
+    "unknown_module": "Неизвестный модуль `{module_id}`."
+  },
+  "quests": {
+    "admin": {
+      "all_members": "все участники",
+      "created_title": "Квест создан",
+      "deleted": "Квест **{quest_name}** (`{quest_id}`) удалён.",
+      "enable_module_first": "Сначала включите модуль квестов (`/modules`).",
+      "expired": "истёк",
+      "goal_label": "цель {goal}",
+      "goal_line": "Цель: **{goal}** • {summary}",
+      "list_title": "Админка квестов",
+      "no_quests_configured": "Квесты не настроены.",
+      "quest_not_found": "Квест `{quest_id}` не найден.",
+      "reaction_requires_fields": "Квесты на реакции требуют **message_id** и **emoji**.",
+      "reset_progress": "Прогресс сброшен для **{quest_name}** ({target}).",
+      "reward_line": "Награда: **{reward_xp}** XP",
+      "toggled": "Квест **{quest_name}** теперь **{state}**."
+    },
+    "board": {
+      "footer_daily_reset": "Квесты Coffeecord • Ежедневные квесты сбрасываются в полночь UTC",
+      "no_quests": "Квестов пока нет.\n\nАдмины могут запустить `/quests admin create`, чтобы добавить квест.",
+      "none_active": "Все квесты истекли, отключены или имеют неизвестный тип.",
+      "title": "Доска квестов"
+    },
+    "checkin": {
+      "already_description": "Вы уже забрали ежедневную награду сегодня (UTC). Попробуйте снова после полуночи UTC.",
+      "already_title": "Уже отмечено",
+      "claimed_description": "**{quest_title}** получен.\n+**{xp_shown}** XP{xp_note}",
+      "default_daily_name": "Ежедневный",
+      "leveling_off_note": "Leveling отключён — XP не выдаётся; награды ролями всё ещё применяются.",
+      "no_daily_quest": "Ежедневный check-in квест не настроен. Админы могут создать его через `/quests admin create` и выбрать **Daily check-in** как тип подсчёта.",
+      "no_quests_configured": "Для этого сервера квесты не настроены.",
+      "title": "Ежедневный check-in"
+    },
+    "footer": "Квесты Coffeecord",
+    "messages": {
+      "module_disabled": "Квесты здесь отключены. Админ может включить их через `/modules`.",
+      "module_disabled_short": "Квесты здесь отключены.",
+      "use_in_server": "Используйте это на сервере."
+    },
+    "quest_fallback_name": "Квест",
+    "rewards": {
+      "complete_title": "Квест выполнен",
+      "no_xp_part": "_В этот раз без награды XP._",
+      "role_part": "**Роль:** {role}",
+      "xp_part": "+**{reward_xp}** опыта"
+    },
+    "rules": {
+      "any_role": "любая роль: {roles}",
+      "channels": "{count} канал(ов)",
+      "count_emojis": "эмодзи",
+      "count_messages": "сообщения",
+      "count_reactions": "реакции",
+      "daily_checkin": "Ежедневный check-in (UTC)",
+      "role_ids": "id ролей: {count}",
+      "roles": "роли: {roles}",
+      "separator": " • ",
+      "window_hours": "окно {hours}ч",
+      "window_minutes": "окно {minutes}м",
+      "window_seconds": "окно {seconds}с"
+    },
+    "status": {
+      "claimed_today": "✅ Получено сегодня (UTC)",
+      "come_back_tomorrow": "Возвращайтесь завтра.",
+      "complete": "✅ Выполнен",
+      "reward_claimed": "Награда получена.",
+      "use_checkin": "используйте `/quests checkin`"
+    }
+  },
+  "reactionrole": {
+    "add_role_failed": "Мне не удалось добавить эту роль из-за ошибки Discord API.",
+    "add_role_success": "Добавлен {role}.",
+    "bot_member_unavailable": "Кэш участников бота недоступен.",
+    "cannot_manage_role_hierarchy": "Я не могу управлять этой ролью из-за иерархии ролей.",
+    "config_updated": "Обновлена ​​конфигурация: Enabled={enabled}, default_mode={mode}, default_logging={logging}.",
+    "delete_success": "Удалена панель `{message_id}`.",
+    "disabled": "Роли реакции отключены для этого сервера.",
+    "field_configured_panels": "Настроенные панели",
+    "field_enabled": "Включено",
+    "field_panels": "Панели",
+    "list_empty": "Панели с ролями реагирования не настроены.",
+    "list_title": "Ролевые панели реагирования",
+    "mapped_role_missing": "Этой роли больше не существует. Попросите сотрудников обновить эту панель.",
+    "max_roles_per_panel": "Выберите не более {max_roles} ролей на панели.",
+    "max_roles_reached": "С этой панели вы можете иметь только роли {max_roles}.",
+    "message_id_numeric": "Идентификатор сообщения должен быть числовым.",
+    "missing_manage_roles": "Мне нужно разрешение `Manage Roles`.",
+    "missing_required_roles": "Вам нужны необходимые роли: {roles}.",
+    "panel_created": "✅ Ролевая панель реакции, созданная в {channel} (`{message_id}`) — {summary}. Участники могут выбирать несколько ролей на этой панели, если вы не установите **remove_others** или **max_roles** в `/reactionrole edit`.",
+    "panel_missing": "Эта панель реагирования больше не существует.",
+    "panel_not_found": "Панель не найдена.",
+    "panel_requires_one_mapping": "Панель должна сохранить хотя бы одно сопоставление ролей.",
+    "panel_updated": "Обновлена ​​панель `{message_id}`.",
+    "provide_role_for_remove": "Укажите `role` при использовании `remove_mapping`.",
+    "reaction_add_partial_failure": "Панель создана, но не удалось добавить некоторые реакции: {failed}. Используйте `/reactionrole edit`, чтобы исправить смайлы.",
+    "reaction_mode_max_guided": "Режим реакции поддерживает до {max_roles} ролей при пошаговой настройке. Используйте здесь меньше ролей или добавьте больше с помощью `/reactionrole edit`.",
+    "remove_role_failed": "Мне не удалось удалить эту роль из-за ошибки Discord API.",
+    "remove_role_success": "Удален {role}.",
+    "role_not_mapped": "Эта роль не отображена на этой панели.",
+    "role_option_missing": "Эта опция роли больше не существует.",
+    "select_channel_first": "Сначала выберите канал.",
+    "select_one_role": "Выберите хотя бы одну роль.",
+    "set_label_or_emoji_first": "Сначала установите метку кнопки или смайлик реакции (шаг 4).",
+    "setup_owner_only": "Эта установка принадлежит другому модератору.",
+    "target_role_hierarchy_block": "Иерархия ролей предотвращает это изменение.",
+    "update_existing_roles_failed": "Мне не удалось обновить существующие роли в панели."
+  },
+  "setup_wizard": {
+    "buttons": {
+      "back": "Назад",
+      "bot_checks": "Проверки на стороне бота",
+      "cancel": "Отмена",
+      "confirm": "Подтвердить",
+      "discord_automod": "Дискорд АвтоМод",
+      "edit_blocked_words": "Изменить блок-слова",
+      "edit_leave_message": "Изменить leave-сообщение",
+      "edit_panel_message": "Изменить текст панели",
+      "edit_ticket_text": "Изменить текст тикета",
+      "edit_welcome_message": "Изменить welcome-сообщение",
+      "enable_tickets": "Включить тикеты",
+      "next": "Далее",
+      "one_ticket_per_user": "Один тикет на пользователя",
+      "preview_logging": "Тест лога (предпросмотр)",
+      "set_emojis": "Задать эмодзи",
+      "skip": "Пропустить",
+      "start": "Старт",
+      "toggle_embed": "Переключить embed",
+      "toggle_enabled": "Вкл/Выкл",
+      "toggle_exit_survey": "Переключить exit survey"
+    },
+    "defaults": {
+      "ticket_button": "Открыть тикет"
+    },
+    "features": {
+      "automod": "Автомод",
+      "leave": "Сообщения при выходе",
+      "logging": "Логирование",
+      "reaction_roles": "Роли реакции",
+      "tickets": "Тикеты",
+      "welcome": "Приветственные сообщения"
+    },
+    "logging_events": {
+      "automod_actions": "Действия automod",
+      "member_join_leave": "Вход/выход участников",
+      "member_leave": "Выход участника",
+      "message_delete_edit": "Удаление/редактирование сообщений",
+      "message_edited": "Сообщение отредактировано",
+      "warns": "Предупреждения"
+    },
+    "match_type": {
+      "contains": "Содержит",
+      "ends_with": "Заканчивается на",
+      "starts_with": "Начинается с"
+    },
+    "messages": {
+      "applied_description": "Все выбранные модули успешно сохранены.",
+      "applied_title": "Настройка применена",
+      "apply_failed_description": "Изменения не применены. Причина: {reason}",
+      "apply_failed_title": "Ошибка применения",
+      "belongs_to_other_admin": "Этот мастер настройки принадлежит другому администратору.",
+      "cancelled_description": "Черновик удалён. Изменения не применялись.",
+      "cancelled_title": "Настройка отменена",
+      "cannot_apply_title": "Нельзя применить настройку",
+      "draft_discarded": "Черновик удалён.",
+      "fix_before_confirm": "Исправьте права/конфигурацию перед подтверждением.",
+      "no_active_draft": "Активный черновик не найден. Сначала используйте `/setup`.",
+      "no_active_draft_short": "Активный черновик не найден.",
+      "preview_log_notice": "Только предпросмотр: тестовая запись лога будет отправлена после подтверждения.",
+      "run_in_server": "Выполните это на сервере.",
+      "select_one_feature": "Выберите хотя бы одну функцию перед запуском."
+    },
+    "modal": {
+      "blocked_words": {
+        "label": "Слова через запятую",
+        "placeholder": "слово1, слово2, фраза3",
+        "title": "Блокируемые слова"
+      },
+      "message_template": {
+        "label": "Шаблон сообщения",
+        "placeholder": "Используйте плейсхолдеры, например {user_mention}, {server_name}"
+      },
+      "reaction_emojis": {
+        "label": "Эмодзи через запятую (1-3)",
+        "placeholder": "✅, 🎮, 📣",
+        "title": "Эмодзи для reaction role"
+      },
+      "reaction_message": {
+        "title": "Сообщение reaction role"
+      },
+      "ticket_text": {
+        "button_label": "Текст кнопки",
+        "message_label": "Сообщение тикета",
+        "title": "Текст панели тикетов"
+      }
+    },
+    "placeholders": {
+      "blocked_word_match_type": "Тип совпадения блок-слов",
+      "exempt_channel": "Исключённый канал (быстрая настройка)",
+      "exempt_roles": "Исключённые роли",
+      "exit_survey_type": "Тип exit survey",
+      "leave_channel": "Канал выхода",
+      "logging_channel": "Канал логов",
+      "logging_events": "Выберите события логирования",
+      "reaction_role_mode": "Режим reaction role",
+      "reaction_role_panel_channel": "Канал панели reaction role",
+      "select_reaction_roles": "Выберите 1-3 роли",
+      "support_roles": "Роли поддержки",
+      "ticket_category_or_channel": "Выберите категорию тикетов (или канал)",
+      "ticket_panel_channel": "Канал панели тикетов",
+      "welcome_channel": "Канал приветствия"
+    },
+    "rr_mode": {
+      "radio": "Радио (убирает другие роли)",
+      "toggle": "Переключать"
+    },
+    "screen": {
+      "confirm": {
+        "description": "Проверьте черновик. Пока ничего не применено.",
+        "title": "Подтверждение настройки"
+      },
+      "not_configured": "Не настроено.",
+      "notice_field": "Примечание",
+      "select": {
+        "description": "Выберите, что хотите настроить. Любой шаг можно пропустить.",
+        "none_selected": "Пока ничего не выбрано.",
+        "selected_field": "Выбрано",
+        "title": "Быстрая настройка Coffeecord"
+      },
+      "step": {
+        "current_draft_field": "Текущий черновик",
+        "description": "Это черновой шаг. Изменения применятся только после подтверждения.",
+        "footer": "Шаг {current}/{total}",
+        "title": "Быстрая настройка • {feature}"
+      }
+    },
+    "select": {
+      "features": {
+        "placeholder": "Выберите модули для настройки"
+      }
+    },
+    "survey_mode": {
+      "free_text": "Свободный текст",
+      "preset": "Готовые варианты"
+    },
+    "validation": {
+      "automod_manage_guild": "{label}: боту нужно право Управлять сервером для Discord AutoMod.",
+      "bot_member_unavailable": "Объект участника бота недоступен на этом сервере.",
+      "channel_invalid": "{label}: выбран неверный канал.",
+      "channel_not_selected": "{label}: канал не выбран.",
+      "needs_embed_links": "{label}: боту нужны права embed в {channel}.",
+      "needs_view_send": "{label}: боту нужны права просмотра/отправки в {channel}.",
+      "reaction_roles_need_role": "{label}: выберите хотя бы одну роль.",
+      "tickets_manage_channels": "{label}: боту нужно право Управлять каналами для создания тикетов.",
+      "tickets_manage_roles": "{label}: боту нужно право Управлять ролями для прав тикета.",
+      "tickets_need_support_role": "{label}: выберите хотя бы одну роль поддержки."
+    }
+  },
+  "slash": {
+    "about": {
+      "description": "Узнайте о Кофекорде"
+    },
+    "automod": {
+      "badword_add": {
+        "description": "Добавить заблокированное слово в bad_words"
+      },
+      "badword_group": {
+        "description": "Управление заблокированными словами"
+      },
+      "badword_list": {
+        "description": "Список заблокированных слов"
+      },
+      "badword_remove": {
+        "description": "Удалить заблокированное слово из bad_words"
+      },
+      "channel_group": {
+        "description": "Управление переопределениями каналов"
+      },
+      "channel_overrideclear": {
+        "description": "Удалить переопределение правила для конкретного канала"
+      },
+      "channel_overrideset": {
+        "description": "Установите значение правила для конкретного канала"
+      },
+      "description": "Команды управления автомодом",
+      "escalation_group": {
+        "description": "Настройки эскалации предупреждений"
+      },
+      "escalation_warn": {
+        "description": "Установите действия по эскалации предупреждений для предупреждений с 1 по 5."
+      },
+      "exempt_group": {
+        "description": "Освободить роли от принудительного применения автомодов"
+      },
+      "exempt_list": {
+        "description": "Список ролей, освобожденных от автомода"
+      },
+      "exempt_role": {
+        "description": "Добавить/remove role exemption from automod"
+      },
+      "group": {
+        "description": "Команды управления автомодом"
+      },
+      "off": {
+        "description": "Отключить автомод для этой гильдии"
+      },
+      "on": {
+        "description": "Включить автомод для этой гильдии"
+      },
+      "overview": {
+        "description": "Просмотр статуса автомода и включенных правил"
+      },
+      "preset": {
+        "description": "Примените пресет автомода напрямую или с помощью кнопок."
+      },
+      "reload": {
+        "description": "Перезагрузить конфигурацию автомода с диска"
+      },
+      "set_action": {
+        "description": "Установите действие для правила автомода"
+      },
+      "set_deletemessage": {
+        "description": "Установить поведение delete_message для правила"
+      },
+      "set_group": {
+        "description": "Установите значения автомода"
+      },
+      "set_log": {
+        "description": "Установить канал журнала автомодов (или очистить)"
+      },
+      "set_value": {
+        "description": "Установите числовые значения конфигурации для правила"
+      },
+      "set_violationwarns": {
+        "description": "Считайте нарушения правил автомодирования предупреждениями (и инициируйте эскалацию предупреждений)."
+      },
+      "status": {
+        "description": "Показать статус автомода"
+      },
+      "toggle_group": {
+        "description": "Переключить настройки автомода"
+      },
+      "toggle_rule": {
+        "description": "Включить/disable a specific automod rule"
+      },
+      "warn_add": {
+        "description": "Добавить предупреждение вручную (использует хранилище предупреждений automod)"
+      },
+      "warn_clear": {
+        "description": "Очистить все предупреждения для пользователя"
+      },
+      "warn_group": {
+        "description": "Управление предупреждениями автомода"
+      },
+      "warn_list": {
+        "description": "Показывать предупреждения automod для участника"
+      },
+      "warn_remove": {
+        "description": "Удалить одно предупреждение по индексу (или последнее)"
+      },
+      "whitelist_channel": {
+        "description": "Добавить/remove a channel from automod whitelist"
+      },
+      "whitelist_group": {
+        "description": "Управление белым списком автомодов"
+      },
+      "whitelist_role": {
+        "description": "Добавить/remove a role from automod whitelist"
+      }
+    },
+    "autorole": {
+      "add": {
+        "description": "Создайте правило автоматической роли с помощью простой интерактивной настройки."
+      },
+      "remove": {
+        "description": "Удаление правила автоматической роли по идентификатору."
+      },
+      "status": {
+        "description": "Показать текущую конфигурацию автоматической роли."
+      },
+      "test": {
+        "description": "Смоделируйте, какие правила автоматической роли применимы к вам."
+      },
+      "toggle": {
+        "description": "Включите или отключите автоматические роли для этого сервера."
+      }
+    },
+    "ban": {
+      "description": "Забанить или временно забанить участника."
+    },
+    "colorrole": {
+      "clear": {
+        "description": "Удалите цветовые роли участника со всех панелей."
+      },
+      "delete": {
+        "description": "Удаление панели цветных ролей по идентификатору сообщения."
+      },
+      "edit": {
+        "description": "Отредактируйте панель роли цвета."
+      },
+      "generate": {
+        "description": "Создайте или повторно используйте 10 предустановленных цветовых ролей и синхронизируйте иерархию."
+      },
+      "info": {
+        "description": "Как настроить цветовые роли на этом сервере."
+      },
+      "list": {
+        "description": "Перечислите панели ролей цвета на этом сервере."
+      },
+      "publish": {
+        "description": "Опубликуйте панель из сохраненного черновика."
+      },
+      "setup": {
+        "description": "Пошаговая настройка панели цветовых ролей."
+      },
+      "sync": {
+        "description": "Исправьте цвета ролей цвета и позиции иерархии."
+      }
+    },
+    "fun": {
+      "8ball": {
+        "description": "Задайте вопрос волшебному шару-восьмерке."
+      },
+      "abracadaberamotherafu": {
+        "description": "💥 Накладывает на танк мощное заклинание БОЛЬШОГО ТАНКОВОГО орудия из танка Toefingers!"
+      },
+      "ak47": {
+        "description": "Отправьте случайную гифку АК-47"
+      },
+      "bet": {
+        "description": "Сделайте ставку с другим пользователем."
+      },
+      "cat": {
+        "description": "Получить фотографию случайного кота"
+      },
+      "dare": {
+        "description": "Дайте кому-нибудь вызов."
+      },
+      "dog": {
+        "description": "Получите фотографию собаки (необязательно по породе)"
+      },
+      "flipcoin": {
+        "description": "Подбросьте монетку, по желанию с призом."
+      },
+      "giftnuke": {
+        "description": "Отправьте подарок... сюрприз! 🎁"
+      },
+      "hug": {
+        "description": "Обнимите кого-нибудь."
+      },
+      "kiss": {
+        "description": "Поцелуй кого-нибудь."
+      },
+      "lovecalc": {
+        "description": "Рассчитайте любовную совместимость между двумя пользователями."
+      },
+      "petpet": {
+        "description": "Создать GIF-изображение домашнего животного на основе аватара пользователя."
+      },
+      "roast": {
+        "description": "Отправить случайное жаркое"
+      },
+      "truth": {
+        "description": "Задайте кому-нибудь правдивый вопрос."
+      },
+      "uwuify": {
+        "description": "Преобразование текста в стиль uwu"
+      }
+    },
+    "getting_started": {
+      "description": "Подробное руководство по настройке Coffeecord с разбивкой по страницам"
+    },
+    "hardmute": {
+      "description": "Отключить звук и удалить все роли пользователя"
+    },
+    "help": {
+      "description": "Просмотр команд бота или поиск конкретной"
+    },
+    "history": {
+      "user": {
+        "description": "Показать историю предупреждений и заметок для участника."
+      }
+    },
+    "inactive": {
+      "bootstrap": {
+        "description": "Одноразовая настройка: отметьте всех текущих участников как активных сегодня."
+      },
+      "check": {
+        "description": "Посмотрите, когда участник в последний раз считался активным."
+      },
+      "description": "Удалите участников, которые давно не писали сообщений.",
+      "disable": {
+        "description": "Отключите автоматическую проверку неактивных участников."
+      },
+      "enable": {
+        "description": "Включите автоматическую проверку неактивных участников."
+      },
+      "exempt_add": {
+        "description": "Освободить роль от неактивного удаления."
+      },
+      "exempt_remove": {
+        "description": "Удаление роли из списка исключений."
+      },
+      "info": {
+        "description": "Как настроить удаление неактивных участников."
+      },
+      "scan": {
+        "description": "Запустите неактивную проверку сейчас (административный тест)."
+      },
+      "setup": {
+        "description": "Установите количество дней без сообщений, прежде чем вы будете исключены или забанены."
+      },
+      "status": {
+        "description": "Посмотрите, настроено ли и запущено ли неактивное удаление."
+      },
+      "warn": {
+        "description": "Укажите, за сколько дней до удаления, предварительно предупредив в Директ."
+      }
+    },
+    "language": {
+      "description": "Выберите язык ответов Coffeecord",
+      "set": {
+        "description": "Установить язык ответов Coffeecord."
+      },
+      "status": {
+        "description": "Показать ваш текущий язык Coffeecord."
+      }
+    },
+    "leave": {
+      "config": {
+        "description": "Настройте параметры оставления сообщения."
+      },
+      "description": "Настройте сообщения о выходе и опросы о выходе.",
+      "test": {
+        "description": "Отправьте тестовое сообщение об отпуске."
+      }
+    },
+    "level": {
+      "description": "Покажите карту уровня вашего или другого пользователя."
+    },
+    "levelcard": {
+      "description": "Команды настройки карты уровня"
+    },
+    "levelreward": {
+      "description": "Ролевые команды вознаграждения за уровень"
+    },
+    "lock": {
+      "description": "Заблокируйте канал для @everyone (отправка сообщений отключена)."
+    },
+    "logging": {
+      "description": "Команды настройки журналирования сервера.",
+      "disable": {
+        "description": "Отключите ведение журнала для этого сервера."
+      },
+      "module": {
+        "description": "Включите или отключите модуль журналирования."
+      },
+      "setup": {
+        "description": "Установите канал регистрации и включите ведение журнала."
+      },
+      "status": {
+        "description": "Показать статус регистрации для этого сервера."
+      },
+      "toggle": {
+        "description": "Включите или отключите определенное событие регистрации."
+      }
+    },
+    "modules": {
+      "description": "Просмотр и переключение серверных модулей."
+    },
+    "mute": {
+      "description": "Отключить звук участника на указанное время."
+    },
+    "note": {
+      "add": {
+        "description": "Добавьте примечание для пользователя."
+      },
+      "view": {
+        "description": "Просмотр заметок персонала для пользователя."
+      }
+    },
+    "poll": {
+      "description": "Создать опрос"
+    },
+    "purge": {
+      "description": "Расширенная очистка с фильтрами и подтверждением."
+    },
+    "quests": {
+      "checkin": {
+        "description": "Получите задание на ежедневную регистрацию (день UTC)"
+      },
+      "description": "Серверные квесты, прогресс и ежедневная регистрация",
+      "list": {
+        "description": "Просмотр активных квестов и вашего прогресса"
+      }
+    },
+    "reactionrole": {
+      "config": {
+        "description": "Установите настройки по умолчанию для панелей ролей реагирования на этом сервере."
+      },
+      "create": {
+        "description": "Создайте панель ролей реагирования с пошаговой настройкой (выберите несколько ролей одновременно)."
+      },
+      "delete": {
+        "description": "Удалить панель роли реакции по идентификатору сообщения."
+      },
+      "edit": {
+        "description": "Редактируйте сопоставления и дополнительные параметры панели."
+      },
+      "list": {
+        "description": "Перечислите панели ролей реагирования на этом сервере."
+      }
+    },
+    "setup": {
+      "description": "Запустите мастер быстрой настройки Coffeecord."
+    },
+    "setup_cancel": {
+      "description": "Отмените черновик быстрой настройки."
+    },
+    "setup_resume": {
+      "description": "Возобновите черновик быстрой настройки."
+    },
+    "staff_utils": {
+      "giverole": {
+        "description": "Дайте роли всем /humans/bots with progress feedback."
+      },
+      "lock": {
+        "description": "Заблокируйте канал для @everyone (отправка сообщений отключена)."
+      },
+      "lockdown": {
+        "description": "Примените ограничения на экстренную блокировку к этому серверу."
+      },
+      "nuke": {
+        "description": "Удалить и заново создать канал (с подтверждением)."
+      },
+      "purge": {
+        "description": "Расширенная очистка с фильтрами и подтверждением."
+      },
+      "removerole": {
+        "description": "Удалить роль у всех/humans/bots with progress feedback."
+      },
+      "slowmode": {
+        "description": "Установите медленный режим канала в секундах."
+      },
+      "unlock": {
+        "description": "Разблокируйте канал для @everyone."
+      },
+      "unlockdown": {
+        "description": "Восстановите разрешения канала, сохраненные /lockdown."
+      },
+      "userinfo": {
+        "description": "Показать подробную информацию об истории пользователя и модерации."
+      }
+    },
+    "sticky_msg": {
+      "create": {
+        "description": "Создайте или замените именованный стикер в канале."
+      },
+      "list": {
+        "description": "Перечислите фиксированные правила для этого сервера."
+      },
+      "remove": {
+        "description": "Удалите именованное закрепленное правило (и попробуйте удалить его последнее сообщение)."
+      }
+    },
+    "theme": {
+      "delete": {
+        "description": "Удаление пользовательской темы (только для сторонников)"
+      },
+      "description": "Настраивайте темы модерации DM и ответы на команды.",
+      "group": {
+        "description": "Темы сообщений модерации"
+      },
+      "info": {
+        "description": "Показать текущую тему и настройки"
+      },
+      "list": {
+        "description": "Список доступных тем (модерация DM + ответы на команды)"
+      },
+      "preview": {
+        "description": "Предварительный просмотр сообщений модерации темы"
+      },
+      "responses_clear": {
+        "description": "Очистить все переопределения ответов на команды (только для сторонников)"
+      },
+      "responses_discover": {
+        "description": "Перечислите все слэш-команды, которые вы можете переопределить."
+      },
+      "responses_group": {
+        "description": "Настройте сообщения ответа на команду"
+      },
+      "responses_keys": {
+        "description": "Перечислить общие ключи ответа и переопределить формат"
+      },
+      "responses_list": {
+        "description": "Список настроенных переопределений ответов на команды"
+      },
+      "responses_presets": {
+        "description": "Список предустановленных тем ответов (используйте /theme set to apply)"
+      },
+      "responses_upload": {
+        "description": "Ответ на команду загрузки переопределяет JSON (только для сторонников)"
+      },
+      "set": {
+        "description": "Установить тему сервера (модерация DM + ответы на команды)"
+      },
+      "upload": {
+        "description": "Загрузите собственную тему (только для сторонников)"
+      }
+    },
+    "ticket": {
+      "add": {
+        "description": "Добавить пользователя в этот билет"
+      },
+      "description": "Панель заявок и команды управления.",
+      "group": {
+        "description": "Команды тикетной системы"
+      },
+      "remove": {
+        "description": "Удалить пользователя из этого билета"
+      },
+      "setup": {
+        "description": "Настройте тикет-систему"
+      }
+    },
+    "translate": {
+      "description": "Переведите текст и управляйте настройками перевода.",
+      "reset": {
+        "description": "Сбросить использование перевода пользователем (только администратор)."
+      },
+      "settings": {
+        "description": "Настройте параметры живого перевода."
+      },
+      "text": {
+        "description": "Переведите текст на другой язык."
+      },
+      "usage": {
+        "description": "Посмотрите ограничения на использование перевода."
+      }
+    },
+    "unban": {
+      "description": "Разблокировать пользователя на сервере по идентификатору (только администратор)"
+    },
+    "uninstall": {
+      "description": "Удалите Coffeecord с этого сервера."
+    },
+    "unlock": {
+      "description": "Разблокируйте канал для @everyone."
+    },
+    "unmute": {
+      "description": "Включите звук участника вручную"
+    },
+    "verifyconfig": {
+      "description": "Настройте систему проверки Coffeecord"
+    },
+    "welcome": {
+      "config": {
+        "description": "Настройте параметры приветственного сообщения."
+      },
+      "description": "Настройте приветственные сообщения для новых участников.",
+      "test": {
+        "description": "Отправьте тестовое приветственное сообщение."
+      }
+    },
+    "xp": {
+      "description": "Команды настройки XP и прокачки"
+    },
+    "xpset": {
+      "description": "Установите опыт и уровень пользователя (только администратор)"
+    },
+    "backup": {
+      "description": "Зашифрованные резервные копии структуры сервера и конфигурации Coffeecord.",
+      "create": {
+        "description": "Создать зашифрованную резервную копию сервера."
+      },
+      "list": {
+        "description": "Список зашифрованных резервных копий на хосте для этого сервера."
+      },
+      "download": {
+        "description": "Снова скачать зашифрованную копию, хранящуюся на хосте."
+      },
+      "delete": {
+        "description": "Удалить слот зашифрованной резервной копии на хосте."
+      },
+      "restore": {
+        "description": "Восстановить сервер из зашифрованной резервной копии."
+      }
+    }
+  },
+  "staff_utils": {
+    "applying_lockdown_body": "Применение переопределений разрешений...",
+    "applying_lockdown_title": "Применение блокировки",
+    "cancelled_body": "Никакого действия не было применено.",
+    "cancelled_title": "Отменено",
+    "channel_locked_body": "{channel} теперь заблокирован.",
+    "channel_locked_title": "Канал заблокирован",
+    "channel_nuked_body": "Воссозданный канал: {channel}",
+    "channel_nuked_title": "Канал Нукед",
+    "channel_unlocked_body": "{channel} теперь разблокирован.",
+    "channel_unlocked_title": "Канал разблокирован",
+    "confirm_lockdown_title": "Подтвердить блокировку",
+    "confirm_nuke_body": "Это приведет к удалению и воссозданию {channel}.\nЭто разрушительно.",
+    "confirm_nuke_title": "Подтвердить ядерное оружие",
+    "invalid_channel_body": "Выберите текстовый канал.",
+    "invalid_channel_title": "Неверный канал",
+    "invalid_note_body": "Текст заметки не может быть пустым.",
+    "invalid_note_title": "Неверное примечание",
+    "invoker_only": "Это может использовать только тот, кто вызывает команду.",
+    "lock_failed_body": "Не удалось заблокировать канал: `{error}`.",
+    "lock_failed_title": "Блокировка не удалась",
+    "lockdown_active_body": "Запустите `/unlockdown` перед повторным применением.",
+    "lockdown_active_summary_title": "Блокировка активна",
+    "lockdown_active_title": "Блокировка уже активна",
+    "lockdown_removed_body": "Восстановлена ​​роль **{count}**/channel permission overwrite(ы) из сохраненного снимка.",
+    "lockdown_removed_title": "Блокировка снята",
+    "module_disabled_body": "На этом сервере отключены служебные утилиты. Включите с помощью `/modules`.",
+    "module_disabled_title": "Модуль отключен",
+    "no_lockdown_body": "Активной блокировки для восстановления нет.",
+    "no_lockdown_title": "Блокировка не активна",
+    "note_added_body": "Сохранена заметка для {user}.",
+    "note_added_title": "Примечание добавлено",
+    "nuke_failed_body": "Не удалось уничтожить канал: `{error}`.",
+    "nuke_failed_title": "Ядерное оружие не удалось",
+    "purge_complete_body": "Очистите {status}. Удален **{deleted}** из сообщений, совпадающих с **{total}**.",
+    "purge_complete_title": "Очистка завершена",
+    "purge_confirm_prompt": "Нажмите **Confirm**, чтобы удалить совпадающие сообщения.",
+    "purge_no_matches": "Нет соответствующих сообщений.",
+    "purge_preview_title": "Предварительный просмотр очистки",
+    "purge_progress": "Обработано **{processed}/{total}** · Удален **{deleted}**",
+    "purge_running_body": "Удаление совпавших сообщений...",
+    "purge_running_title": "Очистка выполняется",
+    "purge_stop_owner_only": "Только инициатор команды может остановить эту очистку.",
+    "role_hierarchy_error_body": "Роль бота должна быть выше целевой роли.",
+    "role_hierarchy_error_title": "Ошибка иерархии ролей",
+    "server_only_body": "Используйте эту команду на сервере.",
+    "server_only_title": "Только сервер",
+    "slowmode_failed_body": "Не удалось обновить медленный режим: `{error}`.",
+    "slowmode_failed_title": "Медленный режим не выполнен",
+    "slowmode_updated_body": "Для {channel} медленный режим установлен на **{seconds}s**.",
+    "slowmode_updated_title": "Медленный режим обновлен",
+    "stopping_purge_body": "Запрошена аварийная остановка. Завершение текущего действия по удалению.",
+    "stopping_purge_title": "Остановка очистки",
+    "unavailable_member_body": "Не удалось разрешить этого участника на этом сервере.",
+    "unavailable_title": "Недоступно",
+    "unlock_failed_body": "Не удалось разблокировать канал: `{error}`.",
+    "unlock_failed_title": "Разблокировать не удалось",
+    "unsupported_channel_body": "Используйте это в текстовом канале.",
+    "unsupported_channel_title": "Неподдерживаемый канал"
+  },
+  "sticky_msg": {
+    "bot_member_unavailable": "Участник-бот недоступен.",
+    "create_success": "✅ Набор липких `{rule_id}` для {channel}. После появления новых сообщений он переместится вниз.",
+    "embed_title": "📌 Липкий",
+    "invalid_rule_id": "Неверный `rule_id`. Используйте символы длиной от 1 до 100: буквы, цифры, только `_`, `-`.",
+    "list_empty": "Жесткие правила не настроены.",
+    "list_title": "Жёсткие правила",
+    "max_rules_reached": "Максимальное количество липких правил **{limit}** на сервер для вашей учетной записи. Сначала удалите один.{hint}",
+    "missing_channel_perms": "Мне нужны **Send Messages**, **View Channel** и **Manage Messages** на этом канале.",
+    "missing_embed_perms": "Мне нужен **Embed Links** на этом канале для вставки стикеров.",
+    "remove_not_found": "Нет жесткого правила с именем `{rule_id}`.",
+    "remove_success": "✅ Убран липкий `{rule_id}`."
+  },
+  "themes": {
+    "command_count": "{count} команда(ы)",
+    "custom_theme_deleted": "Пользовательская тема **{theme}** удалена. Тема сервера сброшена по умолчанию.",
+    "custom_theme_uploaded": "Пользовательская тема **{theme}** загружена. Для подачи заявки используйте /theme set {theme}.",
+    "delete_not_custom_theme": "`{theme}` не ​​является собственной темой. Вы можете удалять только собственные темы (загруженные /theme upload).",
+    "field_command_responses": "Ответы на команды",
+    "field_description": "Описание",
+    "field_moderation_dms": "Модерация личных сообщений",
+    "field_type": "Тип",
+    "info_title": "Информация о теме",
+    "invalid_theme_filename": "Неверное название темы. В имени файла (без .json) должны использоваться только буквы, цифры, дефисы и символы подчеркивания.",
+    "invalid_theme_name": "Неверное название темы. Используйте только буквы, цифры, дефисы и подчеркивания.",
+    "invalid_theme_name_short": "Неверное название темы.",
+    "list_empty": "Темы не найдены. Будет использована тема по умолчанию.",
+    "list_footer": "Используйте /theme set <имя> для подачи заявки (модерация DM + ответы на команды)",
+    "list_title": "Доступные темы",
+    "max_custom_themes_reached": "Максимальное количество пользовательских тем {max_count} на сервер. Удалите один с помощью /theme delete first.",
+    "no_description": "Нет описания.",
+    "none_default_messages": "Нет (сообщения по умолчанию)",
+    "responses_cleared": "Отмена ответа на команду удалена.",
+    "responses_discover_empty": "Слэш-команды не найдены.",
+    "responses_discover_more": "...и {count} еще. Запустите `/theme responses keys` для получения общих ключей.",
+    "responses_discover_title": "Слэш-команды (переопределяемые)",
+    "responses_file_must_be_json": "Файл должен быть файлом .json.",
+    "responses_file_too_large": "Размер файла превышает лимит в 100 КБ ({bytes} байт).",
+    "responses_keys_title": "Клавиши ответа на команду",
+    "responses_list_empty": "Никакой ответ на команду не переопределяет. Используйте /theme responses upload to add custom responses.",
+    "responses_list_footer": "Сторонники могут загружать JSON через /theme responses upload.",
+    "responses_list_title": "Переопределения ответа на команду",
+    "responses_presets_empty": "Предустановленных тем ответов не найдено.",
+    "responses_presets_title": "Предустановленные темы ответов",
+    "responses_upload_success": "✅ Загружены переопределения ответа на команду {count}. Доступные ключи см. в документации.",
+    "set_applied_parts": "Применено: {parts}.",
+    "set_success": "Установлена ​​тема **{theme}**.",
+    "supporter_required_clear_overrides": "Для отмены переопределений требуется статус сторонника Ko-fi.",
+    "supporter_required_custom_themes": "Пользовательские темы требуют статуса сторонника Ko-fi. Используйте /kofi link to get perks.",
+    "supporter_required_response_overrides": "Для отмены ответа на команду требуется статус сторонника Ко-фи. Используйте /kofi link to get perks.",
+    "theme_file_must_be_json": "Файл темы должен быть в формате .json.",
+    "theme_file_too_large": "Размер файла темы превышает лимит в 50 КБ ({bytes} байт).",
+    "theme_not_found": "Тема `{theme}` не ​​найдена.",
+    "theme_not_found_list_hint": "Тема `{theme}` не ​​найдена. Используйте /theme list to see available themes.",
+    "type_custom": "Обычай",
+    "type_preset": "Предустановка"
+  },
+  "tickets": {
+    "add_user_success": "✅ Добавлен {user}",
+    "claim_label": "Требовать",
+    "claimed_by": "🎟️ Заявлен {user}",
+    "close_label": "Закрывать",
+    "closing_soon": "🗑️ Закрытие/Deleting in 5 seconds...",
+    "create_button_label": "Создать {ticket_type}",
+    "create_failed": "❌ Не удалось создать заявку: {error}.",
+    "create_missing_permissions": "❌У меня нет разрешения на создание каналов.",
+    "create_success": "✅ Тикет создан: {channel}",
+    "default_panel_message": "Нажмите ниже, чтобы создать билет.",
+    "lock_label": "Замок",
+    "locked": "🔒 Билет заблокирован",
+    "not_setup": "❌ Для этого сервера не настроена тикетная система.",
+    "panel_title": "🎫 Билеты в службу поддержки",
+    "remove_user_success": "🚫 Удален {user}",
+    "select_option_description": "Создать билет {ticket_type}",
+    "select_placeholder": "Выберите тип билета",
+    "setup_no_valid_roles": "❌ Действительные роли поддержки не найдены. Используйте упоминания ролей, например `@Role`, или необработанные идентификаторы ролей.",
+    "setup_roles_not_found": "❌ На этом сервере не найдена ни одна из предоставленных ролей.",
+    "setup_success": "✅Настроена тикетная система!",
+    "ticket_channel_title": "{ticket_type} Билет",
+    "unlock_label": "Разблокировать",
+    "unlocked": "🔓 Билет разблокирован"
+  },
+  "translate": {
+    "embed": {
+      "auto_detected": "Автоопределение ({language})",
+      "detected_footer": "Определено {source_language} → {target_language}",
+      "live_translation_title": "Живой перевод",
+      "result": "Результат",
+      "translate_from": "Перевести с",
+      "translate_to": "Перевести на",
+      "translation_title": "Перевод"
+    },
+    "messages": {
+      "backend_unavailable": "Сервис перевода недоступен. Настройте Google credentials и перезапустите.",
+      "code_block_skipped": "Блоки кода пропускаются из соображений безопасности. Уберите тройные обратные кавычки для перевода.",
+      "failed": "Перевод не удался. Попробуйте позже.",
+      "free_limit_hit": "Вы достигли бесплатного лимита переводов ({free_limit}/день). Попробуйте снова {reset_ts} или станьте supporter для безлимитного перевода.",
+      "limit_notice_dm": "Вы достигли бесплатного лимита переводов ({free_limit}/день). Переводы возобновятся <t:{reset_at}:R>.",
+      "provide_text": "Укажите текст или запустите команду из контекста сообщения, где Discord может получить содержимое ответа.",
+      "reset_usage": "Использование перевода сброшено для {user}.",
+      "too_long": "Сообщение слишком длинное. Максимальная длина: {max_length} символов."
+    },
+    "settings": {
+      "live_translation": "Живой перевод",
+      "my_language": "Мой язык",
+      "off": "Выкл",
+      "on": "Вкл",
+      "private": "Приватно",
+      "public": "Публично",
+      "response_privacy": "Приватность ответа",
+      "send_to_dm": "Отправлять в ЛС",
+      "title": "Настройки перевода"
+    },
+    "usage": {
+      "free_plan": "Бесплатный план: сегодня использовано `{count}/{free_limit}` переводов. Сброс <t:{reset_at}:R>.",
+      "supporter_unlimited": "Supporter: безлимитные переводы."
+    }
+  },
+  "welcome_leave": {
+    "exit_survey_custom_prompt": "Пожалуйста, укажите свою причину в одном сообщении.",
+    "exit_survey_field_server_left": "Сервер слева",
+    "exit_survey_field_user": "Пользователь",
+    "exit_survey_footer": "Опрос на выходе Coffeecord",
+    "exit_survey_prompt": "Почему ты ушел из **{guild_name}**?\nОтветьте коротким ответом или выберите один из следующих:\n1) Слишком много пингов\n2) Недостаточно активен\n3) Не мое сообщество\n4) Проблемы с модерацией\n5) Другое\n6) Пользовательская причина (напишите свою)\n\nОтветьте номером или собственным текстом. Срок действия этого запроса истекает через 5 минут.",
+    "exit_survey_response_title": "Выход из ответа на опрос",
+    "leave_config_updated": "✅ Оставьте конфигурацию обновленной.\nКанал: {channel}\nВключено: `{enabled}`\nВставить: `{embed}`\nВыходной опрос: `{exit_survey}`\nКанал журнала опроса: {log_channel}",
+    "leave_test_failed": "⚠️ Не удалось отправить тестовое сообщение о выходе (`{reason}`). Проверьте разрешения канала и бота.",
+    "leave_test_success": "✅Отправил тестовое сообщение о выходе.",
+    "leave_title": "До свидания!",
+    "member_resolve_failed": "Не удалось разрешить члена.",
+    "welcome_config_updated": "✅ Обновлена ​​приветственная конфигурация.\nКанал: {channel}\nВключено: `{enabled}`\nВставить: `{embed}`\nДоставка: `{delivery}`\nПрикреплено: `{sticky}`",
+    "welcome_test_failed": "⚠️ Не удалось отправить приветственный тест: {results}.",
+    "welcome_test_success": "✅ Отправлен приветственный тест ({results}).",
+    "welcome_title": "Добро пожаловать!"
+  },
+  "backup": {
+    "owner_only": "Только вызвавший команду может это использовать.",
+    "invalid_slot_id": "Неверное имя слота. Используйте 1–32 символа: буквы, цифры, `_`, `-`.",
+    "bot_missing_perms": "Мне нужны права **Управлять каналами** и **Управлять ролями** для полезных бэкапов.",
+    "slot_limit_supporter_hint": "\nПоддержавшие в Ko-fi получают до {max} слотов на хосте (`/kofi link`).",
+    "slot_limit_reached": "Слоты бэкапа на хосте заполнены ({used}/{limit}). Удалите один или укажите `overwrite:True`.{hint}",
+    "slot_exists": "Слот `{slot}` уже есть. Повторите с `overwrite:True`, чтобы заменить.",
+    "slot_limit_overwrite_existing": "Слоты заполнены. Перезапишите существующее имя или сначала удалите слот.",
+    "create_failed": "Не удалось создать резервную копию.",
+    "slot_limit_race": "Слоты заполнились во время создания. Файл ниже всё равно создан.",
+    "create_phrase": "✅ Бэкап `{slot}` готов.\n\n**Сохраните фразу расшифровки сейчас — она показывается один раз и не хранится:**\n`{phrase}`\n\nИспользуйте её с `/backup restore` вместе с файлом `.ccbak`.",
+    "create_file": "Зашифрованный файл бэкапа для `{guild}` (слот `{slot}`). Храните вместе с фразой.",
+    "list_empty": "Пока нет бэкапов на хосте. Создайте через `/backup create`. Лимит: {limit}.",
+    "list_header": "**Бэкапы на хосте** ({used}/{limit}):\n{lines}",
+    "slot_not_found": "Нет бэкапа на хосте с именем `{slot}`.",
+    "download_ready": "Зашифрованный бэкап `{slot}` (для восстановления всё ещё нужна фраза из 18 символов).",
+    "delete_success": "Бэкап на хосте `{slot}` удалён.",
+    "phrase_bad_length": "Фраза расшифровки должна быть ровно {n} символов.",
+    "restore_need_source": "Укажите загруженный файл `.ccbak` и/или имя слота `slot`.",
+    "invalid_target_guild": "Неверный id целевого сервера.",
+    "target_guild_missing": "Я не нахожусь на этом сервере (или не вижу его).",
+    "target_guild_no_perms": "Вам нужно право **Управлять сервером** на целевом сервере.",
+    "bot_missing_restore_perms": "Мне нужны **Управлять сервером**, **Управлять каналами** и **Управлять ролями** на целевом сервере.",
+    "restore_working": "Расшифровка бэкапа…",
+    "bad_extension": "Загрузите файл бэкапа `.ccbak`.",
+    "restore_read_failed": "Не удалось прочитать источник бэкапа.",
+    "decrypt_failed": "Не удалось расшифровать. Проверьте фразу и файл.",
+    "payload_invalid": "Некорректное содержимое бэкапа.",
+    "restore_storage": "Восстановление Storage Coffeecord…",
+    "restore_failed": "Восстановление прервалось. Проверьте иерархию ролей и права бота.",
+    "restore_done_title": "Восстановление завершено",
+    "restore_done_body": "Восстановлено в **{guild}** ({mode}).",
+    "field_created": "Создано",
+    "field_members": "Участники",
+    "field_rejoin": "Заметки о возврате",
+    "field_skipped": "Пропущено / предупреждения",
+    "field_storage_notes": "Заметки Storage",
+    "restore_confirm_repair": "**Ремонт** восстановление в **{guild}** (`{gid}`)?\nОтсутствующие роли/каналы создаются; совпадающие обновляются. Массового удаления нет. Сохранённые сообщения повторно публикуются в сопоставленные текстовые каналы.",
+    "restore_confirm_overwrite": "⚠️ **ПЕРЕЗАПИСЬ** восстановления в **{guild}** (`{gid}`)?\nЭто **удалит** каналы/роли/эмодзи, которыми бот может управлять, затем пересоберёт из бэкапа. Поднимите мою роль выше (рекомендуется Администратор). Сохранённые сообщения публикуются после пересборки. Это нельзя отменить.",
+    "mode_repair": "Ремонт",
+    "mode_overwrite": "Перезапись",
+    "create_progress_title": "Создание резервной копии…",
+    "create_progress_done_title": "Резервная копия готова",
+    "restore_progress_title": "Восстановление резервной копии…",
+    "step_build": "Снимок Discord + Storage Coffeecord",
+    "step_build_detail": "Чтение ролей, каналов, участников и Storage…",
+    "step_build_detail_msgs": "Чтение структуры и до {n} сообщений на канал…",
+    "step_encrypt": "Сжать и зашифровать архив",
+    "step_encrypt_detail": "Сжатие LZMA + шифрование…",
+    "step_save_slot": "Сохранить слот на хосте",
+    "step_save_detail": "Запись слота на хосте…",
+    "step_decrypt": "Расшифровать резервную копию",
+    "step_decrypt_detail": "Чтение и расшифровка `.ccbak`…",
+    "step_wipe": "Удалить текущую структуру",
+    "step_wipe_detail": "Удаление каналов, категорий, ролей…",
+    "step_structure": "Восстановить роли и каналы",
+    "step_structure_detail": "Создание ролей и каналов…",
+    "step_replay_messages": "Воспроизвести сообщения каналов",
+    "step_replay_detail": "Воспроизведение сохранённых сообщений…",
+    "step_replay_done": "Воспроизведено сообщений: {n}.",
+    "step_restore_storage": "Восстановить Storage Coffeecord",
+    "step_panels": "Заново опубликовать панели",
+    "step_panels_detail": "Повторная публикация тикетов, верификации и панелей реакций…"
+  }
+}

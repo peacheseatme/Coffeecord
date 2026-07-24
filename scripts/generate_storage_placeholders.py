@@ -57,6 +57,7 @@ CONFIG_PLACEHOLDERS: dict[str, object] = {
     },
     "backgrounds.json": {},
     "command_config.json": {"guild_id": 0, "command_config": {}},
+    "exit_surveys.json": {},
     "user_languages.json": {},
     "level_rewards.json": {},
     "leveling.json": {},
@@ -89,7 +90,6 @@ CONFIG_PLACEHOLDERS: dict[str, object] = {
             {"id": "server_backup", "extension": "Modules.server_backup", "path": "Modules/server_backup.py", "display_name": "Server Backup", "description": "Encrypted Discord structure + Coffeecord config backups with host slots.", "default_enabled": True, "category": "configuration"},
             {"id": "setup_wizard", "extension": "Modules.setup_wizard", "path": "Modules/setup_wizard.py", "display_name": "Setup Wizard", "description": "Interactive server setup.", "default_enabled": True, "category": "configuration"},
             {"id": "support", "extension": "Modules.support", "path": "Modules/support.py", "display_name": "Support Us", "description": "Support information and links.", "default_enabled": True, "category": "integrations"},
-            {"id": "test_module", "extension": "Modules.test_module", "path": "Modules/test_module.py", "display_name": "Test Module", "description": "Test module for refresh_registry.", "default_enabled": True, "category": "utilities"},
             {"id": "tickets", "extension": "Modules.tickets", "path": "Modules/tickets.py", "display_name": "Tickets", "description": "Ticket panel and management.", "default_enabled": True, "category": "utilities"},
             {"id": "translate", "extension": "Modules.translate", "path": "Modules/translate.py", "display_name": "Translation", "description": "Manual and live translation.", "default_enabled": True, "category": "utilities"},
             {"id": "verification", "extension": "Modules.verification", "path": "Modules/verification.py", "display_name": "Verification", "description": "Verification UI and flow.", "default_enabled": True, "category": "moderation"},
@@ -127,6 +127,7 @@ DATA_PLACEHOLDERS: dict[str, object] = {
     "lockdown_state.json": {"guilds": {}},
     "member_activity.json": {},
     "inactivity_strikes.json": {},
+    "leveling.json": {},
 }
 
 

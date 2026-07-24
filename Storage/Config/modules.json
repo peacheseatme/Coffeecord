@@ -5,25 +5,16 @@
       "extension": "Modules.adaptive_slowmode",
       "path": "Modules/adaptive_slowmode.py",
       "display_name": "Adaptive Slowmode",
-      "description": "Adaptive slowmode configuration and trigger handling.",
+      "description": "Adaptive slowmode configuration.",
       "default_enabled": true,
       "category": "moderation"
-    },
-    {
-      "id": "anti_abuse",
-      "extension": "Modules.anti_abuse",
-      "path": "Modules/anti_abuse.py",
-      "display_name": "Anti Abuse",
-      "description": "",
-      "default_enabled": true,
-      "category": "utilities"
     },
     {
       "id": "applications",
       "extension": "Modules.applications",
       "path": "Modules/applications.py",
       "display_name": "Applications",
-      "description": "Staff application questions, submissions, and review actions.",
+      "description": "Staff application questions and submissions.",
       "default_enabled": true,
       "category": "utilities"
     },
@@ -32,7 +23,16 @@
       "extension": "Modules.automod",
       "path": "Modules/automod.py",
       "display_name": "Automod",
-      "description": "Spam, caps, link, mention, keyword filters, and escalation.",
+      "description": "Spam, caps, link, mention, keyword filters.",
+      "default_enabled": true,
+      "category": "moderation"
+    },
+    {
+      "id": "inactive_members",
+      "extension": "Modules.inactive_members",
+      "path": "Modules/inactive_members.py",
+      "display_name": "Inactive Members",
+      "description": "Track activity and remove inactive members.",
       "default_enabled": true,
       "category": "moderation"
     },
@@ -46,110 +46,11 @@
       "category": "configuration"
     },
     {
-      "id": "bot_config",
-      "extension": "Modules.bot_config",
-      "path": "Modules/bot_config.py",
-      "display_name": "Bot Config",
-      "description": "",
-      "default_enabled": true,
-      "category": "utilities"
-    },
-    {
       "id": "calls",
       "extension": "Modules.calls",
       "path": "Modules/calls.py",
       "display_name": "Calls",
-      "description": "Private call channels and call membership management.",
-      "default_enabled": true,
-      "category": "utilities"
-    },
-    {
-      "id": "checks",
-      "extension": "Modules.checks",
-      "path": "Modules/checks.py",
-      "display_name": "Checks",
-      "description": "",
-      "default_enabled": true,
-      "category": "utilities"
-    },
-    {
-      "id": "color_roles",
-      "extension": "Modules.color_roles",
-      "path": "Modules/color_roles.py",
-      "display_name": "Color Roles",
-      "description": "Exclusive self-assign color roles via buttons or emoji reactions.",
-      "default_enabled": true,
-      "category": "configuration"
-    },
-    {
-      "id": "command_perm_overrides",
-      "extension": "Modules.command_perm_overrides",
-      "path": "Modules/command_perm_overrides.py",
-      "display_name": "Command Perm Overrides",
-      "description": "",
-      "default_enabled": true,
-      "category": "utilities"
-    },
-    {
-      "id": "dev_broadcast",
-      "extension": "Modules.dev_broadcast",
-      "path": "Modules/dev_broadcast.py",
-      "display_name": "Dev Broadcast",
-      "description": "",
-      "default_enabled": true,
-      "category": "utilities"
-    },
-    {
-      "id": "fun",
-      "extension": "Modules.fun",
-      "path": "Modules/fun.py",
-      "display_name": "Fun Commands",
-      "description": "8ball, flipcoin, hug, kiss, dog, cat, roast, and other fun commands.",
-      "default_enabled": true,
-      "category": "engagement"
-    },
-    {
-      "id": "getting_started_guide",
-      "extension": "Modules.getting_started_guide",
-      "path": "Modules/getting_started_guide.py",
-      "display_name": "Getting Started Guide",
-      "description": "",
-      "default_enabled": true,
-      "category": "utilities"
-    },
-    {
-      "id": "help_search",
-      "extension": "Modules.help_search",
-      "path": "Modules/help_search.py",
-      "display_name": "Help Search",
-      "description": "",
-      "default_enabled": true,
-      "category": "utilities"
-    },
-    {
-      "id": "host_console",
-      "extension": "Modules.host_console",
-      "path": "Modules/host_console.py",
-      "display_name": "Host Console",
-      "description": "",
-      "default_enabled": true,
-      "category": "utilities"
-    },
-    {
-      "id": "inactive_members",
-      "extension": "Modules.inactive_members",
-      "path": "Modules/inactive_members.py",
-      "display_name": "Inactive Members",
-      "description": "Track member activity and remove inactive members by configurable rules.",
-      "default_enabled": true,
-      "category": "moderation"
-    },
-    {
-      "id": "json_cache",
-      "extension": "Modules.json_cache",
-      "path": "Modules/json_cache.py",
-      "display_name": "Json Cache",
-      "description": "",
+      "description": "Private call channels.",
       "default_enabled": true,
       "category": "utilities"
     },
@@ -158,9 +59,36 @@
       "extension": "Modules.kofi",
       "path": "Modules/kofi.py",
       "display_name": "Ko-fi Supporters",
-      "description": "Ko-fi linking/claims, supporter state, and webhook helpers.",
+      "description": "Ko-fi linking and supporter perks.",
       "default_enabled": true,
       "category": "integrations"
+    },
+    {
+      "id": "leveling",
+      "extension": "Modules.leveling",
+      "path": "Modules/leveling.py",
+      "display_name": "Leveling & XP",
+      "description": "XP gain, level-up logic, level cards.",
+      "default_enabled": true,
+      "category": "engagement"
+    },
+    {
+      "id": "logging",
+      "extension": "Modules.logging",
+      "path": "Modules/logging.py",
+      "display_name": "Logging",
+      "description": "Server event logging.",
+      "default_enabled": true,
+      "category": "configuration"
+    },
+    {
+      "id": "modules_cmd",
+      "extension": "Modules.modules_cmd",
+      "path": "Modules/modules_cmd.py",
+      "display_name": "Module Controls",
+      "description": "Per-server module toggle.",
+      "default_enabled": true,
+      "category": "configuration"
     },
     {
       "id": "language",
@@ -172,47 +100,11 @@
       "category": "configuration"
     },
     {
-      "id": "leveling",
-      "extension": "Modules.leveling",
-      "path": "Modules/leveling.py",
-      "display_name": "Leveling & XP",
-      "description": "XP gain, level-up logic, rewards, and level cards.",
-      "default_enabled": true,
-      "category": "engagement"
-    },
-    {
-      "id": "log_actor",
-      "extension": "Modules.log_actor",
-      "path": "Modules/log_actor.py",
-      "display_name": "Log Actor",
-      "description": "",
-      "default_enabled": true,
-      "category": "utilities"
-    },
-    {
-      "id": "logging",
-      "extension": "Modules.logging",
-      "path": "Modules/logging.py",
-      "display_name": "Logging",
-      "description": "Server event and module action logging.",
-      "default_enabled": true,
-      "category": "configuration"
-    },
-    {
-      "id": "modules_cmd",
-      "extension": "Modules.modules_cmd",
-      "path": "Modules/modules_cmd.py",
-      "display_name": "Module Controls",
-      "description": "Per-server module visibility and toggle commands.",
-      "default_enabled": true,
-      "category": "configuration"
-    },
-    {
       "id": "muterole",
       "extension": "Modules.muterole",
       "path": "Modules/muterole.py",
       "display_name": "Mute Role",
-      "description": "Mute role creation and configuration commands.",
+      "description": "Mute role configuration.",
       "default_enabled": true,
       "category": "moderation"
     },
@@ -221,7 +113,7 @@
       "extension": "Modules.nickname",
       "path": "Modules/nickname.py",
       "display_name": "Nickname",
-      "description": "Nickname management commands and related checks.",
+      "description": "Nickname management.",
       "default_enabled": true,
       "category": "utilities"
     },
@@ -230,7 +122,7 @@
       "extension": "Modules.polls",
       "path": "Modules/polls.py",
       "display_name": "Polls",
-      "description": "Poll creation, voting, and poll lifecycle events.",
+      "description": "Poll creation and voting.",
       "default_enabled": true,
       "category": "engagement"
     },
@@ -239,7 +131,7 @@
       "extension": "Modules.quests",
       "path": "Modules/quests.py",
       "display_name": "Quests",
-      "description": "Configurable quests, daily check-in, reaction and message goals with XP rewards.",
+      "description": "Quest board, daily check-in, and XP rewards.",
       "default_enabled": true,
       "category": "engagement"
     },
@@ -248,25 +140,16 @@
       "extension": "Modules.reactionrole",
       "path": "Modules/reactionrole.py",
       "display_name": "Reaction Roles",
-      "description": "Reaction/button based self-role assignment.",
+      "description": "Reaction/button self-role assignment.",
       "default_enabled": true,
       "category": "configuration"
     },
     {
-      "id": "server_backup",
-      "extension": "Modules.server_backup",
-      "path": "Modules/server_backup.py",
-      "display_name": "Server Backup",
-      "description": "Encrypted server structure + Coffeecord config backups with host slots.",
-      "default_enabled": true,
-      "category": "configuration"
-    },
-    {
-      "id": "setup_wizard",
-      "extension": "Modules.setup_wizard",
-      "path": "Modules/setup_wizard.py",
-      "display_name": "Setup Wizard",
-      "description": "Interactive server setup wizard.",
+      "id": "color_roles",
+      "extension": "Modules.color_roles",
+      "path": "Modules/color_roles.py",
+      "display_name": "Color Roles",
+      "description": "Exclusive color role panels with buttons or emoji.",
       "default_enabled": true,
       "category": "configuration"
     },
@@ -275,7 +158,7 @@
       "extension": "Modules.staff_utils",
       "path": "Modules/staff_utils.py",
       "display_name": "Staff Utilities",
-      "description": "Advanced purge, lockdown, staff notes, bulk roles, and moderation tools.",
+      "description": "Advanced purge, lockdown, notes, bulk roles.",
       "default_enabled": true,
       "category": "moderation"
     },
@@ -283,44 +166,44 @@
       "id": "sticky_msg",
       "extension": "Modules.sticky_msg",
       "path": "Modules/sticky_msg.py",
-      "display_name": "Sticky Msg",
-      "description": "",
+      "display_name": "Sticky Messages",
+      "description": "Named stickies re-posted at channel bottom.",
       "default_enabled": true,
-      "category": "utilities"
+      "category": "configuration"
+    },
+    {
+      "id": "server_backup",
+      "extension": "Modules.server_backup",
+      "path": "Modules/server_backup.py",
+      "display_name": "Server Backup",
+      "description": "Encrypted Discord structure + Coffeecord config backups with host slots.",
+      "default_enabled": true,
+      "category": "configuration"
+    },
+    {
+      "id": "setup_wizard",
+      "extension": "Modules.setup_wizard",
+      "path": "Modules/setup_wizard.py",
+      "display_name": "Setup Wizard",
+      "description": "Interactive server setup.",
+      "default_enabled": true,
+      "category": "configuration"
     },
     {
       "id": "support",
       "extension": "Modules.support",
       "path": "Modules/support.py",
       "display_name": "Support Us",
-      "description": "Support information, perks, and support links command.",
+      "description": "Support information and links.",
       "default_enabled": true,
       "category": "integrations"
-    },
-    {
-      "id": "test_module",
-      "extension": "Modules.test_module",
-      "path": "Modules/test_module.py",
-      "display_name": "Test Module",
-      "description": "Simple test module for verifying module refresh_registry works.",
-      "default_enabled": true,
-      "category": "utilities"
-    },
-    {
-      "id": "themes",
-      "extension": "Modules.themes",
-      "path": "Modules/themes.py",
-      "display_name": "Themes",
-      "description": "Customize moderation DM messages with preset or custom themes.",
-      "default_enabled": true,
-      "category": "configuration"
     },
     {
       "id": "tickets",
       "extension": "Modules.tickets",
       "path": "Modules/tickets.py",
       "display_name": "Tickets",
-      "description": "Ticket panel, ticket controls, and ticket management commands.",
+      "description": "Ticket panel and management.",
       "default_enabled": true,
       "category": "utilities"
     },
@@ -329,7 +212,7 @@
       "extension": "Modules.translate",
       "path": "Modules/translate.py",
       "display_name": "Translation",
-      "description": "Manual and live translation with per-user settings.",
+      "description": "Manual and live translation.",
       "default_enabled": true,
       "category": "utilities"
     },
@@ -338,7 +221,7 @@
       "extension": "Modules.verification",
       "path": "Modules/verification.py",
       "display_name": "Verification",
-      "description": "Verification UI, verification flow, and configuration.",
+      "description": "Verification UI and flow.",
       "default_enabled": true,
       "category": "moderation"
     },
@@ -347,7 +230,7 @@
       "extension": "Modules.welcome_leave",
       "path": "Modules/welcome_leave.py",
       "display_name": "Welcome & Leave",
-      "description": "Welcome/leave messages and optional exit surveys.",
+      "description": "Welcome/leave messages.",
       "default_enabled": true,
       "category": "configuration"
     }

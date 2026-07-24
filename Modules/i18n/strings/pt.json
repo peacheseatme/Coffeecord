@@ -1,0 +1,1955 @@
+{
+  "about": {
+    "button_github": "GitHub",
+    "button_invite_me": "Me convide",
+    "button_kofi": "Ko-fi",
+    "button_privacy_policy": "Política de Privacidade",
+    "button_support_server": "Servidor de suporte",
+    "button_terms_of_service": "Termos de Serviço",
+    "button_topgg": "topo.gg",
+    "cmd_description": "Saiba mais sobre o Coffeecord",
+    "cpu": "CPU",
+    "cpu_value": "{pct}%",
+    "developer": "Desenvolvedor",
+    "developer_not_configured": "Não configurado",
+    "footer": "Coffeecord • Feito com ☕ e discord.py ❤",
+    "memory": "Memória",
+    "memory_value": "{mb}MB",
+    "ping": "Pingar",
+    "ping_value": "{ms}ss",
+    "servers": "Servidores",
+    "servers_value": "{count} servidores",
+    "title": "Sobre o Coffeecord",
+    "uptime": "Tempo ativo",
+    "uptime_value": "{hours}h {minutes}m",
+    "version": "Versão"
+  },
+  "anti_abuse": {
+    "guild_block": "Este servidor excedeu temporariamente os limites de comandos. Aguarde alguns minutos.",
+    "rate_limit": "Você está enviando comandos rápido demais. Por favor, vá mais devagar.",
+    "user_block": "Você está temporariamente bloqueado por uso excessivo de comandos."
+  },
+  "announcement": {
+    "language_support": {
+      "body": "O Coffeecord agora tem suporte para espanhol, português e russo! Para definir seu idioma use `/language set`. Não enviaremos mensagens sobre novos recursos no futuro, a menos que você ative isso.",
+      "optout_note": "Use `/optout` em qualquer servidor com este bot para parar de receber estas mensagens."
+    }
+  },
+  "automod": {
+    "admin_required": "Você precisa de `Gerenciar servidor` para usar os comandos de administração do automod.",
+    "badword_added": "Adicionado `{word}` à lista de palavras bloqueadas.",
+    "badword_already_exists": "`{word}` já está nas palavras bloqueadas.",
+    "badword_empty": "A palavra não pode estar vazia.",
+    "badword_list": "Palavras bloqueadas ({count}): {words}",
+    "badword_list_empty": "Nenhuma palavra bloqueada configurada.",
+    "badword_not_found": "`{word}` não estava na lista de palavras bloqueadas.",
+    "badword_removed": "Removido `{word}` da lista de palavras bloqueadas.",
+    "disabled": "Automod desativado para este servidor.",
+    "enabled": "Automod ativado para este servidor.",
+    "escalation_cleared": "Escalonamento de avisos limpo para warn 1-5 (tudo em none/off).",
+    "escalation_invalid": "Configuração de escalonamento inválida:\n- {errors}",
+    "escalation_updated": "Escalonamento de avisos atualizado:\n{lines}",
+    "exempt_roles_list": "Cargos isentos: {roles}",
+    "exempt_roles_updated": "Cargos isentos atualizados ({action}: {role}).",
+    "field_log_channel": "Canal de log",
+    "field_rules": "Regras",
+    "field_status": "Estado",
+    "field_violation_warn_counting": "Contagem de avisos por violação",
+    "log_channel_cleared": "Canal de log do automod limpo.",
+    "log_channel_set": "Canal de log do automod definido para {channel}.",
+    "no_exempt_roles": "Nenhum cargo isento configurado.",
+    "not_set": "Não definido",
+    "override_action_expected": "`action` deve ser um de: {actions}.",
+    "override_bool_expected": "`{setting}` espera `true` ou `false`.",
+    "override_cleared": "Substituição removida para {channel} em `{rule}`.",
+    "override_not_found": "Não existe substituição para esse canal/regra.",
+    "override_numeric_expected": "`{setting}` espera um valor numérico.",
+    "override_set_success": "Substituição definida para {channel}: `{rule}.{setting} = {value}`",
+    "override_setting_unsupported": "Configuração `{setting}` não suportada para `{rule}`.",
+    "overview_title": "Visão geral do Automod",
+    "preset_applied": "✅ Preset de automod aplicado: **{preset}**\n{footer}",
+    "preset_choose_prompt": "Escolha um preset de automod:",
+    "preset_owner_only": "Somente quem executou o comando pode usar estes botões de preset.",
+    "reloaded": "Configuração do automod recarregada.",
+    "set_action_success": "Ação de `{rule}` definida como `{action}`.",
+    "set_deletemessage_success": "`{rule}.delete_message` definido como `{enabled}`.",
+    "set_value_invalid_setting": "Configuração inválida para `{rule}`. Permitidas: {allowed}.",
+    "set_value_invalid_value": "Valor `{value}` inválido para `{setting}`.",
+    "set_value_success": "Atualizado `{rule}.{setting}` para `{value}`.",
+    "set_violationwarns_success": "`count_rule_violations_as_warns` definido como `{enabled}`.",
+    "status_result": "Automod está {status}.",
+    "toggle_rule_success": "Regra `{rule}` definida como {state}.",
+    "warn_add_bot_blocked": "Não é possível avisar um bot.",
+    "warn_cleared": "Removidos **{count}** aviso(s) de {member}.",
+    "warn_list_empty": "{member} não tem avisos do automod.",
+    "warn_list_result": "{member} tem **{count}** aviso(s).\nRecentes:\n{lines}",
+    "warn_remove_empty": "{member} não tem avisos.",
+    "warn_remove_invalid_index": "Índice inválido. Use um valor de 1 a {max_index}.",
+    "warn_removed": "Aviso #{index} removido para {member}: {reason}",
+    "warn_threshold_action": "\nAção por limite: `{action}`",
+    "whitelist_channels_updated": "Canais da lista branca atualizados ({action}: {channel}).",
+    "whitelist_roles_updated": "Cargos da lista branca atualizados ({action}: {role})."
+  },
+  "autorole": {
+    "add_prompt": "Selecione um evento e funções e pressione **Save Rule**.",
+    "event_set": "Evento definido como `{event}`.",
+    "field_delay": "Atraso",
+    "field_enabled": "Habilitado",
+    "field_event": "Evento",
+    "field_roles": "Funções",
+    "field_rule_count": "Contagem de regras",
+    "field_rule_id": "ID da regra",
+    "field_rules": "Regras",
+    "no_rules": "Nenhuma regra configurada.",
+    "pick_one_role": "Escolha pelo menos uma função primeiro.",
+    "roles_selected": "Funções selecionadas: {roles}",
+    "rule_added_title": "Regra de função automática adicionada",
+    "rule_not_found": "Regra não encontrada.",
+    "rule_removed": "Regra removida `{rule_id}`.",
+    "rule_saved": "✅ Regra salva.",
+    "setup_panel_owner_only": "Este painel de configuração pertence a outra pessoa.",
+    "status_title": "Status de funções automáticas",
+    "test_title": "Teste automático de função",
+    "toggle_result": "As funções automáticas agora são **{state}**."
+  },
+  "bot": {
+    "applications": {
+      "added_question": "Pergunta adicionada: {question}",
+      "check_dms": "📨 Verifique seus DMs para iniciar sua inscrição!",
+      "choose_delete": "Selecione a pergunta a ser excluída:",
+      "toggled": "Aplicativos de equipe alternados!"
+    },
+    "autorole_legacy": {
+      "choose_remove": "🗑️ Escolha uma função automática para remover:",
+      "no_roles": "Não há funções automáticas para remover."
+    },
+    "call": {
+      "add_success": "Adicionado {user} à chamada.",
+      "channel_gone": "Canal de chamada não existe mais.",
+      "create_failed": "Não foi possível criar o canal de chamada: {error}",
+      "create_forbidden": "Preciso de **Manage Channels** (e permissão para gerenciar essa categoria) para criar canais de chamada. Peça a um administrador para conceder **Manage Channels** ao bot.",
+      "created": "📞 Chamada criada: {channel}\nOs usuários convidados devem usar **/call join** para entrar.\n{password_line}",
+      "dm_invite": "📞 **{host} está te ligando!**\n➡️ Use **/call join** para entrar: {channel}\n{password_line}",
+      "end_success": "A chamada terminou.",
+      "guild_not_found": "Guilda não encontrada.",
+      "invite_sent": "📨 Enviou convite para ligação para {user}.",
+      "join_guild_only": "Use isto em um servidor (não foi possível resolver guilda ou usuário).",
+      "join_hierarchy": "O bot não está suficientemente alto na hierarquia de papéis (ou não tem permissões).",
+      "join_not_found": "Esta chamada não existe ou expirou.",
+      "join_success": "✅ Você entrou na chamada em {channel}.",
+      "join_success_channel": "✅ Você entrou {channel}",
+      "join_wrong_password": "Senha incorreta.",
+      "no_active_host": "Você não hospeda nenhuma chamada ativa no momento.",
+      "not_host": "Você não é o host de nenhuma chamada ativa.",
+      "password_line": "🔑 Senha: `{password}`",
+      "promote_success": "👑 {user} agora é o anfitrião da chamada!",
+      "remove_not_in_call": "Esse usuário não está na chamada.",
+      "remove_success": "🚫 {user} removido da chamada.",
+      "user_not_found": "Não foi possível resolver seu usuário para este comando."
+    },
+    "command_perms": {
+      "deny_everyone": "Você não pode usar este comando.",
+      "deny_guild_only": "Este comando só pode ser usado em um servidor.",
+      "deny_manage_guild": "Você precisa de **Manage Server** (ou **Administrator**) para alterar as permissões de comando.",
+      "deny_member_resolve": "Não foi possível resolver suas permissões de membro.",
+      "deny_mod_combo": "Você precisa de **Manage Roles**, **Moderate Members**, **Manage Server** ou **Administrator** para usar este comando.",
+      "deny_need_all": "Você precisa de todas estas permissões: **{permissions}**.",
+      "deny_no_permission": "Você não tem permissão para usar este comando.",
+      "docs_button": "Documento de permissões abertas",
+      "docs_description": "Referência completa: quais comandos de barra usam quais permissões **member** e quais recursos de permissões **bot** precisam. Use `/command_perms edit` (Gerenciar Servidor) para digitar qualquer nome de comando de barra e definir os requisitos.",
+      "docs_footer": "As substituições por guilda serão aplicadas após a próxima sincronização; os padrões são enviados com o bot.",
+      "docs_quick_links": "Links rápidos",
+      "docs_title": "Permissões de comandos",
+      "edit_custom_required": "Para **Custom**, preencha `custom_permissions` (nomes de permissão separados por vírgula).",
+      "edit_no_match": "Nenhum comando de barra correspondente. Use o nome dos programas do Discord (por exemplo, `help`, `call create`, `modules toggle`).",
+      "edit_removed": "Removidas regras personalizadas para **`/{command}`** (sem permissão de membro do CoffeeCord).",
+      "edit_reset_default": "Redefina **`/{command}`** para o padrão do bot.",
+      "edit_set": "**`/{command}`** agora requer: {rule}",
+      "list_empty": "Nenhuma substituição neste servidor. Os comandos usam os padrões do bot.",
+      "list_title": "Substituições de permissões de comandos"
+    },
+    "debug": {
+      "commands_printed": "Comandos registrados impressos no console."
+    },
+    "dm_cmd": {
+      "choose_member": "Escolha um usuário para DM",
+      "sent": "DM enviado para {user}.",
+      "user_not_found": "Usuário não encontrado."
+    },
+    "kofi": {
+      "add_success": "{user} marcado como apoiador ativo.",
+      "claim_none": "Nenhum pagamento desvinculado encontrado para `{email}`.",
+      "claim_success": "**{count}** pagamento(s) desvinculado(s) reivindicado(s) para `{email}`.",
+      "field_last_payment": "Último pagamento",
+      "field_tier": "Nível",
+      "field_total_usd": "Total em dólares americanos",
+      "invalid_email": "Forneça um endereço de e-mail válido.",
+      "link_queued": "Vinculado `{email}`. Você está **#{position}** na fila para o próximo pagamento Ko-fi nesse e-mail. As vantagens são ativadas quando um pagamento chega.",
+      "link_success": "Vinculado. Reivindicado **{count}** pagamentos Ko-fi existentes para `{email}`.",
+      "not_supporter": "Você ainda não é marcado como apoiador.",
+      "remove_no_record": "Não existe nenhum registro de apoiador para esse usuário.",
+      "remove_success": "Status de apoiador desativado para {user}.",
+      "status_title": "Status de apoiador Ko-fi"
+    },
+    "nickname": {
+      "no_permission": "Não tenho permissão para alterar meu apelido.",
+      "success": "Apelido alterado para `{name}`.",
+      "success_formatted": "✅ Apelido alterado para **{name}**"
+    },
+    "optout": {
+      "optin_success": "Você voltou a receber DMs da equipe.",
+      "optout_success": "Você não receberá mais DMs da equipe deste bot."
+    },
+    "poll": {
+      "choose_channel": "📊 Escolha um canal para enviar a enquete:",
+      "clear_reactions_denied": "⚠️ Não tenho permissão para limpar reações.",
+      "ended": "🛑 Enquete encerrada! Obrigado por votar.",
+      "footer": "A enquete termina em {minutes} minuto(s).",
+      "select_placeholder": "Selecione um canal para enviar a enquete...",
+      "sent": "✅ Enquete enviada em {channel}",
+      "title": "📊 Enquete"
+    },
+    "purge": {
+      "complete": "**{count}** mensagens excluídas.",
+      "failed": "Falha ao limpar: {error}",
+      "no_permission": "Não tenho permissão para excluir mensagens nesse canal.",
+      "stopped": "Interrompendo a eliminação — finalizando o lote atual e, em seguida, interrompendo…"
+    },
+    "say": {
+      "choose_channel": "Selecione um canal para enviar uma mensagem:",
+      "message_sent": "✅Mensagem enviada!",
+      "sent": "Mensagem enviada para {channel}."
+    },
+    "support": {
+      "description": "Clique no botão abaixo para nos apoiar via Ko-fi.\n\n✅ Vincule sua conta Discord ao Ko-fi e compre um café ou uma assinatura para nos apoiar!\n\n**Perks:**\n- `Supporter` papel!\n- Acesso a um canal privado!\n- Acesso antecipado a novos recursos!\n- Jogue GIFs em sua carta de nivelamento!\n- Traduções ilimitadas!\n- Até 3 slots de backup criptografado do servidor no host (`/backup`)!\n\n**How to activate your perks:**\n1. Clique em **Support us via Ko-fi** abaixo e conclua sua doação ou adesão.\n2. Volte ao Discord e execute `/kofi link email:you@example.com` — use o mesmo e-mail que você usou no Ko-fi.\n3. Suas vantagens são ativadas instantaneamente. Execute `/kofi status` para confirmar.\n\nPrecisar de ajuda? Junte-se ao servidor de suporte: {invite}",
+      "kofi_button": "Apoie-nos via Ko-fi",
+      "title": "Apoie Coffeecord! 💙"
+    },
+    "ticket_io": {
+      "export_failed": "Não foi possível exportar ticket: {error}",
+      "import_success": "Bilhete importado para {channel}.",
+      "invalid_signature": "Assinatura de exportação de ticket inválida ou expirada."
+    },
+    "timers": {
+      "cancelled": "⏹ O temporizador #{id} foi cancelado.",
+      "invalid_datetime": "Formato de data ou hora inválido. Use MM/DD/YY HH:MM.",
+      "invalid_format": "Formato inválido. Use 10s, 5m, 2h ou 1d.",
+      "no_timers": "Você não tem temporizadores ativos.",
+      "own_only": "Você só pode encerrar seus próprios cronômetros.",
+      "reminder_set": "⏰ Lembrete definido para <t:{timestamp}:R>",
+      "started": "⏳ Temporizador #{id} iniciado para {value}{unit}",
+      "timer_cancelled": "Temporizador #{id} cancelado.",
+      "timer_dm": "⏰ O cronômetro #{id} está ativo!",
+      "timer_list": "Seus temporizadores ativos: {list}",
+      "timer_not_found": "Temporizador não encontrado ou não é seu.",
+      "timer_started": "⏳ O temporizador #{id} termina em <t:{timestamp}:R>"
+    },
+    "uninstall": {
+      "cancelled": "Desinstalação cancelada.",
+      "complete": "Desinstalação concluída.",
+      "confirm_body": "Isso removerá canais, funções e dados do Coffeecord deste servidor. Digite **CONFIRM** para continuar.",
+      "confirm_title": "☕ Confirme a desinstalação",
+      "started": "A desinstalação foi iniciada…",
+      "wrong_confirm": "O texto de confirmação não corresponde. Desinstalação cancelada."
+    },
+    "verify": {
+      "already_verified": "✅ Você já está verificado!",
+      "button_label": "Verifique-me ✅",
+      "button_prompt": "Pressione o botão abaixo para verificar você mesmo:",
+      "button_success": "✅ Você foi verificado!",
+      "code_input_label": "Código de verificação",
+      "code_input_placeholder": "Digite seu código de 4 dígitos",
+      "code_modal_title": "Insira o código de verificação",
+      "code_success": "✅ Verificação bem-sucedida!",
+      "code_wrong": "❌ Código incorreto. Tente novamente mais tarde.",
+      "color_correct": "✅ Correto! Você foi verificado.",
+      "color_not_your_session": "❌Não é sua sessão.",
+      "color_wrong": "❌ Cor incorreta. Tente novamente!",
+      "color_wrong_session": "Esta não é sua sessão de verificação.",
+      "guild_only": "⚙️ A verificação deve ser utilizada em um servidor.",
+      "invalid_method": "❌ Método de verificação inválido.",
+      "log_button": "✅ {user} verificado via **Simple Button**.",
+      "log_code": "✅ {user} verificado via **Keypad Code**.",
+      "log_color": "✅ {user} verificado via **Color Buttons**.",
+      "not_setup": "⚙️ Verificação não configurada.",
+      "role_assign_failed": "Não consigo atribuir a função (falta permissão ou hierarquia de funções).",
+      "wrong_user": "Isto não é para você."
+    }
+  },
+  "color_roles": {
+    "add_failed": "Não consegui adicionar esse papel de cor.",
+    "add_success": "Agora você tem {role}.",
+    "assign_protected_blocked": "Essa função é protegida e não pode ser atribuída por meio de funções coloridas.",
+    "bot_member_unavailable": "O cache de membros do bot não está disponível.",
+    "cannot_manage_role_hierarchy": "Não consigo gerenciar essa função devido à hierarquia de funções.",
+    "clear_failed": "Não foi possível remover funções de cores.",
+    "clear_success": "Removido(s) papel(ões) de cor {count} de {member}.",
+    "delete_success": "Painel excluído `{message_id}`.",
+    "disabled": "As funções de cores estão desativadas para este servidor.",
+    "draft_channel_missing": "O canal de rascunho não existe mais.",
+    "draft_missing": "Nenhum rascunho salvo. Execute `/colorrole setup` ou `/colorrole generate` primeiro.",
+    "draft_missing_channel": "Falta um canal no rascunho. Execute `/colorrole setup` novamente.",
+    "draft_roles_missing": "As funções de rascunho não existem mais.",
+    "field_configured_panels": "Painéis Configurados",
+    "field_enabled": "Habilitado",
+    "field_notes": "Notas",
+    "field_panels": "Painéis",
+    "field_preset_roles": "Funções predefinidas",
+    "field_roles_processed": "Funções processadas",
+    "list_empty": "Nenhum painel de função de cor configurado.",
+    "list_title": "Painéis de funções de cores",
+    "mapped_role_missing": "Esse papel não existe mais. Peça à equipe para atualizar este painel.",
+    "max_roles": "Selecione no máximo {max_roles} funções.",
+    "member_no_panel_roles": "{member} não possui funções de cores no painel.",
+    "message_id_numeric": "O ID da mensagem deve ser numérico.",
+    "missing_manage_roles": "Eu preciso de permissão `Manage Roles`.",
+    "no_roles_generated": "Não foi possível criar ou encontrar nenhuma função de cor.",
+    "option_missing": "Essa opção de cor não existe mais.",
+    "panel_created": "Painel de função de cores criado em {channel} (`{message_id}`) com {count} cor(es). Os membros podem segurar uma cor de cada vez.{warn_text}",
+    "panel_max_colors": "Um painel pode ter no máximo {max_colors} cores.",
+    "panel_missing": "Este painel de função de cores não existe mais.",
+    "panel_not_found": "Painel não encontrado.",
+    "panel_requires_mapping": "O painel deve manter pelo menos um mapeamento de cores.",
+    "panel_updated": "Painel atualizado `{message_id}`.",
+    "preset_ready_title": "Funções de cores predefinidas prontas",
+    "protected_role_blocked": "{role} é uma função de moderação protegida e não pode ser usada como função de cor.",
+    "provide_role_for_remove": "Forneça `role` ao usar `remove_mapping`.",
+    "publish_success": "Painel de cores publicado em {channel} (`{message_id}`).",
+    "remove_failed": "Não consegui remover esse papel de cor.",
+    "remove_success": "Removido {role}.",
+    "role_not_on_panel": "Esse papel não está neste painel.",
+    "select_channel_first": "Selecione um canal primeiro.",
+    "select_one_color_role": "Selecione pelo menos uma função de cor.",
+    "setup_footer": "Utilize /colorrole setup to publish a panel.",
+    "setup_owner_only": "Esta configuração pertence a outro moderador.",
+    "sync_no_roles": "Nenhuma função de cor configurada. Execute `/colorrole generate` ou publique um painel primeiro.",
+    "sync_success": "Todas as funções de cores configuradas foram sincronizadas com sucesso.",
+    "sync_title": "Sincronização de função de cores",
+    "target_hierarchy_blocked": "A hierarquia de papéis impede essa mudança.",
+    "update_existing_failed": "Não consegui atualizar suas funções de cores existentes."
+  },
+  "common": {
+    "bot_missing_permissions": "Não tenho as permissões necessárias.",
+    "cancelled": "Cancelado.",
+    "channel_not_found": "Canal não encontrado.",
+    "confirm": "Confirmar",
+    "created": "Criado.",
+    "deleted": "Excluído.",
+    "deny": "Negar",
+    "disabled": "Desativado",
+    "dm_failed": "Não foi possível enviar um DM para esse usuário.",
+    "enabled": "Ativado",
+    "error_generic": "Algo deu errado. Tente novamente.",
+    "guild_only": "Este comando só pode ser usado em servidores.",
+    "invalid_duration": "Formato de duração inválido.",
+    "invalid_id": "ID inválido.",
+    "invalid_user": "Usuário inválido.",
+    "loading": "Processando…",
+    "member_not_found": "Membro não encontrado.",
+    "module_disabled": "Este módulo está desativado. Um administrador pode ativá-lo com /modules.",
+    "no": "Não",
+    "no_changes": "Nenhuma alteração foi feita.",
+    "no_permission": "Você não tem permissão para usar este comando.",
+    "no_reason_provided": "Sem motivo informado",
+    "none": "Nenhum",
+    "not_configured": "Não configurado.",
+    "nothing_to_do": "Nada para fazer.",
+    "owner_only": "Este comando é apenas para o dono do bot.",
+    "page_footer": "Página {current}/{total}",
+    "pagination_next": "Próximo",
+    "pagination_prev": "Anterior",
+    "role_not_found": "Função não encontrada.",
+    "saved": "Salvo.",
+    "staff_only": "Este comando é apenas para a equipe.",
+    "success": "Concluído.",
+    "supporter_only": "Este recurso requer uma assinatura de apoiador ativo.",
+    "unknown": "Desconhecido",
+    "updated": "Configurações atualizadas.",
+    "usage_hint": "Use /help search:{query} para encontrar comandos.",
+    "user_not_found": "Não foi possível encontrar esse usuário.",
+    "yes": "Sim"
+  },
+  "fun": {
+    "abracadaberamotherafu": {
+      "success": "🪄 **ABRACADABERA MOTHERAFU—**\n{user} acabei de explodir um tanque para a próxima dimensão! 💥🚓🔥\n{url}"
+    },
+    "ak47": {
+      "success": "Gif de AK-47 enviado. {url}"
+    },
+    "bet": {
+      "success": "{user} aposte {amount} em {result}!"
+    },
+    "cat": {
+      "success": "Foto do gato entregue. {url}"
+    },
+    "cat_error": "❌ Não foi possível obter uma imagem de gato.",
+    "dare": {
+      "success": "{user} ousado {member}: **{dare}**"
+    },
+    "dog": {
+      "success": "Aqui está um cachorro{breed}. {url}"
+    },
+    "dog_error": "❌ Raça não encontrada ou erro ao obter imagem do cachorro.",
+    "dog_unavailable": "❌ Os serviços de imagens de cachorro estão temporariamente indisponíveis. Tente novamente mais tarde.",
+    "eightball": {
+      "format": "🎱 **Pergunta:** {question}\n**Resposta:** {answer}",
+      "r01": "É certo.",
+      "r02": "Sem dúvida.",
+      "r03": "Pode confiar nisso.",
+      "r04": "Sim, definitivamente.",
+      "r05": "Decididamente sim.",
+      "r06": "Pelo que vejo, sim.",
+      "r07": "Muito provável.",
+      "r08": "Perspectiva boa.",
+      "r09": "Sim.",
+      "r10": "Os sinais apontam para sim.",
+      "r11": "Resposta nebulosa, tente de novo.",
+      "r12": "Pergunte mais tarde.",
+      "r13": "Melhor não dizer agora.",
+      "r14": "Não consigo prever agora.",
+      "r15": "Concentre-se e pergunte de novo.",
+      "r16": "Não conte com isso.",
+      "r17": "Minha resposta é não.",
+      "r18": "Minhas fontes dizem não.",
+      "r19": "Perspectiva não muito boa.",
+      "r20": "Muito duvidoso."
+    },
+    "flipcoin": {
+      "heads": "Cara",
+      "success": "🪙 A moeda caiu em **{result}**!",
+      "success_with_prize": "🪙 A moeda caiu em **{result}**! {user} ganha {prize}!",
+      "tails": "Coroa"
+    },
+    "giftnuke": {
+      "success": "Surpresa! 🎁 {user} deu um presente para {member}! {url}"
+    },
+    "hug": {
+      "success": "🤗 {user} dá {member} um grande abraço!"
+    },
+    "kiss": {
+      "success": "{user} beijou {member}!"
+    },
+    "lovecalc": {
+      "success": "Compatibilidade amorosa entre {user1} e {user2}: **{percentage}%** {hearts}"
+    },
+    "petpet": {
+      "success": "Petpet GIF criado para {member}."
+    },
+    "petpet_missing_dependency": "❌ Petpet não está instalado. Instale com: pip install petpetgif",
+    "roast": {
+      "r01": "Você é tão brilhante quanto um buraco negro e duas vezes mais denso.",
+      "r02": "Você tem algo no queixo... não, o terceiro caiu.",
+      "r03": "Você é a razão pela qual o pool genético precisa de um salva-vidas.",
+      "r04": "Você traz muita alegria a todos… quando sai da sala.",
+      "r05": "Você tem o rosto perfeito para o rádio.",
+      "r06": "Você é como uma nuvem. Quando você desaparece, é um lindo dia.",
+      "success": "Roast: **{roast}**"
+    },
+    "truth": {
+      "success": "{user} fez {member} uma pergunta verdadeira: **{question}**"
+    },
+    "uwuify": {
+      "success": "Texto Uwuificado: {text}"
+    },
+    "uwuify_missing_dependency": "❌ uwuify não está instalado. Instale com: pip install uwuify"
+  },
+  "getting_started": {
+    "cmd_description": "Guia paginado detalhado para configurar o Coffeecord",
+    "page1": {
+      "description": "O Coffeecord é modular: ative apenas o que você precisa, configure por servidor e use `/help` a qualquer momento para ver todos os comandos slash.",
+      "field1": {
+        "name": "Antes de configurar qualquer coisa",
+        "value": "1. **Cargo do bot** — Arraste o cargo do Coffeecord **acima** dos cargos que ele deve atribuir (verificado, mute, cores, recompensas de nível).\n2. **Permissões** — Conceda **Gerenciar Servidor** (ou Administrador) para a equipe que fará a configuração.\n3. **Canais** — Crie `#mod-log`, `#welcome` e `#verify` se ainda não existirem."
+      },
+      "field2": {
+        "name": "Caminho mais rápido: assistente de setup",
+        "value": "Execute **`/setup`** para um rascunho guiado cobrindo boas-vindas, saída, logs, automod, reaction roles e tickets. Nada é aplicado até você confirmar no final.\nContinue depois com **`/setup_resume`** ou descarte com **`/setup_cancel`**."
+      },
+      "field3": {
+        "name": "Veja o que está ativo",
+        "value": "**`/modules status`** — lista todos os módulos e se estão ativos neste servidor.\n**`/modules toggle`** / **`enable`** / **`disable`** — ativa ou desativa recursos.\n**`/modules info`** — descrição de um módulo específico."
+      },
+      "footer": "Use ◀ ▶ para navegar neste guia • Página {current} de {total}",
+      "title": "Primeiros passos ({current}/{total}) — Visão geral"
+    },
+    "page2": {
+      "description": "Logging dá à equipe uma trilha de auditoria em um canal. Configure cedo para registrar entradas, bans, edições e ações do automod desde o primeiro dia.",
+      "field1": {
+        "name": "Configuração inicial",
+        "value": "**`/logging setup`** — escolha o canal de logs e ative logging.\n**`/logging status`** — veja canal, eventos ativos e módulos."
+      },
+      "field2": {
+        "name": "Ajuste fino",
+        "value": "**`/logging toggle`** — ative/desative eventos individuais (mensagem apagada/editada, entrada/saída, timeout, ban, mudanças de cargo, movimentos de voz etc.).\n**`/logging module`** — ativa ou desativa logging por áreas inteiras (mensagens, moderação, tickets, níveis, …).\n**`/logging disable`** — desativa o logging deste servidor."
+      },
+      "field3": {
+        "name": "Dicas",
+        "value": "• Use um canal de texto **somente da equipe**; logs podem incluir conteúdo e IDs.\n• Ative **`member_join`** e **`automod`** primeiro — ajuda contra raids e spam.\n• Combine com **`/automod set log`** para o histórico do automod."
+      },
+      "footer": "Página {current} de {total} • Próximo: verificação e onboarding",
+      "title": "Primeiros passos ({current}/{total}) — Logging"
+    },
+    "page3": {
+      "description": "A verificação bloqueia novos membros até completarem uma checagem. Auto roles e mensagens de boas-vindas cuidam do restante.",
+      "field1": {
+        "name": "Verificação",
+        "value": "**`/verifyconfig`** — escolha método, cargo de verificado, canal de verificação e canal de logs.\nMétodos: **Simple Button**, **Keypad Code** ou **Color Buttons**.\nO bot publica um painel persistente **Verify Me** no canal de verificação."
+      },
+      "field2": {
+        "name": "Cargos automáticos",
+        "value": "**`/autorole status`** — ver regras.\n**`/autorole add`** — criador interativo de regras (ao entrar, após primeira mensagem etc.).\n**`/autorole toggle`** — ativa/desativa autorole no servidor.\n**`/autorole test`** — prévia das regras que se aplicam a você."
+      },
+      "field3": {
+        "name": "Mensagens de boas-vindas e saída",
+        "value": "**`/welcome config`** — canal, mensagem, embed, mensagem fixa.\n**`/welcome test`** — prévia da boas-vindas.\n**`/leave config`** — mensagem de saída e pesquisa opcional.\n**`/leave test`** — prévia do comportamento de saída."
+      },
+      "footer": "Página {current} de {total} • Próximo: moderação",
+      "title": "Primeiros passos ({current}/{total}) — Verificação e onboarding"
+    },
+    "page4": {
+      "description": "Combine permissões do Discord, comandos slash do Coffeecord e automod para proteção em camadas.",
+      "field1": {
+        "name": "Moderação por slash",
+        "value": "**`/ban`** / **`/unban`** — banir por membro ou ID.\n**`/mute`** / **`/unmute`** — timeout com duração (minutos/horas).\n**`/hardmute`** — remove permissão de envio via cargos.\n**`/muterole create`** / **`update`** — configura cargo de mute.\n**`/giverole`** / **`/removerole`** — alterações manuais de cargo.\n**`/purge`** / **`/specific_purge`** — apagar mensagens em massa."
+      },
+      "field2": {
+        "name": "Modificação automática",
+        "value": "**`/automod overview`** — regras e status.\n**`/automod on`** / **`off`** — chave principal.\n**`/automod preset`** — aplica regras iniciais.\n**`/automod toggle rule`** — ativa/desativa regras específicas.\n**`/automod set log`** — canal de log do automod.\n**`/automod badword add`** — amplia o filtro de palavras."
+      },
+      "field3": {
+        "name": "Membros inativos",
+        "value": "**`/inactive info`** — como funciona.\n**`/inactive setup`** — dias de inatividade antes de agir, kick ou ban.\n**`/inactive bootstrap`** — marca membros atuais como ativos (rodar uma vez).\n**`/inactive enable`** / **`disable`** — verificações agendadas."
+      },
+      "footer": "Página {current} de {total} • Próximo: cargos e autoatendimento",
+      "title": "Primeiros passos ({current}/{total}) — Moderação"
+    },
+    "page5": {
+      "description": "Permita que membros escolham cargos sem chamar a equipe. Color roles e reaction roles são exclusivos por design.",
+      "field1": {
+        "name": "Papéis de reação",
+        "value": "**`/reactionrole create`** — cria um painel (botões ou reações).\n**`/reactionrole list`** / **`delete`** / **`edit`** / **`config`** — gerencia painéis.\nÓtimo para pings de jogos, regiões e notificações."
+      },
+      "field2": {
+        "name": "Papéis de cores",
+        "value": "**`/colorrole info`** — leia antes de configurar.\n**`/colorrole generate`** — cria cargos de cor predefinidos.\n**`/colorrole setup`** — rascunho guiado de painel (UI do Discord).\n**`/colorrole publish`** — publica o painel a partir do rascunho.\n**`/colorrole sync`** — corrige cores e ordem após edições manuais."
+      },
+      "field3": {
+        "name": "Avisos fixos",
+        "value": "**`/sticky_msg create`** — reposta uma mensagem no fim do canal quando novas mensagens chegam.\n**`/sticky_msg list`** / **`remove`** — gerencia regras fixas.\nÚtil para lembretes de regras ou suporte."
+      },
+      "footer": "Página {current} de {total} • Próximo: engajamento",
+      "title": "Primeiros passos ({current}/{total}) — Cargos e autoatendimento"
+    },
+    "page6": {
+      "description": "Mantenha a comunidade ativa com XP, enquetes e benefícios opcionais para apoiadores.",
+      "field1": {
+        "name": "Níveis e XP",
+        "value": "**`/level`** — mostra seu cartão (ou de outro usuário).\n**`/xp config`** — taxas de XP, cooldowns e canais ignorados (admin).\n**`/xpset`** — define XP/nível manualmente.\n**`/levelreward add`** — dá cargos por marcos de nível.\n**`/levelcard customize`** / **`preset`** — aparência do cartão."
+      },
+      "field2": {
+        "name": "Enquetes e diversão",
+        "value": "**`/poll`** — enquete com tempo e múltiplas opções.\n**`/quests list`** / **`checkin`** — engajamento diário de quests (se ativo).\nComandos de diversão (`/8ball`, `/flipcoin`, `/hug`, …) não precisam de setup — veja **`/help`**."
+      },
+      "field3": {
+        "name": "Apoiadores Ko-fi",
+        "value": "**`/kofi link`** — vincule um e-mail do Ko-fi à sua conta Discord.\n**`/kofi status`** / **`claim`** — status de apoiador.\nAdmins: **`/kofi add`** / **`remove`** para concessões manuais."
+      },
+      "footer": "Página {current} de {total} • Próximo: tickets e utilitários",
+      "title": "Primeiros passos ({current}/{total}) — Engajamento"
+    },
+    "page7": {
+      "description": "Fluxos de suporte e ferramentas de qualidade de vida para servidores maiores.",
+      "field1": {
+        "name": "Ingressos",
+        "value": "**`/ticket setup`** — canal do painel, categoria e cargo de suporte (interativo).\n**`/ticket add`** / **`remove`** — usuários no ticket atual.\n**`/ticket_export`** / **`ticket_import`** — backup/restauração JSON assinado."
+      },
+      "field2": {
+        "name": "Aplicações e chamadas",
+        "value": "**`/application setup`** — perguntas para candidatura da equipe e cargo revisor.\n**`/application`** — membros iniciam candidatura.\n**`/call create`** — hub de voz temporário; **`join`**, **`add`**, **`end`** fazem a gestão."
+      },
+      "field3": {
+        "name": "Tradução e slowmode",
+        "value": "**`/translate text`** — traduz um trecho.\n**`/translate settings`** — tradução ao vivo, idioma e envio por DM.\n**`/adaptive_slowmode`** — ajusta slowmode pela atividade (até 3 regras)."
+      },
+      "footer": "Página {current} de {total} • Próximo: admin e acabamento",
+      "title": "Primeiros passos ({current}/{total}) — Tickets e utilitários"
+    },
+    "page8": {
+      "description": "Controle quem pode usar comandos, personalize aparência e saiba onde pedir ajuda.",
+      "field1": {
+        "name": "Permissões de comando",
+        "value": "**`/command_perms docs`** — como as regras funcionam.\n**`/command_perms edit`** — presets de permissões por servidor (everyone, manage server, combinações).\nOs padrões já são bons; restrinja comandos sensíveis (purge, ban, modules) quando necessário."
+      },
+      "field2": {
+        "name": "Temas e identidade",
+        "value": "**`/theme list`** / **`set`** / **`preview`** — cores e estilo de embeds.\n**`/theme upload`** — tema JSON personalizado (há limite de tamanho).\n**`/theme responses`** — chaves de texto personalizadas."
+      },
+      "field3": {
+        "name": "Precisa de mais ajuda?",
+        "value": "**`/help`** — lista completa com busca.\n**`/about`** — versão, uptime e links.\n**`/getting_started`** — abra este guia quando quiser.\nEntre no **servidor de suporte** pelos botões de boas-vindas ou em **`/about`**."
+      },
+      "footer": "Página {current} de {total} • Você está pronto para configurar o Coffeecord ☕",
+      "title": "Primeiros passos ({current}/{total}) — Admin e acabamento"
+    }
+  },
+  "guild_join": {
+    "buttons": {
+      "getting_started": "Primeiros passos",
+      "invite_me": "Me convide",
+      "support_server": "Servidor de suporte"
+    },
+    "description": "Use os botões abaixo para suporte e um guia passo a passo.",
+    "title": "Obrigado por adicionar o Coffeecord!"
+  },
+  "help": {
+    "categories": {
+      "automod": "Modificação automática",
+      "calls": "Chamadas",
+      "fun": "Diversão",
+      "general": "Geral",
+      "kofi": "Ko-fi",
+      "leveling": "Níveis",
+      "logging": "Registros",
+      "misc": "Diversos",
+      "moderation": "Moderação",
+      "reaction_roles": "Cargos por reação",
+      "setup_wizard": "Assistente de configuração",
+      "themes": "Temas",
+      "tickets": "Ingressos",
+      "timers": "Temporizadores / Lembretes",
+      "translation": "Tradução",
+      "welcome_leave": "Boas-vindas e saída"
+    },
+    "cmd_description": "Ver comandos do bot ou buscar um específico",
+    "detail_missing": "Esse comando não está mais disponível.",
+    "detail_no_description": "Nenhuma descrição.",
+    "detail_optional": "opcional",
+    "detail_parameters": "Parâmetros",
+    "detail_required": "obrigatório",
+    "detail_usage": "Uso",
+    "footer_browse": "{count} comando(s) • /help search:<o que você quer fazer>",
+    "no_commands": "Nenhum comando slash registrado ainda.",
+    "param_search": "O que você quer fazer, ou `all` para listar todos (ex. banir, configurar logs, all)",
+    "search_footer": "Use o menu abaixo para detalhes completos de um comando.",
+    "search_intro": "Comandos que correspondem ao que você quer fazer:",
+    "search_none": "Nenhum comando encontrado para `{query}`. Tente outras palavras, ou use `all` para listar todos.",
+    "search_select_placeholder": "Mais informações sobre um comando…",
+    "title_page": "Ajuda — {label} ({current}/{total})",
+    "title_prefix": "📖 Ajuda — {label}"
+  },
+  "help_search": {
+    "detail_missing": "Esse comando não está mais disponível.",
+    "detail_no_description": "Sem descrição.",
+    "detail_optional": "opcional",
+    "detail_param_empty": "—",
+    "detail_parameters": "Parâmetros",
+    "detail_required": "obrigatório",
+    "detail_select_option_fallback": "Ver detalhes do comando",
+    "detail_select_placeholder": "Mais informações sobre um comando…",
+    "detail_usage": "Uso",
+    "results_footer": "Use o menu abaixo para detalhes completos de um comando.",
+    "results_intro": "Comandos que correspondem ao que você quer fazer:",
+    "results_more": "\n\n…e mais {count}. Refine sua busca.",
+    "results_none": "Nenhum comando encontrado.",
+    "results_title": "Busca: {query}",
+    "all_title": "Todos os comandos ({current}/{total})",
+    "all_intro": "Todos os comandos slash registrados ({count}):",
+    "all_footer": "Parte {current}/{total} • Use /help search:<tópico> para detalhes"
+  },
+  "inactive_members": {
+    "bootstrap_done": "Marcados **{count}** membros como ativos hoje.\nPróximo: `/inactive setup` então `/inactive enable`.",
+    "check_member": "**{member_name}**\nÚltimo ativo: {last_active}\nInatividade: **{idle_days}** dias (limite: {limit})\nAviso prévio: **{warn_status}** ({warn_schedule})\nProtegido: **{protected}**",
+    "disable_success": "As verificações inativas são **off**. O rastreamento ainda será executado se for ativado posteriormente.",
+    "enable_requires_bootstrap": "Execute `/inactive bootstrap` primeiro — marca os membros atuais como ativos.",
+    "enable_success": "As verificações inativas são **on**. Membros inativos por **{days}** dias podem ser {action}ed.",
+    "exempt_added": "{role} não será removido por inatividade.",
+    "exempt_already": "{role} já está isento.",
+    "exempt_removed": "{role} removido da lista de isentos.",
+    "field_action": "Ação",
+    "field_advance_warning": "Aviso prévio",
+    "field_bootstrapped": "Inicializado",
+    "field_exempt_roles": "Funções isentas",
+    "field_inactive_after": "Inativo depois",
+    "field_last_scan": "Última verificação",
+    "field_log_channel": "Canal de registro",
+    "field_module_on": "Módulo ativado (/modules)",
+    "field_next_step": "Próxima etapa",
+    "field_scanning_enabled": "Verificação ativada",
+    "info_footer": "Opções avançadas (regras de aviso, regex, atividade de voz) podem ser adicionadas posteriormente.",
+    "info_title": "Membros Inativos — Guia Rápido",
+    "manage_server_required": "Você precisa de **Manage Server** para alterar as configurações de membros inativos.",
+    "module_disabled": "Membros inativos estão desativados. Um administrador pode ativá-lo com `/modules`.",
+    "next_step_bootstrap": "Execute `/inactive bootstrap` e depois `/inactive setup`.",
+    "next_step_enable": "Execute `/inactive enable` quando estiver pronto.",
+    "scan_done": "Verificados **{count}** membros.",
+    "setup_done": "Feito. Membros sem mensagens por **{days}** dias serão **{action}**.\n{warn_schedule}\nAltere os avisos a qualquer momento com `/inactive warn`. Execute `/inactive bootstrap` se ainda não o fez, então `/inactive enable`.",
+    "status_title": "Status de membros inativos",
+    "warn_off": "Os DMs de aviso prévio são **off**. Os membros não serão avisados ​​antes da remoção.",
+    "warn_set": "Conjunto de aviso prévio. {warn_schedule}\nOs membros afetados recebem um DM quando ultrapassam esse limite de inatividade."
+  },
+  "language": {
+    "choice_en": "English",
+    "choice_es": "Español",
+    "choice_pt": "Português",
+    "choice_ru": "Русский",
+    "cmd_set_description": "Defina seu idioma para as respostas do Coffeecord.",
+    "cmd_status_description": "Mostra seu idioma atual do Coffeecord.",
+    "group_description": "Escolha seu idioma para as respostas do Coffeecord.",
+    "param_language": "Idioma para respostas e embeds que você vê.",
+    "set_success": "Seu idioma agora é **{language}**.",
+    "status_body": "O Coffeecord responde a você em **{language}**.",
+    "status_title": "Seu idioma"
+  },
+  "leveling": {
+    "default_reward_message": "🎉 {user} alcançou o nível {level} e ganhou {role}!",
+    "level_card_label_level": "Nível",
+    "level_card_label_rank": "Classificação",
+    "level_card_label_xp": "EXP",
+    "level_up_announcement": "🎉 {user} subiu para **Nível {level}**!",
+    "levelcard": {
+      "applied_preset": "✅ Preset `{preset}` aplicado ao seu cartão de nível.",
+      "download_failed": "❌ Falha ao baixar o fundo.",
+      "invalid_color": "❌ Cor inválida para `{key}`. Use hex como `#50FF78`.",
+      "invalid_image_url": "❌ URL de imagem inválida.",
+      "load_error": "❌ Erro ao carregar o fundo: {error}",
+      "no_changes": "ℹ️ Nenhuma alteração enviada. Defina pelo menos uma cor ou URL.",
+      "render_failed": "❌ Não foi possível renderizar o cartão de nível: {error}",
+      "supporter_gif_only": "🚫 Apenas supporters podem usar fundos GIF.",
+      "unknown_preset": "❌ Preset desconhecido selecionado.",
+      "updated_response": "✅ Cartão de nível atualizado: {preview}"
+    },
+    "levelreward": {
+      "added": "✅ Recompensa adicionada para o nível **{level}** -> {role}",
+      "list_line": "**Nível {level}** -> {role}",
+      "list_title": "🎁 Recompensas de nível",
+      "missing_role": "❓ Cargo ausente",
+      "mode_replace_off": "⚙️ Agora mantendo cargos antigos de recompensa.",
+      "mode_replace_on": "✅ Agora removendo cargos antigos de recompensa.",
+      "none_configured": "ℹ️ Nenhuma recompensa configurada ainda.",
+      "not_found": "❌ Nenhuma recompensa encontrada para esse nível.",
+      "removed": "🗑️ Recompensa removida para o nível **{level}**."
+    },
+    "xp": {
+      "base_xp": "**XP base (Nível 1):** {value}",
+      "config_title": "✅ Configuração de XP atualizada!",
+      "message_xp": "**XP por mensagem:** {value}",
+      "poll_vote_xp": "**XP por voto em enquete:** {value}",
+      "preview_header": "📊 **Prévia de XP:**",
+      "preview_line": "Nível {level}: {total_xp} XP total",
+      "reaction_xp": "**XP por reação:** {value}",
+      "scale": "**Escala de XP:** {value}",
+      "vc_minute_xp": "**XP por min no VC:** {value}"
+    },
+    "xpset": {
+      "success": "✅ XP de {user} definido para {xp} e nível para {level}."
+    }
+  },
+  "logging": {
+    "embed": {
+      "account_created": "Conta criada",
+      "action": "Ação",
+      "action_by": "Ação por",
+      "after": "Depois",
+      "author": "Autor",
+      "automod": "Modificação automática",
+      "before": "Antes",
+      "changes": "Mudanças",
+      "channel": "Canal",
+      "command": "Comando",
+      "content": "Conteúdo",
+      "details": "Detalhes",
+      "enabled": "Ativado",
+      "events": "Eventos",
+      "from": "De",
+      "log_channel": "Canal de logs",
+      "member": "Membro",
+      "message": "Mensagem",
+      "module": "Módulo",
+      "modules": "Módulos",
+      "no_reason": "Sem motivo",
+      "no_text": "Sem conteúdo de texto",
+      "no_text_short": "Sem texto",
+      "prefix": "Prefixo",
+      "reason": "Motivo",
+      "role": "Cargo",
+      "roles": "Cargos",
+      "rule": "Regra",
+      "slash": "Barra",
+      "source": "Fonte",
+      "target": "Alvo",
+      "to": "Para",
+      "type": "Tipo",
+      "unknown_channel": "Desconhecido",
+      "until": "Até",
+      "user": "Usuário"
+    },
+    "events": {
+      "automod": "Ação do automod",
+      "automod_action": "Ação de modificação automática",
+      "ban": "Membro banido",
+      "channel_create": "Canal criado",
+      "channel_delete": "Canal excluído",
+      "channel_update": "Canal atualizado",
+      "command_use": "Comando usado",
+      "member_join": "Membro entrou",
+      "member_leave": "Membro saiu",
+      "message_delete": "Mensagem excluída",
+      "message_edit": "Mensagem editada",
+      "module_action": "Ação do Módulo",
+      "module_event": "Evento de módulo",
+      "nickname_change": "Apelido alterado",
+      "role_assign": "Funções adicionadas",
+      "role_create": "Função criada",
+      "role_delete": "Função excluída",
+      "role_remove": "Funções removidas",
+      "role_update": "Função atualizada",
+      "ticket_event": "Evento de ticket",
+      "timeout": "Membro em timeout",
+      "timeout_added": "Timeout aplicado",
+      "timeout_removed": "Timeout removido",
+      "unban": "Membro desbanido",
+      "voice_join": "Junção de voz",
+      "voice_leave": "Licença por Voz",
+      "voice_move": "Movimento de voz",
+      "warn": "Membro advertido"
+    },
+    "status": {
+      "title": "Status de logs"
+    }
+  },
+  "moderation": {
+    "ban": {
+      "bot_hierarchy": "Não posso banir alguém com uma função igual ou superior à minha.",
+      "cmd_description": "Banir ou ban temporário de um membro.",
+      "dm_description": "Você foi banido de {guild_name}.",
+      "dm_title": "Você foi banido",
+      "duration_minutes": "{minutes} minuto(s)",
+      "duration_permanent": "Permanente",
+      "failed": "Não foi possível banir {member}.",
+      "hierarchy": "Você não pode banir alguém com uma função igual ou superior.",
+      "rollback": "O banimento foi aplicado, mas não consegui confirmar. O banimento foi revertido.",
+      "self_ban": "Você não pode se banir.",
+      "success": "🔨 {member} foi banido por {duration}.\nMotivo: {reason}",
+      "success_permanent": "🔨 {member} foi banido permanentemente.\nMotivo: {reason}"
+    },
+    "dm": {
+      "field_duration": "Duração",
+      "field_reason": "Motivo",
+      "field_server": "Servidor",
+      "notice_title": "Aviso de moderação: {action}"
+    },
+    "hardmute": {
+      "cannot_add_mute_role": "Não posso adicionar o cargo de mute (falta permissão ou hierarquia de cargos). Os cargos foram restaurados.",
+      "cannot_hardmute": "Não posso aplicar hardmute em {member}.",
+      "cmd_description": "Silenciar e remover todos os cargos de um usuário",
+      "missing_permissions": "Permissão ausente para gerenciar cargos (ou hierarquia de cargos).",
+      "success": "🔇 {member} silenciado forte. Cargos removidos: {count}"
+    },
+    "kick": {
+      "dm_description": "Você foi expulso de {guild_name}.",
+      "dm_title": "Você foi expulso"
+    },
+    "mute": {
+      "already_muted": "Esse membro já está silenciado.",
+      "cannot_add_mute_role": "Não posso adicionar o cargo de mute a {member} (falta permissão ou hierarquia de cargos).",
+      "cannot_mute": "Não posso silenciar {member}.",
+      "cmd_description": "Silenciar um membro por um tempo.",
+      "duration_hours": "{duration} hora(s)",
+      "duration_minutes": "{duration} minuto(s)",
+      "invalid_unit": "Unidade de tempo inválida. Use 'm' para minutos ou 'h' para horas.",
+      "role_missing": "O cargo de mute não existe. Atualize novamente.",
+      "role_not_set": "Cargo de mute não configurado. Use `/muterole_create` ou `/muterole_update`.",
+      "rollback": "O mute foi aplicado, mas não consegui confirmar neste canal. O mute foi revertido.",
+      "success": "🔇 {member} silenciado por {duration}.\nMotivo: {reason}"
+    },
+    "timeout": {
+      "dm_description": "Você foi isolado em {guild_name}.",
+      "dm_title": "Você foi isolado"
+    },
+    "unban": {
+      "bot_hierarchy": "Não tenho permissão para desbanir este usuário.",
+      "cmd_description": "Desbanir um usuário pelo ID (apenas admin)",
+      "not_banned": "Esse usuário não está banido.",
+      "success": "✅ Desbanido `{user_id}`."
+    },
+    "unmute": {
+      "cannot_remove_mute_role": "Não posso remover o cargo de mute de {member} (falta permissão ou hierarquia de cargos).",
+      "cannot_unmute": "Não posso remover o mute de {member}.",
+      "cmd_description": "Remover silêncio de um membro manualmente",
+      "not_muted": "Esse membro não está silenciado.",
+      "reason_expired": "A duração do mute expirou",
+      "reason_manual": "Remoção manual de mute pela equipe",
+      "role_not_set": "Nenhum cargo de mute configurado.",
+      "success": "🔊 Silêncio removido de {member}."
+    },
+    "warn": {
+      "dm_description": "Você recebeu um aviso em {guild_name}.",
+      "dm_title": "Você recebeu um aviso",
+      "success": "⚠️Avisado {member}.\nMotivo: {reason}"
+    }
+  },
+  "modules_cmd": {
+    "cannot_disable_self": "O comando de módulos não pode ser desabilitado.",
+    "group_description": "Ver e ativar/desativar módulos do servidor.",
+    "info_field_category": "Categoria",
+    "info_field_default": "Padrão",
+    "info_field_description": "Descrição",
+    "info_field_enabled_here": "Ativado aqui",
+    "info_field_id": "EU IA",
+    "info_field_path": "Caminho",
+    "info_title": "Módulo: {module}",
+    "no_description": "Sem descrição.",
+    "status_description": "Estado dos módulos por servidor.",
+    "status_footer": "Página {current}/{total} • Use /modules toggle <módulo> para alterar",
+    "status_title": "Status dos módulos",
+    "toggle_success_off": "Módulo **{module}** desativado neste servidor.",
+    "toggle_success_on": "Módulo **{module}** ativado neste servidor.",
+    "unknown_module": "Módulo desconhecido `{module_id}`."
+  },
+  "quests": {
+    "admin": {
+      "all_members": "todos os membros",
+      "created_title": "Missão criada",
+      "deleted": "Missão **{quest_name}** (`{quest_id}`) excluída.",
+      "enable_module_first": "Ative primeiro o módulo de missões (`/modules`).",
+      "expired": "expirada",
+      "goal_label": "meta {goal}",
+      "goal_line": "Meta: **{goal}** • {summary}",
+      "list_title": "Administração de missões",
+      "no_quests_configured": "Nenhuma missão configurada.",
+      "quest_not_found": "Nenhuma missão `{quest_id}`.",
+      "reaction_requires_fields": "Missões de reação precisam de **message_id** e **emoji**.",
+      "reset_progress": "Progresso redefinido para **{quest_name}** ({target}).",
+      "reward_line": "Recompensa: **{reward_xp}** XP",
+      "toggled": "A missão **{quest_name}** agora está **{state}**."
+    },
+    "board": {
+      "footer_daily_reset": "Missões do Coffeecord • As missões diárias resetam à meia-noite UTC",
+      "no_quests": "Ainda não há missões.\n\nAdmins podem executar `/quests admin create` para adicionar uma.",
+      "none_active": "Todas as missões estão expiradas, desativadas ou usam um tipo desconhecido.",
+      "title": "Quadro de missões"
+    },
+    "checkin": {
+      "already_description": "Você já resgatou o diário de hoje (UTC). Tente novamente após a meia-noite UTC.",
+      "already_title": "Check-in já feito",
+      "claimed_description": "**{quest_title}** resgatada.\n+**{xp_shown}** XP{xp_note}",
+      "default_daily_name": "Diário",
+      "leveling_off_note": "Leveling está desativado — XP não é concedido; recompensas de cargo ainda se aplicam.",
+      "no_daily_quest": "Não há missão de check-in diário. Admins podem criar uma com `/quests admin create` e **Check-in diário** como tipo de contagem.",
+      "no_quests_configured": "Nenhuma missão está configurada para este servidor.",
+      "title": "Check-in diário"
+    },
+    "footer": "Missões do Coffeecord",
+    "messages": {
+      "module_disabled": "As missões estão desativadas aqui. Um admin pode ativá-las com `/modules`.",
+      "module_disabled_short": "As missões estão desativadas aqui.",
+      "use_in_server": "Use isto em um servidor."
+    },
+    "quest_fallback_name": "Missão",
+    "rewards": {
+      "complete_title": "Missão concluída",
+      "no_xp_part": "_Sem recompensa de XP desta vez._",
+      "role_part": "**Cargo:** {role}",
+      "xp_part": "+**{reward_xp}** XP"
+    },
+    "rules": {
+      "any_role": "qualquer cargo: {roles}",
+      "channels": "{count} canal(is)",
+      "count_emojis": "emoticons",
+      "count_messages": "mensagens",
+      "count_reactions": "reações",
+      "daily_checkin": "Check-in diário (UTC)",
+      "role_ids": "ids de cargo: {count}",
+      "roles": "cargos: {roles}",
+      "separator": " • ",
+      "window_hours": "janela de {hours}h",
+      "window_minutes": "janela de {minutes}m",
+      "window_seconds": "janela de {seconds}s"
+    },
+    "status": {
+      "claimed_today": "✅ Resgatado hoje (UTC)",
+      "come_back_tomorrow": "Volte amanhã.",
+      "complete": "✅ Concluída",
+      "reward_claimed": "Recompensa resgatada.",
+      "use_checkin": "usar `/quests checkin`"
+    }
+  },
+  "reactionrole": {
+    "add_role_failed": "Não consegui adicionar essa função devido a um erro da API Discord.",
+    "add_role_success": "Adicionado {role}.",
+    "bot_member_unavailable": "O cache de membros do bot não está disponível.",
+    "cannot_manage_role_hierarchy": "Não consigo gerenciar essa função devido à hierarquia de funções.",
+    "config_updated": "Configuração atualizada: enabled={enabled}, default_mode={mode}, default_logging={logging}",
+    "delete_success": "Painel excluído `{message_id}`.",
+    "disabled": "As funções de reação estão desabilitadas para este servidor.",
+    "field_configured_panels": "Painéis Configurados",
+    "field_enabled": "Habilitado",
+    "field_panels": "Painéis",
+    "list_empty": "Nenhum painel de função de reação configurado.",
+    "list_title": "Painéis de funções de reação",
+    "mapped_role_missing": "Esse papel não existe mais. Peça à equipe para atualizar este painel.",
+    "max_roles_per_panel": "Selecione no máximo {max_roles} funções por painel.",
+    "max_roles_reached": "Você só pode manter {max_roles} funções neste painel.",
+    "message_id_numeric": "O ID da mensagem deve ser numérico.",
+    "missing_manage_roles": "Eu preciso de permissão `Manage Roles`.",
+    "missing_required_roles": "Você precisa das funções obrigatórias: {roles}",
+    "panel_created": "✅ Painel de função de reação criado em {channel} (`{message_id}`) — {summary}. Os membros podem escolher várias funções neste painel, a menos que você defina **remove_others** ou **max_roles** em `/reactionrole edit`.",
+    "panel_missing": "Este painel de funções de reação não existe mais.",
+    "panel_not_found": "Painel não encontrado.",
+    "panel_requires_one_mapping": "O painel deve manter pelo menos um mapeamento de função.",
+    "panel_updated": "Painel atualizado `{message_id}`.",
+    "provide_role_for_remove": "Forneça `role` ao usar `remove_mapping`.",
+    "reaction_add_partial_failure": "Painel criado, mas não foi possível adicionar algumas reações: {failed}. Use `/reactionrole edit` para corrigir emojis.",
+    "reaction_mode_max_guided": "O modo de reação suporta até {max_roles} funções na configuração guiada. Use menos funções aqui ou adicione mais com `/reactionrole edit`.",
+    "remove_role_failed": "Não consegui remover essa função devido a um erro da API Discord.",
+    "remove_role_success": "Removido {role}.",
+    "role_not_mapped": "Essa função não está mapeada neste painel.",
+    "role_option_missing": "Esta opção de função não existe mais.",
+    "select_channel_first": "Selecione um canal primeiro.",
+    "select_one_role": "Selecione pelo menos uma função.",
+    "set_label_or_emoji_first": "Defina primeiro o rótulo do botão ou o emoji de reação (etapa 4).",
+    "setup_owner_only": "Esta configuração pertence a outro moderador.",
+    "target_role_hierarchy_block": "A hierarquia de papéis impede essa mudança.",
+    "update_existing_roles_failed": "Não consegui atualizar suas funções existentes no painel."
+  },
+  "setup_wizard": {
+    "buttons": {
+      "back": "Voltar",
+      "bot_checks": "Checks do bot",
+      "cancel": "Cancelar",
+      "confirm": "Confirmar",
+      "discord_automod": "AutoMod do Discord",
+      "edit_blocked_words": "Editar palavras bloqueadas",
+      "edit_leave_message": "Editar mensagem de saída",
+      "edit_panel_message": "Editar mensagem do painel",
+      "edit_ticket_text": "Editar texto do ticket",
+      "edit_welcome_message": "Editar mensagem de boas-vindas",
+      "enable_tickets": "Ativar tickets",
+      "next": "Próximo",
+      "one_ticket_per_user": "Um ticket por usuário",
+      "preview_logging": "Teste de log (prévia)",
+      "set_emojis": "Definir emojis",
+      "skip": "Pular",
+      "start": "Iniciar",
+      "toggle_embed": "Alternar embed",
+      "toggle_enabled": "Ativar/Desativar",
+      "toggle_exit_survey": "Alternar pesquisa de saída"
+    },
+    "defaults": {
+      "ticket_button": "Abrir Ticket"
+    },
+    "features": {
+      "automod": "Modificação automática",
+      "leave": "Mensagens de saída",
+      "logging": "Registro",
+      "reaction_roles": "Papéis de reação",
+      "tickets": "Ingressos",
+      "welcome": "Mensagens de boas-vindas"
+    },
+    "logging_events": {
+      "automod_actions": "Ações do automod",
+      "member_join_leave": "Entrada/Saída de membro",
+      "member_leave": "Saída de membro",
+      "message_delete_edit": "Mensagem apagada/editada",
+      "message_edited": "Mensagem editada",
+      "warns": "Avisos"
+    },
+    "match_type": {
+      "contains": "Contém",
+      "ends_with": "Termina com",
+      "starts_with": "Começa com"
+    },
+    "messages": {
+      "applied_description": "Todos os módulos selecionados foram salvos com sucesso.",
+      "applied_title": "Setup aplicado",
+      "apply_failed_description": "Nenhuma alteração foi aplicada. Motivo: {reason}",
+      "apply_failed_title": "Falha ao aplicar",
+      "belongs_to_other_admin": "Este assistente de setup pertence a outro administrador.",
+      "cancelled_description": "Rascunho descartado. Nenhuma alteração foi aplicada.",
+      "cancelled_title": "Setup cancelado",
+      "cannot_apply_title": "Não foi possível aplicar o setup",
+      "draft_discarded": "Rascunho descartado.",
+      "fix_before_confirm": "Corrija permissões/configuração antes de confirmar.",
+      "no_active_draft": "Nenhum rascunho ativo encontrado. Use `/setup` primeiro.",
+      "no_active_draft_short": "Nenhum rascunho ativo encontrado.",
+      "preview_log_notice": "Apenas prévia: uma entrada de log de teste seria enviada após Confirmar.",
+      "run_in_server": "Use isto em um servidor.",
+      "select_one_feature": "Selecione ao menos um recurso antes de iniciar."
+    },
+    "modal": {
+      "blocked_words": {
+        "label": "Palavras separadas por vírgula",
+        "placeholder": "palavra1, palavra2, frase3",
+        "title": "Palavras bloqueadas"
+      },
+      "message_template": {
+        "label": "Modelo de mensagem",
+        "placeholder": "Use placeholders como {user_mention}, {server_name}"
+      },
+      "reaction_emojis": {
+        "label": "Emojis separados por vírgula (1-3)",
+        "placeholder": "✅, 🎮, 📣",
+        "title": "Emojis de reaction role"
+      },
+      "reaction_message": {
+        "title": "Mensagem de reaction role"
+      },
+      "ticket_text": {
+        "button_label": "Rótulo do botão",
+        "message_label": "Mensagem do ticket",
+        "title": "Texto do painel de tickets"
+      }
+    },
+    "placeholders": {
+      "blocked_word_match_type": "Tipo de correspondência de palavra bloqueada",
+      "exempt_channel": "Canal isento (setup rápido)",
+      "exempt_roles": "Cargos isentos",
+      "exit_survey_type": "Tipo de pesquisa de saída",
+      "leave_channel": "Canal de saída",
+      "logging_channel": "Canal de logs",
+      "logging_events": "Selecione eventos de logging",
+      "reaction_role_mode": "Modo de reaction role",
+      "reaction_role_panel_channel": "Canal do painel de reaction roles",
+      "select_reaction_roles": "Selecione 1-3 cargos",
+      "support_roles": "Cargos de suporte",
+      "ticket_category_or_channel": "Selecione categoria de ticket (ou canal)",
+      "ticket_panel_channel": "Canal do painel de tickets",
+      "welcome_channel": "Canal de boas-vindas"
+    },
+    "rr_mode": {
+      "radio": "Rádio (remove outros cargos)",
+      "toggle": "Alternar"
+    },
+    "screen": {
+      "confirm": {
+        "description": "Revise seu rascunho. Nada foi aplicado ainda.",
+        "title": "Confirmar setup"
+      },
+      "not_configured": "Não configurado.",
+      "notice_field": "Aviso",
+      "select": {
+        "description": "Selecione o que você deseja configurar. Você pode pular qualquer etapa.",
+        "none_selected": "Nada selecionado ainda.",
+        "selected_field": "Selecionado",
+        "title": "Setup rápido do Coffeecord"
+      },
+      "step": {
+        "current_draft_field": "Rascunho atual",
+        "description": "Este é um passo de rascunho. Nada é aplicado até Confirmar.",
+        "footer": "Etapa {current}/{total}",
+        "title": "Setup rápido • {feature}"
+      }
+    },
+    "select": {
+      "features": {
+        "placeholder": "Selecione módulos para configurar"
+      }
+    },
+    "survey_mode": {
+      "free_text": "Texto livre",
+      "preset": "Opções prontas"
+    },
+    "validation": {
+      "automod_manage_guild": "{label}: o bot precisa de Gerenciar Servidor para regras do AutoMod do Discord.",
+      "bot_member_unavailable": "O objeto do membro do bot não está disponível neste servidor.",
+      "channel_invalid": "{label}: canal selecionado inválido.",
+      "channel_not_selected": "{label}: nenhum canal selecionado.",
+      "needs_embed_links": "{label}: o bot precisa de permissão de embed em {channel}.",
+      "needs_view_send": "{label}: o bot precisa ver/enviar mensagens em {channel}.",
+      "reaction_roles_need_role": "{label}: selecione ao menos um cargo.",
+      "tickets_manage_channels": "{label}: o bot precisa de Gerenciar Canais para criar canais de ticket.",
+      "tickets_manage_roles": "{label}: o bot precisa de Gerenciar Cargos para aplicar permissões de ticket.",
+      "tickets_need_support_role": "{label}: selecione ao menos um cargo de suporte."
+    }
+  },
+  "slash": {
+    "about": {
+      "description": "Saiba mais sobre o Coffeecord"
+    },
+    "automod": {
+      "badword_add": {
+        "description": "Adicionar uma palavra bloqueada a Bad_words"
+      },
+      "badword_group": {
+        "description": "Gerir palavras bloqueadas"
+      },
+      "badword_list": {
+        "description": "Palavras Bloqueadas"
+      },
+      "badword_remove": {
+        "description": "Remover uma palavra bloqueada de Bad_words"
+      },
+      "channel_group": {
+        "description": "Gerir substituições de canais"
+      },
+      "channel_overrideclear": {
+        "description": "Limpar substituição de regra específica do canal"
+      },
+      "channel_overrideset": {
+        "description": "Definir um valor de regra específico do canal"
+      },
+      "description": "Comandos de gestão do módulo automático",
+      "escalation_group": {
+        "description": "Alertar definições de escalonamento"
+      },
+      "escalation_warn": {
+        "description": "Definir ações de escalonamento de aviso para WARN 1 a WARN 5"
+      },
+      "exempt_group": {
+        "description": "Funções isentas da imposição de automod"
+      },
+      "exempt_list": {
+        "description": "Listar funções isentas de automod"
+      },
+      "exempt_role": {
+        "description": "Adicionar/remover isenção de função do automod"
+      },
+      "group": {
+        "description": "Comandos de gestão do módulo automático"
+      },
+      "off": {
+        "description": "Desativar automod para esta guilda"
+      },
+      "on": {
+        "description": "Ativar automod para esta guilda"
+      },
+      "overview": {
+        "description": "Ver estado do automod e regras ativadas"
+      },
+      "preset": {
+        "description": "Aplicar uma predefinição de automod diretamente ou através de botões"
+      },
+      "reload": {
+        "description": "Recarregar a configuração do automod do disco"
+      },
+      "set_action": {
+        "description": "Definir a ação para uma regra de automod"
+      },
+      "set_deletemessage": {
+        "description": "Definir o comportamento de delete_message para uma regra"
+      },
+      "set_group": {
+        "description": "Definir valores de automod"
+      },
+      "set_log": {
+        "description": "Definir canal de registo automático (ou limpar)"
+      },
+      "set_value": {
+        "description": "Definir valores de configuração numérica para uma regra"
+      },
+      "set_violationwarns": {
+        "description": "Conte as violações da regra de automod como avisos (e ative o escalonamento de alertas)."
+      },
+      "status": {
+        "description": "Mostrar estado do automod"
+      },
+      "toggle_group": {
+        "description": "Alternar definições do automod"
+      },
+      "toggle_rule": {
+        "description": "Ativar/desativar uma regra de automod específica"
+      },
+      "warn_add": {
+        "description": "Adicionar manualmente um aviso (usa o automod avisa o armazenamento)"
+      },
+      "warn_clear": {
+        "description": "Limpar todos os avisos para um utilizador"
+      },
+      "warn_group": {
+        "description": "Gerir avisos automod"
+      },
+      "warn_list": {
+        "description": "Mostrar alertas automod para um membro"
+      },
+      "warn_remove": {
+        "description": "Remover um aviso por índice (ou mais recente)"
+      },
+      "whitelist_channel": {
+        "description": "Adicionar/remover um canal da lista de permissões do automod"
+      },
+      "whitelist_group": {
+        "description": "Gerir lista de permissões automod"
+      },
+      "whitelist_role": {
+        "description": "Adicionar/remover uma função da lista de permissões do automod"
+      }
+    },
+    "autorole": {
+      "add": {
+        "description": "Crie uma regra de função automática com uma configuração interativa simples."
+      },
+      "remove": {
+        "description": "Remover uma regra de função automática por ID."
+      },
+      "status": {
+        "description": "Mostrar configuração de função automática atual."
+      },
+      "test": {
+        "description": "Simule quais regras de função automática se aplicam a você."
+      },
+      "toggle": {
+        "description": "Ativar ou desativar funções automáticas para este servidor."
+      }
+    },
+    "ban": {
+      "description": "Banir ou tempban um membro."
+    },
+    "colorrole": {
+      "clear": {
+        "description": "Remova as funções de cor de um membro de todos os painéis."
+      },
+      "delete": {
+        "description": "Excluir um painel de função de cor por ID de mensagem."
+      },
+      "edit": {
+        "description": "Edite um painel de funções de cores."
+      },
+      "generate": {
+        "description": "Crie ou reutilize 10 funções de cores predefinidas e hierarquia de sincronização."
+      },
+      "info": {
+        "description": "Como configurar funções de cor neste servidor."
+      },
+      "list": {
+        "description": "Listar painéis de função de cores neste servidor."
+      },
+      "publish": {
+        "description": "Publique um painel a partir do rascunho salvo."
+      },
+      "setup": {
+        "description": "Configuração guiada para um painel de funções de cores."
+      },
+      "sync": {
+        "description": "Corrija as cores das funções de cor e as posições de hierarquia."
+      }
+    },
+    "fun": {
+      "8ball": {
+        "description": "Faça uma pergunta à bola mágica 8."
+      },
+      "abracadaberamotherafu": {
+        "description": "💥 Conjura um poderoso feitiço de uma GRANDE arma de TANQUE do tanque Toefingers em um tanque!"
+      },
+      "ak47": {
+        "description": "Envie um gif aleatório de AK-47"
+      },
+      "bet": {
+        "description": "Faça uma aposta com outro utilizador."
+      },
+      "cat": {
+        "description": "Tire uma foto de um gato aleatório"
+      },
+      "dare": {
+        "description": "Dê a alguém um desafio de ousadia."
+      },
+      "dog": {
+        "description": "Obter uma foto de um cão (opcionalmente por raça)"
+      },
+      "flipcoin": {
+        "description": "Jogue uma moeda, opcionalmente com um prémio."
+      },
+      "giftnuke": {
+        "description": "Envie um presente... surpresa! 🎁"
+      },
+      "hug": {
+        "description": "Dê um abraço em alguém."
+      },
+      "kiss": {
+        "description": "Beije alguém."
+      },
+      "lovecalc": {
+        "description": "Calcule a compatibilidade de amor entre dois utilizadores."
+      },
+      "petpet": {
+        "description": "Gerar um GIF petpet do avatar de um utilizador"
+      },
+      "roast": {
+        "description": "Enviar um assado aleatório"
+      },
+      "truth": {
+        "description": "Faça uma pergunta verdadeira a alguém."
+      },
+      "uwuify": {
+        "description": "Converter texto para estilo uwu"
+      }
+    },
+    "getting_started": {
+      "description": "Guia paginado detalhado para configurar o Coffeecord"
+    },
+    "hardmute": {
+      "description": "Silenciar e remover todas as funções de um utilizador"
+    },
+    "help": {
+      "description": "Ver comandos de bot ou procurar um específico"
+    },
+    "history": {
+      "user": {
+        "description": "Mostrar aviso + histórico de notas para um membro."
+      }
+    },
+    "inactive": {
+      "bootstrap": {
+        "description": "Configuração única: marque todos os membros atuais como ativos hoje."
+      },
+      "check": {
+        "description": "Veja quando um membro foi contado pela última vez como ativo."
+      },
+      "description": "Remova membros que não enviam mensagens há algum tempo.",
+      "disable": {
+        "description": "Desative as verificações automáticas de membros inativos."
+      },
+      "enable": {
+        "description": "Ative as verificações automáticas de membros inativos."
+      },
+      "exempt_add": {
+        "description": "Isentar uma função de remoção inativa."
+      },
+      "exempt_remove": {
+        "description": "Remover uma função da lista de isentos."
+      },
+      "info": {
+        "description": "Como configurar a remoção de membros inativos."
+      },
+      "scan": {
+        "description": "Execute uma verificação inativa agora (teste de administrador)."
+      },
+      "setup": {
+        "description": "Defina quantos dias sem uma mensagem antes de chutar ou banir."
+      },
+      "status": {
+        "description": "Veja se a remoção inativa está configurada e em execução."
+      },
+      "warn": {
+        "description": "Defina quantos dias antes da remoção para DM um aviso prévio."
+      }
+    },
+    "language": {
+      "description": "Escolha seu idioma para as respostas do Coffeecord",
+      "set": {
+        "description": "Defina seu idioma para as respostas do Coffeecord."
+      },
+      "status": {
+        "description": "Mostra seu idioma atual do Coffeecord."
+      }
+    },
+    "leave": {
+      "config": {
+        "description": "Configure as definições da mensagem de saída."
+      },
+      "description": "Configure mensagens de saída e pesquisas de saída.",
+      "test": {
+        "description": "Envie uma mensagem de saída de teste."
+      }
+    },
+    "level": {
+      "description": "Mostre o seu cartão de nível ou o de outro utilizador."
+    },
+    "levelcard": {
+      "description": "Comandos de personalização do cartão de nível"
+    },
+    "levelreward": {
+      "description": "Comandos de função de recompensa de nível"
+    },
+    "lock": {
+      "description": "Bloqueie um canal para @todos (envie mensagens desligadas)."
+    },
+    "logging": {
+      "description": "Comandos de configuração de log do servidor.",
+      "disable": {
+        "description": "Desativar o registo para este servidor."
+      },
+      "module": {
+        "description": "Ativar ou desativar um módulo de registo."
+      },
+      "setup": {
+        "description": "Defina o canal de registo e ative o registo."
+      },
+      "status": {
+        "description": "Mostrar estado de registo para este servidor."
+      },
+      "toggle": {
+        "description": "Ativar ou desativar um evento de registo específico."
+      }
+    },
+    "modules": {
+      "description": "Visualize e alterne os módulos do servidor."
+    },
+    "mute": {
+      "description": "Silenciar um membro por um tempo especificado."
+    },
+    "note": {
+      "add": {
+        "description": "Adicione uma nota de pessoal para um utilizador."
+      },
+      "view": {
+        "description": "Ver notas do pessoal para um utilizador."
+      }
+    },
+    "poll": {
+      "description": "Criar uma sondagem"
+    },
+    "purge": {
+      "description": "Purga avançada com filtros e confirmação."
+    },
+    "quests": {
+      "checkin": {
+        "description": "Reivindique a sua missão diária de check-in (dia UTC)"
+      },
+      "description": "Solicitações do servidor, progresso e check-in diário",
+      "list": {
+        "description": "Veja as missões ativas e o seu progresso"
+      }
+    },
+    "reactionrole": {
+      "config": {
+        "description": "Definir padrões para painéis de função de reação neste servidor."
+      },
+      "create": {
+        "description": "Crie um painel de funções de reação com configuração guiada (selecione várias funções ao mesmo tempo)."
+      },
+      "delete": {
+        "description": "Exclua um painel de função de reação por ID de mensagem."
+      },
+      "edit": {
+        "description": "Edite mapeamentos e opções avançadas para um painel."
+      },
+      "list": {
+        "description": "Liste os painéis de função de reação neste servidor."
+      }
+    },
+    "setup": {
+      "description": "Inicie o assistente de configuração rápida do Coffeecord."
+    },
+    "setup_cancel": {
+      "description": "Descarte o rascunho de configuração rápida."
+    },
+    "setup_resume": {
+      "description": "Retome o seu rascunho de configuração rápida."
+    },
+    "staff_utils": {
+      "giverole": {
+        "description": "Dar uma função a todos/humanos/bots com feedback de progresso."
+      },
+      "lock": {
+        "description": "Bloqueie um canal para @todos (envie mensagens desligadas)."
+      },
+      "lockdown": {
+        "description": "Aplique restrições de bloqueio de emergência a este servidor."
+      },
+      "nuke": {
+        "description": "Exclua e recrie um canal (com confirmação)."
+      },
+      "purge": {
+        "description": "Purga avançada com filtros e confirmação."
+      },
+      "removerole": {
+        "description": "Remova uma função de todos/humanos/bots com feedback de progresso."
+      },
+      "slowmode": {
+        "description": "Defina o modo lento do canal em segundos."
+      },
+      "unlock": {
+        "description": "Desbloqueie um canal para @everyone."
+      },
+      "unlockdown": {
+        "description": "Restaure as permissões do canal salvas por /lockdown."
+      },
+      "userinfo": {
+        "description": "Mostrar informações detalhadas sobre o histórico do utilizador e da moderação."
+      }
+    },
+    "sticky_msg": {
+      "create": {
+        "description": "Crie ou substitua um sticky nomeado num canal."
+      },
+      "list": {
+        "description": "Listar regras fixas para este servidor."
+      },
+      "remove": {
+        "description": "Remova uma regra fixa nomeada (e tente excluir sua última postagem)."
+      }
+    },
+    "theme": {
+      "delete": {
+        "description": "Eliminar um tema personalizado (apenas apoiantes)"
+      },
+      "description": "Personalize temas de moderação DM e respostas de comando.",
+      "group": {
+        "description": "Temas de mensagens de moderação"
+      },
+      "info": {
+        "description": "Mostrar tema e definições atuais"
+      },
+      "list": {
+        "description": "Listar temas disponíveis (DMs de moderação + respostas de comando)"
+      },
+      "preview": {
+        "description": "Pré-visualizar as mensagens de moderação de um tema"
+      },
+      "responses_clear": {
+        "description": "Limpar todas as substituições de resposta de comando (apenas apoiadores)"
+      },
+      "responses_discover": {
+        "description": "Listar todos os comandos de barra que podem ser substituídos"
+      },
+      "responses_group": {
+        "description": "Personalizar mensagens de resposta de comando"
+      },
+      "responses_keys": {
+        "description": "Listar as chaves de resposta comuns e substituir o formato"
+      },
+      "responses_list": {
+        "description": "Listar substituições de resposta de comando configuradas"
+      },
+      "responses_presets": {
+        "description": "Listar temas de resposta predefinidos (uso /tema definido para aplicar)"
+      },
+      "responses_upload": {
+        "description": "A resposta do comando de upload substitui o JSON (somente suportes)"
+      },
+      "set": {
+        "description": "Definir o tema do servidor (moderação DMs + respostas de comando)"
+      },
+      "upload": {
+        "description": "Carregar um tema personalizado (apenas apoiantes)"
+      }
+    },
+    "ticket": {
+      "add": {
+        "description": "Adicionar um utilizador a este bilhete"
+      },
+      "description": "Painel de tickets e comandos de gestão.",
+      "group": {
+        "description": "Comandos do sistema de tickets"
+      },
+      "remove": {
+        "description": "Remover um utilizador deste bilhete"
+      },
+      "setup": {
+        "description": "Configurar o sistema de tickets"
+      }
+    },
+    "translate": {
+      "description": "Traduzir texto e gerir as definições de tradução.",
+      "reset": {
+        "description": "Redefinir o uso de tradução de um utilizador (apenas administrador)."
+      },
+      "settings": {
+        "description": "Configure as suas preferências de tradução ao vivo."
+      },
+      "text": {
+        "description": "Traduzir o texto para outro idioma."
+      },
+      "usage": {
+        "description": "Veja os seus limites de uso de tradução."
+      }
+    },
+    "unban": {
+      "description": "Remover a proibição de um utilizador do servidor por ID (apenas administrador)"
+    },
+    "uninstall": {
+      "description": "Desinstale o Coffeecord deste servidor."
+    },
+    "unlock": {
+      "description": "Desbloqueie um canal para @everyone."
+    },
+    "unmute": {
+      "description": "Desativar mudo de um membro manualmente"
+    },
+    "verifyconfig": {
+      "description": "Configurar o sistema de verificação do Coffeecord"
+    },
+    "welcome": {
+      "config": {
+        "description": "Configure as definições da mensagem de boas-vindas."
+      },
+      "description": "Configure mensagens de boas-vindas para novos membros.",
+      "test": {
+        "description": "Envie uma mensagem de boas-vindas de teste."
+      }
+    },
+    "xp": {
+      "description": "XP e comandos de configuração de nivelamento"
+    },
+    "xpset": {
+      "description": "Defina o XP e o nível de um usuário (somente administrador)"
+    },
+    "backup": {
+      "description": "Backups criptografados da estrutura do servidor e da config do Coffeecord.",
+      "create": {
+        "description": "Criar um backup criptografado do servidor."
+      },
+      "list": {
+        "description": "Listar backups criptografados armazenados no host neste servidor."
+      },
+      "download": {
+        "description": "Baixar novamente um backup criptografado do host."
+      },
+      "delete": {
+        "description": "Excluir um slot de backup criptografado no host."
+      },
+      "restore": {
+        "description": "Restaurar um servidor a partir de um backup criptografado."
+      }
+    }
+  },
+  "staff_utils": {
+    "applying_lockdown_body": "Aplicando substituições de permissão...",
+    "applying_lockdown_title": "Aplicando bloqueio",
+    "cancelled_body": "Nenhuma ação foi aplicada.",
+    "cancelled_title": "Cancelado",
+    "channel_locked_body": "{channel} agora está bloqueado.",
+    "channel_locked_title": "Canal bloqueado",
+    "channel_nuked_body": "Canal recriado: {channel}",
+    "channel_nuked_title": "Canal Nuked",
+    "channel_unlocked_body": "{channel} agora está desbloqueado.",
+    "channel_unlocked_title": "Canal desbloqueado",
+    "confirm_lockdown_title": "Confirmar bloqueio",
+    "confirm_nuke_body": "Isso excluirá e recriará {channel}.\nIsto é destrutivo.",
+    "confirm_nuke_title": "Confirmar Nuke",
+    "invalid_channel_body": "Escolha um canal de texto.",
+    "invalid_channel_title": "Canal inválido",
+    "invalid_note_body": "O texto da nota não pode estar vazio.",
+    "invalid_note_title": "Nota inválida",
+    "invoker_only": "Somente o invocador do comando pode usar isso.",
+    "lock_failed_body": "Não foi possível bloquear o canal: `{error}`",
+    "lock_failed_title": "Falha no bloqueio",
+    "lockdown_active_body": "Execute `/unlockdown` antes de aplicar novamente.",
+    "lockdown_active_summary_title": "Bloqueio ativo",
+    "lockdown_active_title": "Bloqueio já ativo",
+    "lockdown_removed_body": "**{count}** funções/channel permission overwrite(s) restauradas do instantâneo salvo.",
+    "lockdown_removed_title": "Bloqueio removido",
+    "module_disabled_body": "Os utilitários da equipe estão desabilitados neste servidor. Ative com `/modules`.",
+    "module_disabled_title": "Módulo desabilitado",
+    "no_lockdown_body": "Não há bloqueio ativo para restaurar.",
+    "no_lockdown_title": "Nenhum bloqueio ativo",
+    "note_added_body": "Nota salva para {user}.",
+    "note_added_title": "Nota adicionada",
+    "nuke_failed_body": "Não foi possível destruir o canal: `{error}`",
+    "nuke_failed_title": "Arma nuclear falhou",
+    "purge_complete_body": "Purgar {status}. Excluídas **{deleted}** de **{total}** mensagens correspondentes.",
+    "purge_complete_title": "Purga concluída",
+    "purge_confirm_prompt": "Pressione **Confirm** para excluir as mensagens correspondentes.",
+    "purge_no_matches": "Nenhuma mensagem corresponde.",
+    "purge_preview_title": "Pré-visualização da eliminação",
+    "purge_progress": "Processado **{processed}/{total}** · Excluído **{deleted}**",
+    "purge_running_body": "Excluindo mensagens correspondentes...",
+    "purge_running_title": "Purgar em execução",
+    "purge_stop_owner_only": "Somente o invocador do comando pode interromper essa limpeza.",
+    "role_hierarchy_error_body": "A função do bot deve estar acima da função de destino.",
+    "role_hierarchy_error_title": "Erro de hierarquia de funções",
+    "server_only_body": "Use este comando em um servidor.",
+    "server_only_title": "Apenas servidor",
+    "slowmode_failed_body": "Não foi possível atualizar o modo lento: `{error}`",
+    "slowmode_failed_title": "Falha no modo lento",
+    "slowmode_updated_body": "{channel} modo lento definido como **{seconds}s**.",
+    "slowmode_updated_title": "Modo lento atualizado",
+    "stopping_purge_body": "Parada de emergência solicitada. Concluindo a ação de exclusão atual.",
+    "stopping_purge_title": "Parando a purga",
+    "unavailable_member_body": "Não foi possível resolver esse membro neste servidor.",
+    "unavailable_title": "Indisponível",
+    "unlock_failed_body": "Não foi possível desbloquear o canal: `{error}`",
+    "unlock_failed_title": "Falha no desbloqueio",
+    "unsupported_channel_body": "Use isso em um canal de texto.",
+    "unsupported_channel_title": "Canal não suportado"
+  },
+  "sticky_msg": {
+    "bot_member_unavailable": "Membro do bot não disponível.",
+    "create_success": "✅ Sticky `{rule_id}` definido para {channel}. Ele irá para a parte inferior após novas mensagens.",
+    "embed_title": "📌 pegajoso",
+    "invalid_rule_id": "`rule_id` inválido. Use de 1 a 100 caracteres: letras, dígitos, `_`, `-` apenas.",
+    "list_empty": "Nenhuma regra fixa configurada.",
+    "list_title": "Regras fixas",
+    "max_rules_reached": "Máximo de **{limit}** regras fixas por servidor para sua conta. Remova um primeiro.{hint}",
+    "missing_channel_perms": "Preciso de **Send Messages**, **View Channel** e **Manage Messages** nesse canal.",
+    "missing_embed_perms": "Preciso de **Embed Links** nesse canal para incorporar stickies.",
+    "remove_not_found": "Nenhuma regra fixa chamada `{rule_id}`.",
+    "remove_success": "✅ Removido pegajoso `{rule_id}`."
+  },
+  "themes": {
+    "command_count": "{count} comando(s)",
+    "custom_theme_deleted": "Tema personalizado **{theme}** excluído. Tema do servidor redefinido para o padrão.",
+    "custom_theme_uploaded": "Tema personalizado **{theme}** carregado. Use /theme set {theme} para aplicar.",
+    "delete_not_custom_theme": "`{theme}` não é um tema personalizado. Você só pode excluir temas personalizados (carregados por /theme upload).",
+    "field_command_responses": "Respostas de Comando",
+    "field_description": "Descrição",
+    "field_moderation_dms": "DMs de moderação",
+    "field_type": "Tipo",
+    "info_title": "Informações do tema",
+    "invalid_theme_filename": "Nome de tema inválido. O nome do arquivo (sem .json) deve usar apenas letras, números, hifens e sublinhados.",
+    "invalid_theme_name": "Nome de tema inválido. Use apenas letras, números, hífens e sublinhados.",
+    "invalid_theme_name_short": "Nome de tema inválido.",
+    "list_empty": "Nenhum tema encontrado. O tema padrão será usado.",
+    "list_footer": "Use /theme set <nome> para aplicar (DMs de moderação + respostas de comando)",
+    "list_title": "Temas disponíveis",
+    "max_custom_themes_reached": "Máximo de {max_count} temas personalizados por servidor. Exclua um com /theme delete first.",
+    "no_description": "Nenhuma descrição.",
+    "none_default_messages": "Nenhum (mensagens padrão)",
+    "responses_cleared": "Substituições de resposta de comando desmarcadas.",
+    "responses_discover_empty": "Nenhum comando de barra encontrado.",
+    "responses_discover_more": "...e {count} mais. Execute `/theme responses keys` para chaves comuns.",
+    "responses_discover_title": "Comandos de barra (substituíveis)",
+    "responses_file_must_be_json": "O arquivo deve ser um arquivo .json.",
+    "responses_file_too_large": "O arquivo excede o limite de 100 KB ({bytes} bytes).",
+    "responses_keys_title": "Chaves de resposta de comando",
+    "responses_list_empty": "Nenhuma substituição de resposta de comando. Utilize /theme responses upload to add custom responses.",
+    "responses_list_footer": "Apoiadores podem fazer upload de JSON via /theme responses upload",
+    "responses_list_title": "Substituições de resposta de comando",
+    "responses_presets_empty": "Nenhum tema de resposta predefinido encontrado.",
+    "responses_presets_title": "Temas de resposta predefinidos",
+    "responses_upload_success": "✅ Substituições de resposta de comando {count} carregadas. Consulte a documentação para obter as chaves disponíveis.",
+    "set_applied_parts": "Aplicado: {parts}.",
+    "set_success": "Tema definido como **{theme}**.",
+    "supporter_required_clear_overrides": "A limpeza de substituições requer o status de apoiador Ko-fi.",
+    "supporter_required_custom_themes": "Temas personalizados exigem status de apoiador Ko-fi. Utilize /kofi link to get perks.",
+    "supporter_required_response_overrides": "As substituições de resposta de comando requerem status de apoiador Ko-fi. Utilize /kofi link to get perks.",
+    "theme_file_must_be_json": "O arquivo do tema deve ser um arquivo .json.",
+    "theme_file_too_large": "O arquivo do tema excede o limite de 50 KB ({bytes} bytes).",
+    "theme_not_found": "Tema `{theme}` não encontrado.",
+    "theme_not_found_list_hint": "Tema `{theme}` não encontrado. Utilize /theme list to see available themes.",
+    "type_custom": "Personalizado",
+    "type_preset": "Predefinido"
+  },
+  "tickets": {
+    "add_user_success": "✅ Adicionado {user}",
+    "claim_label": "Alegar",
+    "claimed_by": "🎟️ Reivindicado por {user}",
+    "close_label": "Fechar",
+    "closing_soon": "🗑️ Fechando/Deleting in 5 seconds...",
+    "create_button_label": "Criar {ticket_type}",
+    "create_failed": "❌ Falha ao criar ticket: {error}",
+    "create_missing_permissions": "❌ Não tenho permissão para criar canais.",
+    "create_success": "✅ Bilhete criado: {channel}",
+    "default_panel_message": "Clique abaixo para criar um ticket.",
+    "lock_label": "Trancar",
+    "locked": "🔒 Bilhete bloqueado",
+    "not_setup": "❌ Sistema de tickets não configurado para este servidor.",
+    "panel_title": "🎫 Bilhetes de suporte",
+    "remove_user_success": "🚫 Removido {user}",
+    "select_option_description": "Crie um tíquete {ticket_type}",
+    "select_placeholder": "Selecione o tipo de ingresso",
+    "setup_no_valid_roles": "❌ Nenhuma função de suporte válida encontrada. Use menções de função como `@Role` ou IDs de função brutos.",
+    "setup_roles_not_found": "❌ Nenhuma das funções fornecidas foi encontrada neste servidor.",
+    "setup_success": "✅ Sistema de tickets configurado!",
+    "ticket_channel_title": "{ticket_type} Ingresso",
+    "unlock_label": "Desbloquear",
+    "unlocked": "🔓 Bilhete desbloqueado"
+  },
+  "translate": {
+    "embed": {
+      "auto_detected": "Detectado automaticamente ({language})",
+      "detected_footer": "Detectado {source_language} → {target_language}",
+      "live_translation_title": "Tradução ao vivo",
+      "result": "Resultado",
+      "translate_from": "Traduzir de",
+      "translate_to": "Traduzir para",
+      "translation_title": "Tradução"
+    },
+    "messages": {
+      "backend_unavailable": "O backend de tradução está indisponível. Configure as credenciais do Google e reinicie.",
+      "code_block_skipped": "Blocos de código são ignorados por segurança. Remova as crases triplas para traduzir.",
+      "failed": "A tradução falhou. Tente novamente mais tarde.",
+      "free_limit_hit": "Você atingiu o limite gratuito de tradução ({free_limit}/dia). Tente novamente {reset_ts} ou torne-se supporter para traduções ilimitadas.",
+      "limit_notice_dm": "Você atingiu o limite gratuito de tradução ({free_limit}/dia). As traduções voltam <t:{reset_at}:R>.",
+      "provide_text": "Forneça um texto ou execute este comando no contexto de uma mensagem em que o Discord resolva a mensagem respondida.",
+      "reset_usage": "Uso de tradução redefinido para {user}.",
+      "too_long": "Mensagem muito longa. O tamanho máximo é {max_length} caracteres."
+    },
+    "settings": {
+      "live_translation": "Tradução ao vivo",
+      "my_language": "Meu idioma",
+      "off": "Desligado",
+      "on": "Ligado",
+      "private": "Privado",
+      "public": "Público",
+      "response_privacy": "Privacidade da resposta",
+      "send_to_dm": "Enviar por DM",
+      "title": "Configurações de tradução"
+    },
+    "usage": {
+      "free_plan": "Plano gratuito: `{count}/{free_limit}` traduções usadas hoje. Reinicia <t:{reset_at}:R>.",
+      "supporter_unlimited": "Supporter: traduções ilimitadas."
+    }
+  },
+  "welcome_leave": {
+    "exit_survey_custom_prompt": "Digite seu motivo personalizado em uma mensagem.",
+    "exit_survey_field_server_left": "Servidor restante",
+    "exit_survey_field_user": "Usuário",
+    "exit_survey_footer": "Pesquisa de saída Coffeecord",
+    "exit_survey_prompt": "Por que você saiu **{guild_name}**?\nResponda com uma resposta curta ou escolha uma destas:\n1) Muitos pings\n2) Não é ativo o suficiente\n3) Não é minha comunidade\n4) Preocupações com moderação\n5) Outro\n6) Motivo personalizado (escreva o seu próprio)\n\nResponda com um número ou seu próprio texto. Esta solicitação expira em 5 minutos.",
+    "exit_survey_response_title": "Sair da resposta da pesquisa",
+    "leave_config_updated": "✅ Deixe a configuração atualizada.\nCanal: {channel}\nAtivado: `{enabled}`\nIncorporar: `{embed}`\nPesquisa de saída: `{exit_survey}`\nCanal de registro de pesquisa: {log_channel}",
+    "leave_test_failed": "⚠️ Não foi possível enviar mensagem de teste (`{reason}`). Verifique as permissões do canal e do bot.",
+    "leave_test_success": "✅Enviou uma mensagem de teste de licença.",
+    "leave_title": "Adeus!",
+    "member_resolve_failed": "Não foi possível resolver o membro.",
+    "welcome_config_updated": "✅ Configuração de boas-vindas atualizada.\nCanal: {channel}\nAtivado: `{enabled}`\nIncorporar: `{embed}`\nEntrega: `{delivery}`\nPegajoso: `{sticky}`",
+    "welcome_test_failed": "⚠️ Não foi possível enviar teste de boas-vindas: {results}",
+    "welcome_test_success": "✅ Enviado teste de boas-vindas ({results}).",
+    "welcome_title": "Bem-vindo!"
+  },
+  "backup": {
+    "owner_only": "Somente quem executou o comando pode usar isto.",
+    "invalid_slot_id": "Nome de slot inválido. Use 1–32 caracteres: letras, dígitos, `_`, `-`.",
+    "bot_missing_perms": "Preciso de **Gerenciar Canais** e **Gerenciar Cargos** para criar backups úteis.",
+    "slot_limit_supporter_hint": "\nApoiadores Ko-fi têm até {max} slots no host (`/kofi link`).",
+    "slot_limit_reached": "Slots de backup no host cheios ({used}/{limit}). Apague um ou use `overwrite:True`.{hint}",
+    "slot_exists": "O slot `{slot}` já existe. Execute de novo com `overwrite:True` para substituir.",
+    "slot_limit_overwrite_existing": "Slots cheios. Sobrescreva um nome existente ou apague um primeiro.",
+    "create_failed": "Falha ao criar o backup.",
+    "slot_limit_race": "Slots encheram durante a criação. O download abaixo ainda foi gerado.",
+    "create_phrase": "✅ Backup `{slot}` pronto.\n\n**Salve esta frase de descriptografia agora — ela aparece uma vez e nunca é armazenada:**\n`{phrase}`\n\nUse com `/backup restore` junto do arquivo `.ccbak`.",
+    "create_file": "Arquivo de backup criptografado de `{guild}` (slot `{slot}`). Guarde com sua frase.",
+    "list_empty": "Ainda não há backups no host. Crie com `/backup create`. Limite: {limit}.",
+    "list_header": "**Backups no host** ({used}/{limit}):\n{lines}",
+    "slot_not_found": "Nenhum backup no host chamado `{slot}`.",
+    "download_ready": "Backup criptografado `{slot}` (você ainda precisa da frase de 18 caracteres para restaurar).",
+    "delete_success": "Backup do host `{slot}` excluído.",
+    "phrase_bad_length": "A frase deve ter exatamente {n} caracteres.",
+    "restore_need_source": "Envie um arquivo `.ccbak` e/ou um nome de `slot` do host.",
+    "invalid_target_guild": "ID de servidor de destino inválido.",
+    "target_guild_missing": "Não estou nesse servidor (ou não consigo vê-lo).",
+    "target_guild_no_perms": "Você precisa de **Gerenciar Servidor** no servidor de destino.",
+    "bot_missing_restore_perms": "Preciso de **Gerenciar Servidor**, **Gerenciar Canais** e **Gerenciar Cargos** no destino.",
+    "restore_working": "Descriptografando backup…",
+    "bad_extension": "Envie um arquivo `.ccbak`.",
+    "restore_read_failed": "Não foi possível ler a origem do backup.",
+    "decrypt_failed": "Não foi possível descriptografar. Verifique a frase e o arquivo.",
+    "payload_invalid": "Payload do backup inválido.",
+    "restore_storage": "Restaurando o Storage do Coffeecord…",
+    "restore_failed": "A restauração falhou no meio. Verifique minha hierarquia de cargos e permissões.",
+    "restore_done_title": "Restauração concluída",
+    "restore_done_body": "Restaurado em **{guild}** ({mode}).",
+    "field_created": "Criado",
+    "field_members": "Membros",
+    "field_rejoin": "Notas de reentrada",
+    "field_skipped": "Ignorado / avisos",
+    "field_storage_notes": "Notas de Storage",
+    "restore_confirm_repair": "Restauração **Reparar** em **{guild}** (`{gid}`)?\nCargos/canais ausentes são criados; os correspondentes são atualizados. Nada é apagado em massa. As mensagens armazenadas são reenviadas para os canais de texto remapeados.",
+    "restore_confirm_overwrite": "⚠️ Restauração **SOBRESCREVER** em **{guild}** (`{gid}`)?\nIsso **apaga** canais/cargos/emojis que o bot puder gerenciar e depois reconstrói a partir do backup. Coloque meu cargo perto do topo (Administrador recomendado). As mensagens armazenadas são reenviadas após a reconstrução. Isso não pode ser desfeito.",
+    "mode_repair": "Reparar",
+    "mode_overwrite": "Sobrescrever",
+    "create_progress_title": "Criando backup…",
+    "create_progress_done_title": "Backup pronto",
+    "restore_progress_title": "Restaurando backup…",
+    "step_build": "Instantâneo do Discord + Storage do Coffeecord",
+    "step_build_detail": "Lendo cargos, canais, membros e Storage…",
+    "step_build_detail_msgs": "Lendo estrutura e até {n} mensagens por canal…",
+    "step_encrypt": "Comprimir e criptografar arquivo",
+    "step_encrypt_detail": "Compressão LZMA + criptografia…",
+    "step_save_slot": "Salvar slot no host",
+    "step_save_detail": "Gravando slot no host…",
+    "step_decrypt": "Descriptografar backup",
+    "step_decrypt_detail": "Lendo e descriptografando `.ccbak`…",
+    "step_wipe": "Apagar estrutura existente",
+    "step_wipe_detail": "Excluindo canais, categorias, cargos…",
+    "step_structure": "Restaurar cargos e canais",
+    "step_structure_detail": "Criando cargos e canais…",
+    "step_replay_messages": "Reproduzir mensagens dos canais",
+    "step_replay_detail": "Reproduzindo mensagens armazenadas…",
+    "step_replay_done": "Reproduzidas {n} mensagens.",
+    "step_restore_storage": "Restaurar Storage do Coffeecord",
+    "step_panels": "Republicar painéis interativos",
+    "step_panels_detail": "Republicando tickets, verificação e painéis de reação…"
+  }
+}

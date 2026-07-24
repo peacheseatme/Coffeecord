@@ -2045,9 +2045,7 @@ logging_config = sanitize_logging_config(load_logging_config())
 def should_log(guild_id: str, event: str):
     cfg = logging_config.get("guilds", {}).get(guild_id, {})
     log_events = cfg.get("log_events", {})
-    is_enabled = cfg.get("enabled") and log_events.get(event, {}).get("enabled", False)
-    print(f"[DEBUG] should_log → guild_id={guild_id}, event={event}, result={is_enabled}")
-    return is_enabled
+    return bool(cfg.get("enabled") and log_events.get(event, {}).get("enabled", False))
 
 # --- Extract Options for Slash Commands ---
 def extract_options(data):
@@ -2101,17 +2099,15 @@ async def log_action(interaction: discord.Interaction, message: str) -> None:
         or cfg.get("log_channel_id")
     )
     if not channel_id:
-        print(f"[DEBUG] No channel_id set for event '{event}' in guild {guild_id}")
         return
     channel = interaction.guild.get_channel(channel_id)
     if channel:
         try:
             await channel.send(message)
-            print(f"[DEBUG] Sent log message to channel {channel_id}")
         except Exception as e:
             print(_redact_discord_token_in_text(f"[ERROR] Failed to send log message: {e}"))
     else:
-        print(f"[DEBUG] Channel ID {channel_id} not found in guild {guild_id}")
+        print(f"[WARN] Log channel ID {channel_id} not found in guild {guild_id}")
 
 # ----- UI Components -----
 

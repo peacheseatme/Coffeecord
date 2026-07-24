@@ -21,6 +21,13 @@ __pycache__/
 
 # Storage (runtime data; install script generates placeholders)
 Storage/
+Storage.bak.*/
+
+# Local / legacy runtime leftovers
+data/
+journal
+journal.log
+journal.pub
 
 # Local tarball from scripts/backup_instance_data.sh (restore after clone)
 instance_data_backup.tgz
@@ -38,6 +45,6 @@ temp_*.jpg
 
 # Old root-level data files (migrated to Storage/)
 *.json
+!Modules/i18n/strings/*.json
 
-instance_data_backup.tgz
-
+.pytest_cache/

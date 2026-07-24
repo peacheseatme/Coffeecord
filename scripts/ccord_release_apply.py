@@ -26,7 +26,7 @@ from pathlib import Path
 USER_AGENT = "coffeecord-c-cord-update"
 ACCEPT_ARCHIVE = "application/vnd.github+json"
 
-# Top-level names never replaced by a release overlay (user / runtime data).
+# Top-level names never replaced by a release overlay.
 PRESERVE_TOP_LEVEL = frozenset(
     {
         ".git",
@@ -44,41 +44,16 @@ PRESERVE_TOP_LEVEL = frozenset(
     }
 )
 
-# Relative path prefixes (posix) skipped anywhere under the install root.
-PRESERVE_PREFIXES = (
-    "Storage/",
-    ".venv/",
-    "venv/",
-    "data/",
-    "Src/.env",
-    "Src/ticket.env",
-)
-
-# Exact relative paths (posix) always preserved when present on disk.
-PRESERVE_EXACT = frozenset(
-    {
-        "Src/.env",
-        "Src/ticket.env",
-    }
-)
-
 
 def _is_preserved(rel_posix: str) -> bool:
     name = rel_posix.strip("/")
     if not name:
         return True
     top = name.split("/", 1)[0]
-    if top in PRESERVE_TOP_LEVEL:
+    if top in PRESERVE_TOP_LEVEL or top.startswith("Storage.bak."):
         return True
-    if top.startswith("Storage.bak."):
-        return True
-    if name in PRESERVE_EXACT:
-        return True
-    for prefix in PRESERVE_PREFIXES:
-        if name == prefix.rstrip("/") or name.startswith(prefix):
-            return True
     base = Path(name).name
-    # Secrets / local env overrides (gitignore uses *.env)
+    # Secrets / local env overrides (gitignore treats *.env as secret)
     if base.endswith(".env") or base.startswith(".env"):
         return True
     return False
@@ -92,7 +67,6 @@ def _download(url: str, dest: Path) -> None:
     }
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    # browser_download_url assets need octet-stream; zipball accepts github+json redirect.
     if "objects.githubusercontent.com" in url or "/releases/download/" in url:
         headers["Accept"] = "application/octet-stream"
 
@@ -111,36 +85,37 @@ def _extract(archive: Path, dest_dir: Path) -> Path:
     """Extract archive into dest_dir; return the single top-level source directory."""
     dest_dir.mkdir(parents=True, exist_ok=True)
     name = archive.name.lower()
-    if name.endswith(".zip"):
+
+    def _unzip() -> None:
         with zipfile.ZipFile(archive, "r") as zf:
             zf.extractall(dest_dir)
-    elif name.endswith((".tar.gz", ".tgz")) or name.endswith(".tar"):
-        with tarfile.open(archive, "r:*") as tf:
+
+    def _untar(mode: str = "r:*") -> None:
+        with tarfile.open(archive, mode) as tf:
             tf.extractall(dest_dir, filter=tarfile.data_filter)
+
+    if name.endswith(".zip"):
+        _unzip()
+    elif name.endswith((".tar.gz", ".tgz", ".tar")):
+        _untar()
     else:
         # GitHub zipball responses often lack a useful suffix; sniff magic.
         raw = archive.read_bytes()[:4]
         if raw[:2] == b"PK":
-            with zipfile.ZipFile(archive, "r") as zf:
-                zf.extractall(dest_dir)
+            _unzip()
         elif raw[:2] == b"\x1f\x8b":
-            with tarfile.open(archive, "r:gz") as tf:
-                tf.extractall(dest_dir, filter=tarfile.data_filter)
+            _untar("r:gz")
         else:
             raise RuntimeError(f"Unrecognized archive format: {archive.name}")
 
-    children = [p for p in dest_dir.iterdir() if p.name not in {".", ".."}]
+    children = [p for p in dest_dir.iterdir()]
     if len(children) == 1 and children[0].is_dir():
         return children[0]
-    # Flat archive: treat dest_dir itself as the source root
     return dest_dir
 
 
 def _overlay(src_root: Path, install_root: Path) -> tuple[int, int]:
-    """Copy files from src_root onto install_root, skipping preserved paths.
-
-    Returns (copied_files, skipped_files).
-    """
+    """Copy files from src_root onto install_root, skipping preserved paths."""
     copied = 0
     skipped = 0
     for dirpath, dirnames, filenames in os.walk(src_root):
@@ -148,7 +123,6 @@ def _overlay(src_root: Path, install_root: Path) -> tuple[int, int]:
         if rel_dir == ".":
             rel_dir = ""
 
-        # Prune preserved directories so we do not walk into them
         keep_dirs: list[str] = []
         for d in dirnames:
             child_rel = f"{rel_dir}/{d}" if rel_dir else d
@@ -211,10 +185,8 @@ def apply_archive(install_root: Path, urls: list[str], *, tag: str = "") -> int:
             print(f"Release archive apply failed: {last_error}", file=sys.stderr)
             return 1
 
-        extract_dir = work / "extract"
-        print("Extracting archive...", file=sys.stderr)
-        src_root = _extract(archive_path, extract_dir)
-        print(f"Overlaying onto {install_root} (preserving Storage/, .venv/, secrets)...", file=sys.stderr)
+        print("Extracting and overlaying (preserving Storage/, .venv/, secrets)...", file=sys.stderr)
+        src_root = _extract(archive_path, work / "extract")
         copied, skipped = _overlay(src_root, install_root)
         print(f"Overlay complete: {copied} files updated, {skipped} preserved/skipped.", file=sys.stderr)
         return 0
@@ -233,7 +205,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--json-line",
         default="",
-        help="JSON object from ccord_release_resolve.py --json (uses preferred_archive_url)",
+        help="JSON object from ccord_release_resolve.py --json",
     )
     args = parser.parse_args(argv)
 
