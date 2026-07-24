@@ -33,7 +33,6 @@ PRESERVE_TOP_LEVEL = frozenset(
         ".venv",
         "venv",
         "Storage",
-        "data",
         "instance_data_backup.tgz",
         ".cursor",
         ".vscode",

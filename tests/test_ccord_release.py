@@ -103,22 +103,22 @@ def test_apply_preserves_local_paths(tmp_path: Path) -> None:
         (base / "Modules").mkdir(parents=True)
         (base / "Src").mkdir(parents=True)
         (base / "Storage" / "Config").mkdir(parents=True)
+        (base / "Storage" / "Data").mkdir(parents=True)
         (base / ".venv" / "bin").mkdir(parents=True)
-        (base / "data").mkdir(parents=True)
 
     (install / "Src" / ".env").write_text("SECRET=keep\n", encoding="utf-8")
     (install / "Src" / "ticket.env").write_text("TICKET=keep\n", encoding="utf-8")
     (install / "Storage" / "Config" / "c-cord.json").write_text('{"x":1}\n', encoding="utf-8")
+    (install / "Storage" / "Data" / "banned_users.json").write_text('{"banned_users":[]}\n', encoding="utf-8")
     (install / ".venv" / "bin" / "python").write_text("old\n", encoding="utf-8")
-    (install / "data" / "banned_users.json").write_text("{}\n", encoding="utf-8")
     (install / "Modules" / "old.py").write_text("old\n", encoding="utf-8")
 
     (src / "Src" / ".env").write_text("SECRET=overwrite\n", encoding="utf-8")
     (src / "Src" / "ticket.env").write_text("TICKET=overwrite\n", encoding="utf-8")
     (src / "Src" / "Bot.py").write_text("new bot\n", encoding="utf-8")
     (src / "Storage" / "Config" / "c-cord.json").write_text('{"x":99}\n', encoding="utf-8")
+    (src / "Storage" / "Data" / "banned_users.json").write_text('{"banned_users":[1]}\n', encoding="utf-8")
     (src / ".venv" / "bin" / "python").write_text("new\n", encoding="utf-8")
-    (src / "data" / "banned_users.json").write_text('{"bad":1}\n', encoding="utf-8")
     (src / "Modules" / "old.py").write_text("new module\n", encoding="utf-8")
     (src / "Modules" / "new.py").write_text("added\n", encoding="utf-8")
 
@@ -128,8 +128,8 @@ def test_apply_preserves_local_paths(tmp_path: Path) -> None:
     assert (install / "Src" / ".env").read_text(encoding="utf-8") == "SECRET=keep\n"
     assert (install / "Src" / "ticket.env").read_text(encoding="utf-8") == "TICKET=keep\n"
     assert (install / "Storage" / "Config" / "c-cord.json").read_text(encoding="utf-8") == '{"x":1}\n'
+    assert (install / "Storage" / "Data" / "banned_users.json").read_text(encoding="utf-8") == '{"banned_users":[]}\n'
     assert (install / ".venv" / "bin" / "python").read_text(encoding="utf-8") == "old\n"
-    assert (install / "data" / "banned_users.json").read_text(encoding="utf-8") == "{}\n"
     assert (install / "Modules" / "old.py").read_text(encoding="utf-8") == "new module\n"
     assert (install / "Modules" / "new.py").read_text(encoding="utf-8") == "added\n"
     assert (install / "Src" / "Bot.py").read_text(encoding="utf-8") == "new bot\n"
@@ -137,10 +137,11 @@ def test_apply_preserves_local_paths(tmp_path: Path) -> None:
 
 def test_is_preserved_helpers() -> None:
     assert apply._is_preserved("Storage/Config/c-cord.json")
+    assert apply._is_preserved("Storage/Data/banned_users.json")
     assert apply._is_preserved(".venv/lib/x")
     assert apply._is_preserved("Src/.env")
     assert apply._is_preserved("Src/ticket.env")
-    assert apply._is_preserved("data/banned_users.json")
     assert not apply._is_preserved("Modules/automod.py")
     assert not apply._is_preserved("Src/Bot.py")
     assert not apply._is_preserved("bot.sh")
+    assert not apply._is_preserved("data/banned_users.json")

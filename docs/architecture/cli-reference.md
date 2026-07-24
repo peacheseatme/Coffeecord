@@ -48,7 +48,7 @@ Paths are relative to the project root unless absolute. The config is loaded aut
 
 Default update uses the [GitHub Releases API](https://docs.github.com/en/rest/releases/releases) on the repo inferred from `git remote get-url origin` (HTTPS or `git@github.com:...`), unless `github_repo` is set in `c-cord.json`. Publishing a Release on a tag (e.g. `1.0.4` / `v1.0.4`) is enough — custom release assets are optional.
 
-**Fallback order:** resolve the release tag → if this is a git clone with a clean tree, `git fetch` + `git checkout` that tag → otherwise (or if git fails) download GitHub’s auto **zipball** for the tag and overlay it onto the install root. Overlay never replaces `Storage/`, `.venv/`, `Src/.env`, `Src/ticket.env`, or the local `data/` tree. Draft/prerelease tags are not treated as “latest” (`/releases/latest` already excludes them).
+**Fallback order:** resolve the release tag → if this is a git clone with a clean tree, `git fetch` + `git checkout` that tag → otherwise (or if git fails) download GitHub’s auto **zipball** for the tag and overlay it onto the install root. Overlay never replaces `Storage/`, `.venv/`, `Src/.env`, or `Src/ticket.env`. Draft/prerelease tags are not treated as “latest” (`/releases/latest` already excludes them).
 
 Works without a `.git` directory when `github_repo` (or `GITHUB_REPO`) identifies `owner/repo`. For git checkouts, the working tree must be clean unless you pass `-f`. After a successful git release checkout the repo is in a **detached HEAD** at the tag — expected for production. To follow `main` again, use `c-cord update --branch` or `git checkout main && git pull`.
 
