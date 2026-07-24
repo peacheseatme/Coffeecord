@@ -1,14 +1,1 @@
-{
-    "123456789012345678": {
-        "per_message": 15,
-        "per_minute_vc": 10,
-        "per_reaction": 5,
-        "per_vote": 20
-    },
-    "987654321098765432": {
-        "per_message": 10,
-        "per_minute_vc": 6,
-        "per_reaction": 3,
-        "per_vote": 15
-    }
-}
+{}

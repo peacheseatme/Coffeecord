@@ -50,5 +50,3 @@ c-cord update --branch     # git pull main (development)
 ## License
 
 See repository for license details.
-
-Cursor and ChatGPt helped me bc I'm still learning to code :)

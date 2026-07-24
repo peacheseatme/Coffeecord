@@ -1,11 +1,1 @@
-{
-  "guild_id": {
-    "channel_id": {
-      "enabled": true,
-      "rules": [
-        { "mpm": 30, "delay": 5 },
-        { "mpm": 60, "delay": 10 }
-      ]
-    }
-  }
-}
+{}

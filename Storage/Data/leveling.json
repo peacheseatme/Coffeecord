@@ -1,14 +1,1 @@
-{
-    "USER_ID_1": {
-        "xp": 250,
-        "level": 3,
-        "next_level_xp": 400,
-        "background": "USER_ID_1.raw.gif"
-    },
-    "USER_ID_2": {
-        "xp": 120,
-        "level": 2,
-        "next_level_xp": 200,
-        "background": "USER_ID_2.raw.mp4"
-    }
-}
+{}

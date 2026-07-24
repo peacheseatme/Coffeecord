@@ -1,13 +1,1 @@
-{
-    "1212210181044183171": {
-        "channel_id": 1217441097794584658,
-        "notify_role": 1212455526143758406,
-        "approval_role": 1212455526143758406,
-        "pass_role": 1379687525576212572,
-        "questions": [
-            "Are you good at Fortnite?",
-            "Can you Fart?"
-        ],
-        "enabled": true
-    }
-}
+{}
