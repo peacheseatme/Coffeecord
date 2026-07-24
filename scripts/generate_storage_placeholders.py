@@ -128,6 +128,8 @@ DATA_PLACEHOLDERS: dict[str, object] = {
     "member_activity.json": {},
     "inactivity_strikes.json": {},
     "leveling.json": {},
+    "banned_users.json": {"banned_users": []},
+    "banned_guilds.json": {"banned_guilds": []},
 }
 
 

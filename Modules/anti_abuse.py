@@ -40,9 +40,10 @@ BLACKLIST_REJECT_MESSAGE = "Error 1234"
 _MENTION_RE = re.compile(r"^<@!?(\d+)>$")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = ROOT_DIR / "data"
+DATA_DIR = ROOT_DIR / "Storage" / "Data"
 BANNED_USERS_FILE = DATA_DIR / "banned_users.json"
 BANNED_GUILDS_FILE = DATA_DIR / "banned_guilds.json"
+_LEGACY_DATA_DIR = ROOT_DIR / "data"
 
 
 # -----------------------------
@@ -90,6 +91,27 @@ def _save_id_set(path: Path, key: str, values: set[int]) -> None:
     with path.open("w", encoding="utf-8") as fp:
         json.dump(payload, fp, indent=2, ensure_ascii=True)
 
+
+def _migrate_legacy_ban_file(filename: str, key: str) -> None:
+    """Move root data/<file> into Storage/Data/ once (legacy layout)."""
+    legacy = _LEGACY_DATA_DIR / filename
+    dest = DATA_DIR / filename
+    if dest.exists() or not legacy.is_file():
+        return
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        legacy.replace(dest)
+    except OSError:
+        try:
+            ids = _load_id_set(legacy, key)
+            _save_id_set(dest, key, ids)
+            legacy.unlink(missing_ok=True)
+        except OSError:
+            return
+
+
+_migrate_legacy_ban_file("banned_users.json", "banned_users")
+_migrate_legacy_ban_file("banned_guilds.json", "banned_guilds")
 
 banned_users: set[int] = _load_id_set(BANNED_USERS_FILE, "banned_users")
 banned_guilds: set[int] = _load_id_set(BANNED_GUILDS_FILE, "banned_guilds")
