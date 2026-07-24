@@ -21,6 +21,8 @@ The bot is controlled via `bot.sh` or the `c-cord` symlink.
 | `update <version>` | Same, pinned to that release tag (e.g. `1.0.3` or `v1.0.3`) |
 | `update --branch` | `git pull` on current branch (for development on `main`) → pip → restart |
 | `update -f` | Continue even if resolve/git/archive/pull fails |
+| `publish-release <ver>` | Maintainer: push branch + create tag `v<ver>` (for `c-cord update`) |
+| `publish-release <ver> -f` | Same, but move/overwrite an existing tag and force-push it |
 | `module refresh` | Scan Modules/, add new files to registry |
 | `module refresh_registry` | Alias for module refresh |
 | `module refresh --dry-run` | Preview additions without writing |
@@ -57,6 +59,17 @@ Optional uploaded asset: if you attach a file named exactly `coffeecord-release.
 Unauthenticated API calls are rate-limited (about 60/hour per IP). For private repositories or heavier use, set environment variable `GITHUB_TOKEN` (fine-grained or classic PAT with `Contents: Read`) when running `c-cord update`.
 
 If the latest release cannot be resolved (e.g. no published releases) on a git clone, the helper falls back to the newest **local** semver-looking tag after you run `git fetch --tags`; that may include tags that were never published as GitHub “releases.”
+
+### `c-cord publish-release` (maintainers)
+
+From a clean git clone on `main`:
+
+```bash
+c-cord publish-release 1.0.5          # push main + create tag v1.0.5
+c-cord publish-release 1.0.4 -f       # move tag v1.0.4 to HEAD and force-push
+```
+
+Also available as `./scripts/ccord_publish_release.sh`. If `gh` is logged in, it creates/updates the GitHub Release so zipball updates work; otherwise publish the Release in the GitHub UI after the tag push.
 
 ## ngrok (Ko-fi webhooks)
 
